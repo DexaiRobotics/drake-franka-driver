@@ -14,28 +14,35 @@ list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR})
 list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake)
 list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake/drake)
 
+list(APPEND CMAKE_PREFIX_PATH $ENV{FRANKA_BUILD_DIR})
+
 find_package(drake REQUIRED)
+find_package(Franka REQUIRED)
 find_package(lcm REQUIRED)
-find_package(GFlags MODULE REQUIRED COMPONENTS shared)
+find_package(gflags MODULE REQUIRED COMPONENTS shared)
+find_package(spdlog CONFIG REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
 
 
 # add include dir for FRIClient headers
-include_directories(${fri_client_build}/include)
+include_directories(
+	include
+	${Franka_INCLUDE_DIRS}
+	)
 
 
-# build the lcm driver that uses FRIClient
+# build the lcm driver that uses Franka Robot Interface (FRI)
 add_definitions(-std=c++11)
 set(driver_name drake_franka_driver)
-add_executable(${driver_name} kuka_driver.cc)
+add_executable(${driver_name} src/drake_franka_driver.cc)
 target_link_libraries(${driver_name}
-                      ${fri_client_library}
+                      ${Franka_LIBRARIES}
                       ${LCM_NAMESPACE}lcm 
-                      gflags_shared
+                      gflags
                       drake::drake-lcmtypes-cpp 
-                      ${catkin_LIBRARIES})
+                      )
 
 # install the lcm driver
 install(TARGETS ${driver_name}
