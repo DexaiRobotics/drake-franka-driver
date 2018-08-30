@@ -1,20 +1,60 @@
-// Copyright (c) 2017 Franka Emika GmbH
-// Use of this source code is governed by the Apache-2.0 license, see LICENSE
+// Copyright (c) 2018 Dexai Robotics, Inc.
+// Author: @dmsj David M.S. Johnson
+// Use of this source code is governed by the BSD 3-clause license, see LICENSE
 #include <array>
 #include <atomic>
+
+#include <cassert>
 #include <cmath>
+#include <cstring>
+
 #include <functional>
 #include <iostream>
 #include <iterator>
+
+#include <limits>
 #include <mutex>
+#include <poll.h>
+
+#include <stdexcept>
 #include <thread>
+#include <vector>
+
+#include <gflags/gflags.h>
+#include <lcm/lcm-cpp.hpp>
+
 #include <franka/duration.h>
 #include <franka/exception.h>
 #include <franka/model.h>
 #include <franka/rate_limiting.h>
 #include <franka/robot.h>
+
 #include "examples_common.h"
+#include "drake_lcmtypes/drake/lcmt_iiwa_command.hpp"
+#include "drake_lcmtypes/drake/lcmt_iiwa_status.hpp"
+
+using drake::lcmt_iiwa_command;
+using drake::lcmt_iiwa_status;
+
+
 namespace {
+
+double ToRadians(double degrees) {
+  return degrees * M_PI / 180.;
+}
+
+void PrintVector(const std::vector<double>& array, int start, int length,
+                 std::ostream& out) {
+  const int end = std::min(start + length, static_cast<int>(array.size()));
+  for (int i = start; i < end; i++) {
+    out << array.at(i);
+    if (i != end - 1)
+      out << ", ";
+    else
+      out << "\n";
+  }
+}
+
 template <class T, size_t N>
 std::ostream& operator<<(std::ostream& ostream, const std::array<T, N>& array) {
   ostream << "[";
@@ -24,6 +64,24 @@ std::ostream& operator<<(std::ostream& ostream, const std::array<T, N>& array) {
   return ostream;
 }
 }  // anonymous namespace
+
+DEFINE_double(ext_trq_limit, kJointTorqueSafetyMarginNm,
+              "Maximal external torque that triggers safety freeze");
+DEFINE_string(joint_ext_trq_limit, "", "Specify the maximum external torque "
+              "that triggers safety freeze on a per-joint basis.  "
+              "This is a comma separated list of numbers e.g. "
+              "100,100,53.7,30,30,28.5,10.  Overrides ext_trq_limit.");
+DEFINE_int32(fri_port, kDefaultPort, "First UDP port for FRI messages");
+DEFINE_int32(num_robots, 1, "Number of robots to control");
+DEFINE_string(lcm_command_channel, kLcmCommandChannel,
+              "Channel to receive LCM command messages on");
+DEFINE_string(lcm_status_channel, kLcmStatusChannel,
+              "Channel to send LCM status messages on");
+DEFINE_bool(restart_fri, false,
+            "Restart robot motion after the FRI signal has degraded and "
+            "been restored.");
+
+
 int main(int argc, char** argv) {
   // Check whether the required arguments were passed.
   if (argc != 2) {
