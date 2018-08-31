@@ -19,11 +19,14 @@ list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake/drake)
 
 list(APPEND CMAKE_PREFIX_PATH $ENV{FRANKA_BUILD_DIR})
 
-IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-	find_package(Eigen3 3.3.5 CONFIG REQUIRED)
-	message(STATUS "Eigen3 include: ${EIGEN3_INCLUDE_DIR}")
-	message(STATUS "Eigen3 found: ${Eigen3_FOUND}")
-ENDIF()
+# IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+list(APPEND CMAKE_PREFIX_PATH "/usr/local/share/eigen3/cmake")
+	find_package(Eigen3 3.3.90 CONFIG REQUIRED)
+	message(STATUS "Eigen3 use file: ${EIGEN3_USE_FILE}")
+	message(STATUS "Eigen3 include dirs: ${EIGEN3_INCLUDE_DIRS}")
+	message(STATUS "Eigen3 include dir: ${EIGEN3_INCLUDE_DIR}")
+	message(STATUS "Eigen3 found: ${EIGEN3_FOUND}")
+# ENDIF()
 
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
@@ -39,21 +42,22 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 include_directories(
 	include
 	${Franka_INCLUDE_DIRS}
-	${EIGEN3_INCLUDE_DIR}
+	${EIGEN3_INCLUDE_DIRS}
 	)
 
 
 # build the lcm driver that uses Franka Robot Interface (FRI)
 add_definitions(-std=c++14)
-set(driver_name drake_franka_driver)
+set(driver_name franka_plan_runner)
 add_executable(${driver_name} 
-	src/drake_franka_driver.cc
+	src/franka_plan_runner.cc
 	src/examples_common.cpp
 	)
 target_link_libraries(${driver_name}
                       ${Franka_LIBRARIES}
                       ${LCM_NAMESPACE}lcm 
                       gflags
+					  drake::drake
                       drake::drake-lcmtypes-cpp 
                       )
 

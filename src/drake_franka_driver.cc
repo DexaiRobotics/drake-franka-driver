@@ -1,6 +1,24 @@
-// Copyright (c) 2018 Dexai Robotics, Inc.
-// Author: @dmsj David M.S. Johnson
-// Use of this source code is governed by the BSD 3-clause license, see LICENSE
+/** @file drake_franka_driver.cc
+ * franka_plan_runner is designed to wait for LCM messages contraining a robot_spline_t message, and then execute the plan on the Franka PANDA arm
+ * franka_plan_runner also communicating via LCM using the lcmt_iiwa_command/lcmt_iiwa_status messages.
+/
+/ When a plan is received, it will immediately begin executing that
+/ plan on the arm (replacing any plan in progress).
+/
+/ If a stop message is received, it will immediately discard the
+/ current plan and wait until a new plan is received.
+
+Copyright (c) 2018 Dexai Robotics, Inc.
+Author: @dmsj David M.S. Johnson
+Use of this source code is governed by the BSD 3-clause license, see LICENSE
+
+*/
+
+/**
+ * 
+ * 
+ */
+
 #include <array>
 #include <atomic>
 
