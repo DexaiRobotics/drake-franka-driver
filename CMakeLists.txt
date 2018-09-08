@@ -38,7 +38,18 @@ find_package(Franka REQUIRED)
 find_package(lcm REQUIRED)
 find_package(gflags MODULE REQUIRED COMPONENTS shared)
 find_package(GTest REQUIRED)
-# find_package(spdlog CONFIG REQUIRED)
+
+set(Python2_ROOT_DIR $ENV{LOCAL_PYTHON_PATH})
+find_package( Python2 2.7.12 REQUIRED Interpreter Development)
+set(PYTHON_LIBRARIES ${Python2_LIBRARIES} ) 
+set(PYTHON_INCLUDE_DIRS "${Python2_INCLUDE_DIRS}"
+    "${Python2_LIBRARY_DIRS}/python2.7/dist-packages/numpy/core/include"
+    "${Python2_LIBRARY_DIRS}/python2.7/site-packages/numpy/core/include")
+
+message(STATUS "Python2_LIBRARIES: ${Python2_LIBRARIES}")
+message(STATUS "Python2_INCLUDE_DIRS: ${Python2_INCLUDE_DIRS}")
+message(STATUS "Python2_LIBRARY_DIRS: ${Python2_LIBRARY_DIRS}")
+message(STATUS "PYTHON_INCLUDE_DIRS ${PYTHON_INCLUDE_DIRS}")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
@@ -46,8 +57,10 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 include_directories(
 	include
 	$ENV{DRACULA_INCLUDE_DIR}
+	$ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
 	${Franka_INCLUDE_DIRS}
 	${EIGEN3_INCLUDE_DIRS}
+	${PYTHON_INCLUDE_DIRS}
 	)
 
 

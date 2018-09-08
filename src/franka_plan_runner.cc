@@ -83,9 +83,6 @@ const char* const kLcmPlanChannel = "COMMITTED_ROBOT_PLAN";
 const char* const kLcmStopChannel = "STOP";
 const int kNumJoints = 7;
 
-std::atomic_bool running{false};
-std::atomic_bool isRobotAlive{false};
-
 using trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
 typedef PPType::PolynomialType PPPoly;
@@ -124,14 +121,14 @@ lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState &robot_state){
 
 int do_main(std::string robot_ip_addr) {
     create_momap_log("kuka_plan_runner");
-    running = true; 
-    isRobotAlive = false; 
+    std::atomic_bool running{true};
+    std::atomic_bool isRobotAlive{false};
     RobotData robot_data{};
     robot_data.has_data = false; 
     
     ::lcm::LCM lcm_;
 
-    lcm_.subscribe(kLcmPlanChannel, &HandlePlan, this);
+    // lcm_.subscribe(kLcmPlanChannel, &HandlePlan, this);
 
     int plan_number_{};
     std::unique_ptr<PiecewisePolynomial<double>> plan_;
