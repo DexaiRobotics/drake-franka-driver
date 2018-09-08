@@ -57,6 +57,16 @@
 
 #include "examples_common.h"
 
+#include <iostream>
+#include <memory>
+
+#include <momap/momap_robot_plan_v1.h>
+#include <lcmtypes/robot_spline_t.hpp>
+
+#include "trajectory_solver.h"
+#include "log_momap.h"
+#include <dracula_utils.h>
+
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
 using Eigen::VectorXi;
@@ -72,6 +82,9 @@ const char* const kLcmStatusChannel = "FRANKA_STATUS";
 const char* const kLcmPlanChannel = "COMMITTED_ROBOT_PLAN";
 const char* const kLcmStopChannel = "STOP";
 const int kNumJoints = 7;
+
+std::atomic_bool running{false};
+std::atomic_bool isRobotAlive{false};
 
 using trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
@@ -110,10 +123,20 @@ lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState &robot_state){
 }
 
 int do_main(std::string robot_ip_addr) {
+    create_momap_log("kuka_plan_runner");
+    running = true; 
+    isRobotAlive = false; 
     RobotData robot_data{};
     robot_data.has_data = false; 
-    std::atomic_bool running{true};
+    
     ::lcm::LCM lcm_;
+
+    lcm_.subscribe(kLcmPlanChannel, &HandlePlan, this);
+
+    int plan_number_{};
+    std::unique_ptr<PiecewisePolynomial<double>> plan_;
+    lcmt_iiwa_status iiwa_status_;
+    PPType piecewise_polynomial;
 
     // Set and initialize trajectory parameters.
     const double radius = 0.05;
@@ -150,11 +173,11 @@ int do_main(std::string robot_ip_addr) {
         }
     });
 
-
     try {
         // Connect to robot.
         franka::Robot robot(robot_ip_addr);
         setDefaultBehavior(robot);
+        isRobotAlive = true; 
 
         // First move the robot to a suitable joint configuration
         std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
