@@ -1,32 +1,23 @@
-# Prerequisites
-*.d
+# .gitignore
 
-# Compiled Object files
-*.slo
-*.lo
-*.o
-*.obj
+# Ignore the example directory for robot URDFs
+robots/
 
-# Precompiled Headers
-*.gch
-*.pch
+# Ignore the build directory and compiled binaries
+build/
+externals/
 
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
+# Ignore backup files
+*.bak
+*.swp
+*~
 
-# Fortran module files
-*.mod
-*.smod
+# Ignore log file
+*.json
+*.cereal
 
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
-*.exe
-*.out
-*.app
+# Ignore other files
+*.pyc
+*DS_Store
+*snopt.out
+*.ipynb_checkpoints
