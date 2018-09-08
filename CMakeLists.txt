@@ -4,6 +4,11 @@ project(drake-franka-driver)
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
+# SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
+
 set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 
@@ -58,6 +63,7 @@ target_link_libraries(${driver_name}
                       ${LCM_NAMESPACE}lcm 
                       gflags
 					  drake::drake
+					  Threads::Threads
                       $ENV{DRACULA_LIBRARIES} 
                       )
 

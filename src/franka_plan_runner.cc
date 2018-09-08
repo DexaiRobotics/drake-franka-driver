@@ -29,6 +29,7 @@
 #include <poll.h>
 
 #include <stdexcept>
+#include <sys/time.h>
 #include <thread>
 #include <vector>
 
@@ -91,7 +92,10 @@ std::vector<T> ConvertToVector(std::array<T, SIZE> &a){
 lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState &robot_state){
     lcmt_iiwa_status robot_status{}; 
     int num_joints_ = robot_state.q.size();
-    robot_status.utime = int64_t(1000.0 * robot_state.time.toMSec());
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+
+    robot_status.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec); //int64_t(1000.0 * robot_state.time.toMSec());
     robot_status.num_joints = num_joints_;
     // q
     robot_status.joint_position_measured = ConvertToVector(robot_state.q);
@@ -195,7 +199,8 @@ int do_main(std::string robot_ip_addr) {
                 robot_data.mutex.unlock();
             }
 
-            if (time >= 60.0) {
+            // if (time >= 60.0) {
+            if (0) {
                 std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
                 return franka::MotionFinished(output);
             }
