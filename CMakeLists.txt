@@ -19,28 +19,28 @@ list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake/drake)
 
 list(APPEND CMAKE_PREFIX_PATH $ENV{FRANKA_BUILD_DIR})
 
-# IF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+
 list(APPEND CMAKE_PREFIX_PATH "/usr/local/share/eigen3/cmake")
-	find_package(Eigen3 3.3.90 CONFIG REQUIRED)
-	message(STATUS "Eigen3 use file: ${EIGEN3_USE_FILE}")
-	message(STATUS "Eigen3 include dirs: ${EIGEN3_INCLUDE_DIRS}")
-	message(STATUS "Eigen3 include dir: ${EIGEN3_INCLUDE_DIR}")
-	message(STATUS "Eigen3 found: ${EIGEN3_FOUND}")
-# ENDIF()
+find_package(Eigen3 3.3 CONFIG REQUIRED)
+message(STATUS "Eigen3 use file: ${EIGEN3_USE_FILE}")
+message(STATUS "Eigen3 include dirs: ${EIGEN3_INCLUDE_DIRS}")
+message(STATUS "Eigen3 include dir: ${EIGEN3_INCLUDE_DIR}")
+message(STATUS "Eigen3 found: ${EIGEN3_FOUND}")
+
 
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
 find_package(lcm REQUIRED)
 find_package(gflags MODULE REQUIRED COMPONENTS shared)
+find_package(GTest REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
-
-
-# add include dir for FRIClient headers
+# add include dir for Franka headers
 include_directories(
 	include
+	$ENV{DRACULA_INCLUDE_DIR}
 	${Franka_INCLUDE_DIRS}
 	${EIGEN3_INCLUDE_DIRS}
 	)
@@ -58,7 +58,7 @@ target_link_libraries(${driver_name}
                       ${LCM_NAMESPACE}lcm 
                       gflags
 					  drake::drake
-                      drake::drake-lcmtypes-cpp 
+                      $ENV{DRACULA_LIBRARIES} 
                       )
 
 # install the lcm driver
