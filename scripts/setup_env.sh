@@ -7,3 +7,7 @@ export DRACULA_SOURCE_PATH="$PWD/../dracula"
 export DRACULA_BUILD_PATH="$DRACULA_SOURCE_PATH/build"
 export DRACULA_INCLUDE_DIR="$DRACULA_SOURCE_PATH/dracula/include"
 export DRACULA_LIBRARIES="$DRACULA_BUILD_PATH/dracula/libdracula.so"
+
+if [ "$(uname)" == "Darwin" ]; then
+    export DRACULA_LIBRARIES="$DRACULA_BUILD_PATH/dracula/libdracula.dylib"
+fi
