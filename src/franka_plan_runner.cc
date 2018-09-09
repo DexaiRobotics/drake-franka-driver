@@ -36,7 +36,6 @@
 #include <gflags/gflags.h>
 
 #include "lcm/lcm-cpp.hpp"
-#include "lcmtypes/robot_spline_t.hpp"
 #include "drake/common/drake_assert.h"
 #include "drake/common/find_resource.h"
 #include "drake/common/trajectories/piecewise_polynomial.h"
