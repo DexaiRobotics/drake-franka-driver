@@ -139,6 +139,7 @@ private:
     RobotData robot_data_{}; 
     PPType piecewise_polynomial;
     std::thread lcm_publish_status_thread_ptr;
+    int sign_{};
 
     // Set print rate for comparing commanded vs. measured torques.
     const double lcm_publish_rate = 200.0; //Hz
@@ -156,6 +157,7 @@ public:
         cur_plan_number = plan_number_;
         cur_time_us = -1;
         start_time_us = -1;
+        sign_ = +1; 
     };
 
     ~FrankaPlanRunner(){
@@ -194,37 +196,6 @@ public:
             // Load the kinematics and dynamics model.
             franka::Model model = robot.loadModel();
 
-            // std::array<double, 7> goal_joint_conifg;
-
-            // Define callback for the joint position control loop.
-            // std::function<franka::JointPositions(const franka::RobotState&, franka::Duration)>
-            //     joint_position_callback =
-            //         [&goal_joint_conifg, &franka_time = franka_time, &robot_data_ = robot_data_](
-            //             const franka::RobotState& robot_state, franka::Duration period) -> franka::JointPositions {
-            //     franka_time += period.toSec();
-
-            //     if (franka_time == 0.0) {
-            //         goal_joint_conifg = robot_state.q_d;
-            //     }
-
-            //     franka::JointPositions output = {{ goal_joint_conifg[0], goal_joint_conifg[1],
-            //                                     goal_joint_conifg[2], goal_joint_conifg[3],
-            //                                     goal_joint_conifg[4], goal_joint_conifg[5],
-            //                                     goal_joint_conifg[6] }};
-            //     // Update data to publish.
-            //     if (robot_data_.mutex.try_lock()) {
-            //         robot_data_.has_data = true;
-            //         robot_data_.robot_state = robot_state;
-            //         robot_data_.mutex.unlock();
-            //     }
-
-            //     // if (time >= 60.0) {
-            //     if (0) {
-            //         std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
-            //         return franka::MotionFinished(output);
-            //     }
-            //     return output;
-            // };
             std::function<franka::JointPositions(const franka::RobotState&, franka::Duration)>
                 joint_position_callback = [&, this](
                         const franka::RobotState& robot_state, franka::Duration period) -> franka::JointPositions {
@@ -263,6 +234,17 @@ private:
             std::array<double, 7> current_conf = robot_state.q_d;
             desired_next = du::v_to_e( ConvertToVector(current_conf) );
         }
+
+        // TODO: debug lines which move robot, remove soon @dmsj
+        // if (desired_next(0) > 1.5 && sign_ > 0){
+        //     sign_ = -1;
+        //     momap::log()->info("set sign: {}", sign_);
+        // } else if (desired_next(0) < -1.5 && sign_ < 0){
+        //     sign_ = +1; 
+        //     momap::log()->info("set sign: {}", sign_);
+        // }
+        // desired_next(0) += 0.001*sign_; 
+
         // set desired position based on interpolated spline
         franka::JointPositions output = {{ desired_next[0], desired_next[1],
                                            desired_next[2], desired_next[3],
@@ -275,6 +257,7 @@ private:
             robot_data_.mutex.unlock();
         }
 
+        // TODO: remove with a better way to quit @dmsj
         // if (time >= 60.0) {
         if (0) {
             std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
