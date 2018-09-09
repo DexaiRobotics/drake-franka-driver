@@ -132,6 +132,9 @@ private:
     std::atomic_bool robot_alive_{false};
     ::lcm::LCM lcm_;
     int plan_number_{};
+    int cur_plan_number{};
+    int64_t cur_time_us{};
+    int64_t start_time_us{};
     std::unique_ptr<PiecewisePolynomial<double>> plan_;
     RobotData robot_data_{}; 
     PPType piecewise_polynomial;
@@ -149,8 +152,10 @@ public:
         lcm_.subscribe(kLcmStopChannel, &FrankaPlanRunner::HandleStop, this);
         running_ = true;
         franka_time = 0.0; 
-        robot_data_.has_data = false; 
-        
+
+        cur_plan_number = plan_number_;
+        cur_time_us = -1;
+        start_time_us = -1;
     };
 
     ~FrankaPlanRunner(){
@@ -189,37 +194,42 @@ public:
             // Load the kinematics and dynamics model.
             franka::Model model = robot.loadModel();
 
-            std::array<double, 7> goal_joint_conifg;
+            // std::array<double, 7> goal_joint_conifg;
 
             // Define callback for the joint position control loop.
+            // std::function<franka::JointPositions(const franka::RobotState&, franka::Duration)>
+            //     joint_position_callback =
+            //         [&goal_joint_conifg, &franka_time = franka_time, &robot_data_ = robot_data_](
+            //             const franka::RobotState& robot_state, franka::Duration period) -> franka::JointPositions {
+            //     franka_time += period.toSec();
+
+            //     if (franka_time == 0.0) {
+            //         goal_joint_conifg = robot_state.q_d;
+            //     }
+
+            //     franka::JointPositions output = {{ goal_joint_conifg[0], goal_joint_conifg[1],
+            //                                     goal_joint_conifg[2], goal_joint_conifg[3],
+            //                                     goal_joint_conifg[4], goal_joint_conifg[5],
+            //                                     goal_joint_conifg[6] }};
+            //     // Update data to publish.
+            //     if (robot_data_.mutex.try_lock()) {
+            //         robot_data_.has_data = true;
+            //         robot_data_.robot_state = robot_state;
+            //         robot_data_.mutex.unlock();
+            //     }
+
+            //     // if (time >= 60.0) {
+            //     if (0) {
+            //         std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
+            //         return franka::MotionFinished(output);
+            //     }
+            //     return output;
+            // };
             std::function<franka::JointPositions(const franka::RobotState&, franka::Duration)>
-                joint_position_callback =
-                    [&goal_joint_conifg, &franka_time = franka_time, &robot_data_ = robot_data_](
+                joint_position_callback = [&, this](
                         const franka::RobotState& robot_state, franka::Duration period) -> franka::JointPositions {
-                franka_time += period.toSec();
-
-                if (franka_time == 0.0) {
-                    goal_joint_conifg = robot_state.q_d;
-                }
-
-                franka::JointPositions output = {{ goal_joint_conifg[0], goal_joint_conifg[1],
-                                                goal_joint_conifg[2], goal_joint_conifg[3],
-                                                goal_joint_conifg[4], goal_joint_conifg[5],
-                                                goal_joint_conifg[6] }};
-                // Update data to publish.
-                if (robot_data_.mutex.try_lock()) {
-                    robot_data_.has_data = true;
-                    robot_data_.robot_state = robot_state;
-                    robot_data_.mutex.unlock();
-                }
-
-                // if (time >= 60.0) {
-                if (0) {
-                    std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
-                    return franka::MotionFinished(output);
-                }
-                return output;
-            };
+                        return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
+                    };
 
             robot.control(joint_position_callback);
 
@@ -234,6 +244,44 @@ public:
     };
 
 private:
+    franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
+        franka_time += period.toSec();
+        cur_time_us = int64_t(franka_time * 1.0e6); 
+
+        Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
+
+        if (plan_) {
+            if (plan_number_ != cur_plan_number) {
+                momap::log()->info("Starting new plan.");
+                start_time_us = cur_time_us;
+                cur_plan_number = plan_number_;
+            }
+
+            const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
+            desired_next = plan_->value(cur_traj_time_s);
+        } else {
+            std::array<double, 7> current_conf = robot_state.q_d;
+            desired_next = du::v_to_e( ConvertToVector(current_conf) );
+        }
+        // set desired position based on interpolated spline
+        franka::JointPositions output = {{ desired_next[0], desired_next[1],
+                                           desired_next[2], desired_next[3],
+                                           desired_next[4], desired_next[5],
+                                           desired_next[6] }};
+        // Update data to publish.
+        if (robot_data_.mutex.try_lock()) {
+            robot_data_.has_data = true;
+            robot_data_.robot_state = robot_state;
+            robot_data_.mutex.unlock();
+        }
+
+        // if (time >= 60.0) {
+        if (0) {
+            std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
+            return franka::MotionFinished(output);
+        }
+        return output;
+    };
     void PublishLcmStatus(){ //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
         while (running_) {
             // Sleep to achieve the desired print rate.
