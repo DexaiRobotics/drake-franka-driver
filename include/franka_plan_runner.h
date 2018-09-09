@@ -68,7 +68,7 @@
 
 #include "trajectory_solver.h"
 #include "log_momap.h"
-#include <dracula_utils.h>
+#include "dracula_utils.h"
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;

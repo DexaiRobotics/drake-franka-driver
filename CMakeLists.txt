@@ -24,20 +24,12 @@ list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake/drake)
 
 list(APPEND CMAKE_PREFIX_PATH $ENV{FRANKA_BUILD_DIR})
 
-
-list(APPEND CMAKE_PREFIX_PATH "/usr/local/share/eigen3/cmake")
-find_package(Eigen3 3.3 CONFIG REQUIRED)
-message(STATUS "Eigen3 use file: ${EIGEN3_USE_FILE}")
-message(STATUS "Eigen3 include dirs: ${EIGEN3_INCLUDE_DIRS}")
-message(STATUS "Eigen3 include dir: ${EIGEN3_INCLUDE_DIR}")
-message(STATUS "Eigen3 found: ${EIGEN3_FOUND}")
-
-
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
 find_package(lcm REQUIRED)
 find_package(gflags MODULE REQUIRED COMPONENTS shared)
 find_package(GTest REQUIRED)
+find_package(fcl REQUIRED)
 
 set(Python2_ROOT_DIR $ENV{LOCAL_PYTHON_PATH})
 find_package( Python2 2.7.12 REQUIRED Interpreter Development)
@@ -59,7 +51,6 @@ include_directories(
 	$ENV{DRACULA_INCLUDE_DIR}
 	$ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
 	${Franka_INCLUDE_DIRS}
-	${EIGEN3_INCLUDE_DIRS}
 	${PYTHON_INCLUDE_DIRS}
 	)
 
@@ -77,7 +68,9 @@ target_link_libraries(${driver_name}
                       gflags
 					  drake::drake
 					  Threads::Threads
-                      $ENV{DRACULA_LIBRARIES} 
+                      $ENV{DRACULA_LIBRARIES}
+					  ${PYTHON_LIBRARIES}
+					  fcl
                       )
 
 # install the lcm driver
