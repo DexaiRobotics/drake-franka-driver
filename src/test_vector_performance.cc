@@ -1,20 +1,11 @@
 #include "StopWatch.h" // https://github.com/KjellKod/Stopwatch
-#include <iostream>
-#include <vector>
-#include <list>
+
+#include "franka_plan_runner.h"
 
 using namespace std;
 
-
-struct BigTestStruct
-{
-  int iValue = 1;
-  float fValue;
-  long lValue;
-  double dValue;
-  char cNameArr[10];
-  int iValArr[100];
-};
+namespace drake {
+namespace franka_driver {
 
 struct TestRunAggregater
 {
@@ -28,9 +19,68 @@ struct TestRunAggregater
   }
 };
 
-void FillVector(vector<BigTestStruct>& testVector);
+void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
+  lcm_status_.utime = -1;
+  lcm_status_.num_joints = kNumJoints;
+  lcm_status_.joint_position_measured.resize(kNumJoints, 0);
+  lcm_status_.joint_position_commanded.resize(kNumJoints, 0);
+  lcm_status_.joint_position_ipo.resize(kNumJoints, 0);
+  lcm_status_.joint_velocity_estimated.resize(kNumJoints, 0);
+  lcm_status_.joint_torque_measured.resize(kNumJoints, 0);
+  lcm_status_.joint_torque_commanded.resize(kNumJoints, 0);
+  lcm_status_.joint_torque_external.resize(kNumJoints, 0);
+}
+// Fuctions to show the benefit of vector::reserve()
+void FillVector(vector<lcmt_iiwa_status>& testVector)
+{
+  for (int i = 0; i < 100; i++)
+  {
+    lcmt_iiwa_status bt;
+    testVector.push_back(bt);
+  }
+}
+void FillVectorPreAllocate(vector<lcmt_iiwa_status>& testVector)
+{
+  for (int i = 0; i < 100; i++)
+  {
+    lcmt_iiwa_status bt;
+    ResizeStatusMessage(bt);
+    testVector.push_back(bt);
+  }
+}
+void Populate(vector<lcmt_iiwa_status>& testVector){
+  for(auto &status : testVector){
+    franka::RobotState rs; 
+    status = ConvertToLcmStatus(rs);
+  }
+}
 
-int main()
+void AssignToLcmStatus(franka::RobotState &robot_state, lcmt_iiwa_status &robot_status){
+    int num_joints_ = kNumJoints;
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+
+    robot_status.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec); //int64_t(1000.0 * robot_state.time.toMSec());
+    robot_status.num_joints = num_joints_;
+    // q
+    robot_status.joint_position_measured.assign(std::begin(robot_state.q), std::end(robot_state.q)) ;
+    robot_status.joint_position_commanded.assign(std::begin(robot_state.q_d), std::end(robot_state.q_d)) ; // = ConvertToVector(robot_state.q_d);
+    robot_status.joint_position_ipo.resize(num_joints_, 0);
+    robot_status.joint_velocity_estimated.assign(std::begin(robot_state.dq), std::end(robot_state.dq)) ;// = ConvertToVector(robot_state.dq);
+    robot_status.joint_torque_measured.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ; // = ConvertToVector(robot_state.tau_J);
+    robot_status.joint_torque_commanded.assign(std::begin(robot_state.tau_J_d), std::end(robot_state.tau_J_d)) ; // = ConvertToVector(robot_state.tau_J_d);
+    robot_status.joint_torque_external.resize(num_joints_, 0);
+
+}
+
+void PopulateByAssign(vector<lcmt_iiwa_status>& testVector){
+  for(auto &status : testVector){
+    franka::RobotState rs; 
+    AssignToLcmStatus(rs, status);
+  }
+}
+
+int do_main()
 {
   StopWatch sw;
 
@@ -39,27 +89,28 @@ int main()
   tg.test2 = 0;
   tg.test3 = 0;
 
+  // #1: use convert array and vector constructure
+
+  // #2: pre-allocate and copy
+
+  // #3: pre-allocate and .assign
+
   // #1: Avoid unnecessary reallocate and copy cycles by reserving the size of vector ahead of time.
-  vector<BigTestStruct> testVector1;
-  vector<BigTestStruct> testVector2;
+  vector<lcmt_iiwa_status> testVector1;
+  vector<lcmt_iiwa_status> testVector2;
 
   for (int i = 0; i < 100; i++)
   {
-    sw.Restart();
     FillVector(testVector1);
+    FillVectorPreAllocate(testVector2);
+    sw.Restart();
+    Populate(testVector1);
     tg.test1 += sw.ElapsedUs();
 
 
     sw.Restart();
-    testVector2.reserve(10000);
-    FillVector(testVector2);
+    PopulateByAssign(testVector2);
     tg.test2 += sw.ElapsedUs();
-
-    testVector1.clear();
-    testVector1.shrink_to_fit();
-    testVector2.clear();
-    testVector2.shrink_to_fit();
-
   }
 
   cout << "Average Time to Fill Vector Without Reservation:" << (tg.test1 / 100) << endl;
@@ -67,180 +118,15 @@ int main()
 
   tg.Reset();
 
-  // #2 Use shrink_to_fit() to release memory consumed by the vector – clear() or erase() does not release memory
-  FillVector(testVector1);
-  size_t capacity = testVector1.capacity();
-  cout << "Capacity Before Erasing Elements:" << capacity << endl;
-
-  testVector1.erase(testVector1.begin(), testVector1.begin() + 3); //
-  capacity = testVector1.capacity();
-  cout << "Capacity After Erasing 3 elements Elements:" << capacity << endl;
-
-
-  testVector1.clear();
-  capacity = testVector1.capacity();
-  cout << "Capacity After clearing all emements:" << capacity << endl;
-
-
-  testVector1.shrink_to_fit();
-  capacity = testVector1.capacity();
-  cout << "Capacity After shrinking the Vector:" << capacity << endl;
-
-  // Point # 3: When filling up or copying into a vector, prefer assignment over insert() or push_back().
-
-  cout << "Begining Test for Vector element enumeration " << endl;
-
-  //Using an iterator
-  vector<BigTestStruct> testVectorSum;
-  FillVector(testVectorSum);
-
-  for (int i = 0; i < 100; i++)
-  {
-    sw.Restart();
-    int sum = 0;
-
-    for (auto it = testVectorSum.begin(); it != testVectorSum.end(); ++it)
-    {
-      sum = sum + it->iValue;
-    }
-    tg.test1 += sw.ElapsedUs();
-
-    //Using the at() member function
-    sw.Restart();
-    sum = 0;
-
-    for (unsigned i = 0; i < testVectorSum.size(); ++i)
-    {
-      sum = sum + testVectorSum.at(i).iValue;
-    }
-    tg.test2 += sw.ElapsedUs();
-
-    // Using the subscript notation
-    sw.Restart();
-    sum = 0;
-    for (unsigned i = 0; i < testVectorSum.size(); ++i)
-    {
-      sum = sum + testVectorSum[i].iValue;
-    }
-    tg.test3 += sw.ElapsedUs();
-  }
-
-  cout << "Using Iterator:" << (tg.test1 / 100) << endl;
-  cout << "Using at() :" << (tg.test2 / 100) << endl;
-  cout << "Using subscripting:" << (tg.test3 / 100) << endl;
-
-  tg.Reset();
-
-  // Point # 4:	While iterating through elements in a std::vector, avoid the std::vector::at() function
-  vector<BigTestStruct> sourceVector, destinationVector;
-  FillVector(sourceVector);
-
-  for (int i = 0; i < 100; i++)
-  {
-    // Assign sourceVector to destination vector
-    sw.Restart();
-    destinationVector = sourceVector;
-    tg.test1 += sw.ElapsedUs();
-
-
-    //Using std::vector::insert()
-    vector<BigTestStruct> sourceVector1, destinationVector1;
-    FillVector(sourceVector1);
-
-    sw.Restart();
-    destinationVector1.insert(destinationVector1.end(),
-      sourceVector1.begin(),
-      sourceVector1.end());
-    tg.test2 += sw.ElapsedUs();
-
-
-    //Using push_back()
-    vector<BigTestStruct> sourceVector2, destinationVector2;
-    FillVector(sourceVector2);
-
-    sw.Restart();
-    for (unsigned i = 0; i < sourceVector2.size(); ++i)
-    {
-      destinationVector2.push_back(sourceVector2[i]);
-    }
-    tg.test3 += sw.ElapsedUs();
-  }
-  cout << "Average of Assigning Vector :" << (tg.test1 / 100) << endl;
-  cout << "Average of Using insert() :" << (tg.test2 / 100) << endl;
-  cout << "dmsj Average of Using push_back :" << (tg.test3 / 100) << endl;
-
-  tg.Reset();
-  cout << "dmsj jjjjjj" << endl;
-
-  //Point # 5:  Don’t use push-front() – its O(n) - if for some reason you need to use push_front(), consider using a std::list
-  // vector<BigTestStruct> sourceVector3, pushFrontTestVector;
-  // FillVector(sourceVector3);
-
-  // list<BigTestStruct> pushFrontTestList;
-
-  // cout << "dmsj jjjjjj" << endl;
-
-  // for (int i = 0; i < 100; i++)
-  // {
-  //   cout << i << endl;
-  //   //Push 100k elements in front of the new vector -- this is horrible code !!! 
-  //   sw.Restart();
-  //   for (unsigned i = 1; i < sourceVector3.size(); ++i)
-  //   {
-  //     pushFrontTestVector.insert(pushFrontTestVector.begin(), sourceVector3[i]);
-  //   }
-  //   tg.test1 += sw.ElapsedUs();
-
-  //   // push in front of a list
-  //   sw.Restart();
-  //   for (unsigned i = 0; i < sourceVector3.size(); ++i)
-  //   {
-  //     pushFrontTestList.push_front(sourceVector3[i]);
-  //   }
-  //   tg.test2 += sw.ElapsedUs();
-
-  // }
-  // cout << "Average of Pushing in front of Vector :" << (tg.test1 / 100) << endl;
-  // cout << "Average of Pushing in front of list :" << (tg.test2 / 100) << endl;
-  // tg.Reset();
-
-  // Point # 6: Prefer emplace_back() instead of push_back() while inserting into a vector
-  vector<BigTestStruct> sourceVector4, pushBackTestVector, emplaceBackTestVector;
-  FillVector(sourceVector4);
-
-  for (int i = 0; i < 100; i++)
-  {
-    //Test push back performance
-    sw.Restart();
-    for (unsigned i = 0; i < sourceVector4.size(); ++i)
-    {
-      pushBackTestVector.push_back(sourceVector4[i]);
-    }
-    tg.test1 += sw.ElapsedUs();
-
-
-    //Test emplace_back()
-    sw.Restart();
-    for (unsigned i = 0; i < sourceVector4.size(); ++i)
-    {
-      emplaceBackTestVector.emplace_back(sourceVector4[i]);
-    }
-    tg.test2 += sw.ElapsedUs();
-
-  }
-
-  cout << "Average Using push_back :" << (tg.test1 / 100) << endl;
-  cout << "Average Using emplace_back :" << (tg.test2 / 100) << endl;
-
   return 0;
 }
+} // franka_driver
+} // drake
 
-// Fuctions to show the benefit of vector::reserve()
-void FillVector(vector<BigTestStruct>& testVector)
-{
-  for (int i = 0; i < 10000; i++)
-  {
-    BigTestStruct bt;
-    testVector.push_back(bt);
-  }
+int main(int argc, char** argv) {
+    if (argc != 1) {
+        std::cerr << "Usage: " << argv[0] << std::endl;
+        return -1;
+    }
+    return drake::franka_driver::do_main();
 }

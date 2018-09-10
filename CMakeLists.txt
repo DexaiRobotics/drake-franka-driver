@@ -52,6 +52,7 @@ include_directories(
 	$ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
 	${Franka_INCLUDE_DIRS}
 	${PYTHON_INCLUDE_DIRS}
+	externals/StopWatch
 	)
 
 
@@ -73,13 +74,20 @@ target_link_libraries(${driver_name}
 					  fcl
                       )
 
-include_directories(externals/StopWatch)
 add_executable( ArrayToVectorPerformance 
 				src/test_vector_performance.cc
 				externals/StopWatch/StopWatch.cpp
-			  )
-# target_link_libraries(ArrayToVectorPerformance
-# )
+			   )
+target_link_libraries( ArrayToVectorPerformance
+					   ${Franka_LIBRARIES}
+                       ${LCM_NAMESPACE}lcm 
+                       gflags
+					   drake::drake
+					   Threads::Threads
+                       $ENV{DRACULA_LIBRARIES}
+					   ${PYTHON_LIBRARIES}
+					   fcl
+					 )
 
 # install the lcm driver
 # install(TARGETS ${driver_name}
