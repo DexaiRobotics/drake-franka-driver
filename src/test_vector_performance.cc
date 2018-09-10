@@ -167,38 +167,42 @@ int main()
   }
   cout << "Average of Assigning Vector :" << (tg.test1 / 100) << endl;
   cout << "Average of Using insert() :" << (tg.test2 / 100) << endl;
-  cout << "Average of Using push_back :" << (tg.test3 / 100) << endl;
+  cout << "dmsj Average of Using push_back :" << (tg.test3 / 100) << endl;
 
   tg.Reset();
+  cout << "dmsj jjjjjj" << endl;
 
   //Point # 5:  Don’t use push-front() – its O(n) - if for some reason you need to use push_front(), consider using a std::list
-  vector<BigTestStruct> sourceVector3, pushFrontTestVector;
-  FillVector(sourceVector3);
+  // vector<BigTestStruct> sourceVector3, pushFrontTestVector;
+  // FillVector(sourceVector3);
 
-  list<BigTestStruct> pushFrontTestList;
+  // list<BigTestStruct> pushFrontTestList;
 
-  for (int i = 0; i < 100; i++)
-  {
-    //Push 100k elements in front of the new vector -- this is horrible code !!! 
-    sw.Restart();
-    for (unsigned i = 1; i < sourceVector3.size(); ++i)
-    {
-      pushFrontTestVector.insert(pushFrontTestVector.begin(), sourceVector3[i]);
-    }
-    tg.test1 += sw.ElapsedUs();
+  // cout << "dmsj jjjjjj" << endl;
 
-    // push in front of a list
-    sw.Restart();
-    for (unsigned i = 0; i < sourceVector3.size(); ++i)
-    {
-      pushFrontTestList.push_front(sourceVector3[i]);
-    }
-    tg.test2 += sw.ElapsedUs();
+  // for (int i = 0; i < 100; i++)
+  // {
+  //   cout << i << endl;
+  //   //Push 100k elements in front of the new vector -- this is horrible code !!! 
+  //   sw.Restart();
+  //   for (unsigned i = 1; i < sourceVector3.size(); ++i)
+  //   {
+  //     pushFrontTestVector.insert(pushFrontTestVector.begin(), sourceVector3[i]);
+  //   }
+  //   tg.test1 += sw.ElapsedUs();
 
-  }
-  cout << "Average of Pushing in front of Vector :" << (tg.test1 / 100) << endl;
-  cout << "Average of Pushing in front of list :" << (tg.test2 / 100) << endl;
-  tg.Reset();
+  //   // push in front of a list
+  //   sw.Restart();
+  //   for (unsigned i = 0; i < sourceVector3.size(); ++i)
+  //   {
+  //     pushFrontTestList.push_front(sourceVector3[i]);
+  //   }
+  //   tg.test2 += sw.ElapsedUs();
+
+  // }
+  // cout << "Average of Pushing in front of Vector :" << (tg.test1 / 100) << endl;
+  // cout << "Average of Pushing in front of list :" << (tg.test2 / 100) << endl;
+  // tg.Reset();
 
   // Point # 6: Prefer emplace_back() instead of push_back() while inserting into a vector
   vector<BigTestStruct> sourceVector4, pushBackTestVector, emplaceBackTestVector;

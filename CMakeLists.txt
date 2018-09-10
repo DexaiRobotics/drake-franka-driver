@@ -56,7 +56,7 @@ include_directories(
 
 
 # build the lcm driver that uses Franka Robot Interface (FRI)
-add_definitions(-std=c++14)
+# add_definitions(-std=c++14)
 set(driver_name franka_plan_runner)
 add_executable(${driver_name} 
 	src/franka_plan_runner.cc
@@ -73,9 +73,17 @@ target_link_libraries(${driver_name}
 					  fcl
                       )
 
+include_directories(externals/StopWatch)
+add_executable( ArrayToVectorPerformance 
+				src/test_vector_performance.cc
+				externals/StopWatch/StopWatch.cpp
+			  )
+# target_link_libraries(ArrayToVectorPerformance
+# )
+
 # install the lcm driver
-install(TARGETS ${driver_name}
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-ARCHIVE DESTINATION lib)
+# install(TARGETS ${driver_name}
+#     RUNTIME DESTINATION bin
+#     LIBRARY DESTINATION lib
+# ARCHIVE DESTINATION lib)
 
