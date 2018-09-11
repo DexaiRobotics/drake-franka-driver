@@ -105,6 +105,24 @@ std::vector<T> ConvertToVector(std::array<T, SIZE> &a){
     return v;
 }
 
+void AssignToLcmStatus(franka::RobotState &robot_state, lcmt_iiwa_status &robot_status){
+    int num_joints_ = kNumJoints;
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+
+    robot_status.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec); //int64_t(1000.0 * robot_state.time.toMSec());
+    robot_status.num_joints = num_joints_;
+    // q
+    robot_status.joint_position_measured.assign(std::begin(robot_state.q), std::end(robot_state.q)) ;
+    robot_status.joint_position_commanded.assign(std::begin(robot_state.q_d), std::end(robot_state.q_d)) ; // = ConvertToVector(robot_state.q_d);
+    robot_status.joint_position_ipo.resize(num_joints_, 0);
+    robot_status.joint_velocity_estimated.assign(std::begin(robot_state.dq), std::end(robot_state.dq)) ;// = ConvertToVector(robot_state.dq);
+    robot_status.joint_torque_measured.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ; // = ConvertToVector(robot_state.tau_J);
+    robot_status.joint_torque_commanded.assign(std::begin(robot_state.tau_J_d), std::end(robot_state.tau_J_d)) ; // = ConvertToVector(robot_state.tau_J_d);
+    robot_status.joint_torque_external.resize(num_joints_, 0);
+
+}
+
 lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState &robot_state){
     lcmt_iiwa_status robot_status{}; 
     int num_joints_ = robot_state.q.size();
@@ -125,6 +143,18 @@ lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState &robot_state){
     return robot_status; 
 }
 
+void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
+  lcm_status_.utime = -1;
+  lcm_status_.num_joints = kNumJoints;
+  lcm_status_.joint_position_measured.resize(kNumJoints, 0);
+  lcm_status_.joint_position_commanded.resize(kNumJoints, 0);
+  lcm_status_.joint_position_ipo.resize(kNumJoints, 0);
+  lcm_status_.joint_velocity_estimated.resize(kNumJoints, 0);
+  lcm_status_.joint_torque_measured.resize(kNumJoints, 0);
+  lcm_status_.joint_torque_commanded.resize(kNumJoints, 0);
+  lcm_status_.joint_torque_external.resize(kNumJoints, 0);
+}
+
 class FrankaPlanRunner {
 private:
     std::string ip_addr_;
@@ -138,7 +168,7 @@ private:
     std::unique_ptr<PiecewisePolynomial<double>> plan_;
     RobotData robot_data_{}; 
     PPType piecewise_polynomial;
-    std::thread lcm_publish_status_thread_ptr;
+    std::thread lcm_publish_status_thread;
     int sign_{};
 
     // Set print rate for comparing commanded vs. measured torques.
@@ -161,14 +191,14 @@ public:
     };
 
     ~FrankaPlanRunner(){
-        // if (lcm_publish_status_thread_ptr.joinable()) {
-        //     lcm_publish_status_thread_ptr.join();
+        // if (lcm_publish_status_thread.joinable()) {
+        //     lcm_publish_status_thread.join();
         // }
     };
 
     // bool ConnectToRobot();
     int Run(){
-        lcm_publish_status_thread_ptr = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
+        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
         try {
             // Connect to robot.
             franka::Robot robot(ip_addr_);
@@ -199,17 +229,16 @@ public:
             std::function<franka::JointPositions(const franka::RobotState&, franka::Duration)>
                 joint_position_callback = [&, this](
                         const franka::RobotState& robot_state, franka::Duration period) -> franka::JointPositions {
-                        return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
-                    };
-
+                return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
+            };
             robot.control(joint_position_callback);
 
         } catch (const franka::Exception& ex) {
             running_ = false;
             std::cerr << ex.what() << std::endl;
         }
-        if (lcm_publish_status_thread_ptr.joinable()) {
-            lcm_publish_status_thread_ptr.join();
+        if (lcm_publish_status_thread.joinable()) {
+            lcm_publish_status_thread.join();
         }
         return 0;
     };

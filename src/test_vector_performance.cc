@@ -18,18 +18,6 @@ struct TestRunAggregater
     test1 = test2 = test3 = 0;
   }
 };
-
-void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
-  lcm_status_.utime = -1;
-  lcm_status_.num_joints = kNumJoints;
-  lcm_status_.joint_position_measured.resize(kNumJoints, 0);
-  lcm_status_.joint_position_commanded.resize(kNumJoints, 0);
-  lcm_status_.joint_position_ipo.resize(kNumJoints, 0);
-  lcm_status_.joint_velocity_estimated.resize(kNumJoints, 0);
-  lcm_status_.joint_torque_measured.resize(kNumJoints, 0);
-  lcm_status_.joint_torque_commanded.resize(kNumJoints, 0);
-  lcm_status_.joint_torque_external.resize(kNumJoints, 0);
-}
 // Fuctions to show the benefit of vector::reserve()
 void FillVector(vector<lcmt_iiwa_status>& testVector)
 {
@@ -53,24 +41,6 @@ void Populate(vector<lcmt_iiwa_status>& testVector){
     franka::RobotState rs; 
     status = ConvertToLcmStatus(rs);
   }
-}
-
-void AssignToLcmStatus(franka::RobotState &robot_state, lcmt_iiwa_status &robot_status){
-    int num_joints_ = kNumJoints;
-    struct timeval  tv;
-    gettimeofday(&tv, NULL);
-
-    robot_status.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec); //int64_t(1000.0 * robot_state.time.toMSec());
-    robot_status.num_joints = num_joints_;
-    // q
-    robot_status.joint_position_measured.assign(std::begin(robot_state.q), std::end(robot_state.q)) ;
-    robot_status.joint_position_commanded.assign(std::begin(robot_state.q_d), std::end(robot_state.q_d)) ; // = ConvertToVector(robot_state.q_d);
-    robot_status.joint_position_ipo.resize(num_joints_, 0);
-    robot_status.joint_velocity_estimated.assign(std::begin(robot_state.dq), std::end(robot_state.dq)) ;// = ConvertToVector(robot_state.dq);
-    robot_status.joint_torque_measured.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ; // = ConvertToVector(robot_state.tau_J);
-    robot_status.joint_torque_commanded.assign(std::begin(robot_state.tau_J_d), std::end(robot_state.tau_J_d)) ; // = ConvertToVector(robot_state.tau_J_d);
-    robot_status.joint_torque_external.resize(num_joints_, 0);
-
 }
 
 void PopulateByAssign(vector<lcmt_iiwa_status>& testVector){
