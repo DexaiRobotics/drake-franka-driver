@@ -87,6 +87,8 @@ const char* const kLcmPlanChannel = "FRANKA_PLAN";
 const char* const kLcmInterfaceChannel = "FRANKA_SIMPLE_INTERFACE";
 const char* const kLcmStopChannel = "STOP";
 const int kNumJoints = 7;
+const std::string home_addr = "192.168.0.0"; 
+
 
 using trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
@@ -195,9 +197,16 @@ public:
         //     lcm_publish_status_thread.join();
         // }
     };
+    int Run(){
+        if(ip_addr_.compare(home_addr)){
+            return -1;
+        } else {
+            return RunFranka();
+        }
+    }
 
     // bool ConnectToRobot();
-    int Run(){
+    int RunFranka(){
         lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
         try {
             // Connect to robot.
