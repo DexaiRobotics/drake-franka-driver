@@ -20,6 +20,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstring>
+#include <chrono>
 
 #include <iostream>
 #include <memory>
@@ -69,6 +70,9 @@
 #include "trajectory_solver.h"
 #include "log_momap.h"
 #include "dracula_utils.h"
+#include "mock_dracula.h"
+
+using namespace std::chrono;
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -87,7 +91,7 @@ const char* const kLcmPlanChannel = "FRANKA_PLAN";
 const char* const kLcmInterfaceChannel = "FRANKA_SIMPLE_INTERFACE";
 const char* const kLcmStopChannel = "STOP";
 const int kNumJoints = 7;
-const std::string home_addr = "192.168.0.0"; 
+const std::string home_addr = "192.168.1.1"; 
 
 
 using trajectories::PiecewisePolynomial;
@@ -106,6 +110,13 @@ std::vector<T> ConvertToVector(std::array<T, SIZE> &a){
     std::vector<T> v(a.begin(), a.end());
     return v;
 }
+template <typename T, std::size_t SIZE>
+void ConvertToArray(std::vector<T> &v, std::array<T, SIZE> &a){
+    for(int i=0; i<SIZE; i++){
+        a[i] = v[i];
+    }
+}
+
 
 void AssignToLcmStatus(franka::RobotState &robot_state, lcmt_iiwa_status &robot_status){
     int num_joints_ = kNumJoints;
@@ -160,6 +171,7 @@ void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
 class FrankaPlanRunner {
 private:
     std::string ip_addr_;
+    std::string param_yaml_; 
     std::atomic_bool running_{false};
     std::atomic_bool robot_alive_{false};
     ::lcm::LCM lcm_;
@@ -178,7 +190,7 @@ private:
     double franka_time;
 
 public:
-    FrankaPlanRunner(const std::string ip_addr) : ip_addr_(ip_addr), plan_number_(0)
+    FrankaPlanRunner(const std::string ip_addr, const std::string param_yaml) : ip_addr_(ip_addr), param_yaml_(param_yaml), plan_number_(0)
     {
         lcm_.subscribe(kLcmPlanChannel, &FrankaPlanRunner::HandlePlan, this);
         // lcm_.subscribe(kLcmPlanChannel, &RobotPlanRunner::HandleSimpleCommand, this);
@@ -198,14 +210,13 @@ public:
         // }
     };
     int Run(){
-        if(ip_addr_.compare(home_addr)){
-            return -1;
+        if(ip_addr_ == home_addr){
+            return RunSim();
         } else {
             return RunFranka();
         }
     }
-
-    // bool ConnectToRobot();
+private: 
     int RunFranka(){
         lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
         try {
@@ -252,7 +263,31 @@ public:
         return 0;
     };
 
-private:
+    int RunSim(){
+        // first, load some parameters
+        momap::log()->info("Starting sim robot.");
+        parameters::Parameters params;
+        int verbose = 5;
+        Dracula *dracula = make_dracula(param_yaml_, params, verbose);
+        dracula->getViz()->loadRobot();
+        Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
+        franka::RobotState robot_state; // internal state; mapping to franka state
+        franka::Duration period;
+        milliseconds start_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
+
+        while(1){
+            franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period); 
+            dracula->getViz()->displayState(next_conf);
+            std::vector<double> next_conf_vec = du::e_to_v(next_conf);
+            ConvertToArray(next_conf_vec, robot_state.q);
+            ConvertToArray(next_conf_vec, robot_state.q_d);
+            milliseconds current_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
+            int64_t delta_ms = int64_t( (current_ms - start_ms).count() );
+            period = franka::Duration(delta_ms);
+        }
+        return -1; 
+    };
+
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
         franka_time += period.toSec();
         cur_time_us = int64_t(franka_time * 1.0e6); 
@@ -269,7 +304,7 @@ private:
             const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
             desired_next = plan_->value(cur_traj_time_s);
         } else {
-            std::array<double, 7> current_conf = robot_state.q_d;
+            std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
             desired_next = du::v_to_e( ConvertToVector(current_conf) );
         }
 
@@ -321,7 +356,7 @@ private:
         }
     };
     
-    void HandlePlan(const lcm::ReceiveBuffer*, const std::string&, const robot_spline_t* rst)
+    void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&, const robot_spline_t* rst)
     {
         momap::log()->info("New plan received.");
         if (! robot_alive_) {
@@ -387,7 +422,7 @@ private:
         ++plan_number_;
     };
 
-    void HandleStop(const lcm::ReceiveBuffer*, const std::string&,
+    void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_plan_t*) {
         momap::log()->info("Received stop command. Discarding plan.");
         plan_.reset();

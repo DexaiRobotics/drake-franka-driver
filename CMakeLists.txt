@@ -49,6 +49,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 include_directories(
 	include
 	$ENV{DRACULA_INCLUDE_DIR}
+	$ENV{DRACULA_INCLUDE_DIR}/../tests
 	$ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
 	${Franka_INCLUDE_DIRS}
 	${PYTHON_INCLUDE_DIRS}
@@ -88,6 +89,9 @@ target_link_libraries( ArrayToVectorPerformance
 					   ${PYTHON_LIBRARIES}
 					   fcl
 					 )
+
+configure_file($ENV{DRACULA_SOURCE_PATH}/dracula/tests/data/dracula_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
+configure_file($ENV{DRACULA_SOURCE_PATH}/dracula/tests/data/dracula_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 
 # install the lcm driver
 # install(TARGETS ${driver_name}
