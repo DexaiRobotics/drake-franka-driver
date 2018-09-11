@@ -183,6 +183,7 @@ private:
     RobotData robot_data_{}; 
     PPType piecewise_polynomial;
     std::thread lcm_publish_status_thread;
+    std::thread lcm_handle_thread;
     int sign_{};
 
     // Set print rate for comparing commanded vs. measured torques.
@@ -219,6 +220,8 @@ public:
 private: 
     int RunFranka(){
         lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
+        lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
+
         try {
             // Connect to robot.
             franka::Robot robot(ip_addr_);
@@ -263,8 +266,15 @@ private:
         return 0;
     };
 
+    void HandleLcm(){
+        while (true) {
+            lcm_.handleTimeout(10);
+        }
+    }
+
     int RunSim(){
         lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
+        lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
 
         // first, load some parameters
         momap::log()->info("Starting sim robot.");
@@ -273,20 +283,21 @@ private:
         Dracula *dracula = new Dracula(params);
         dracula->getViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
-        next_conf[5] = 0.5;
+        next_conf[5] = 1.5;
         franka::RobotState robot_state; // internal state; mapping to franka state
         franka::Duration period;
         milliseconds start_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
 
         while(1){
             franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period); 
-            dracula->getViz()->displayState(next_conf);
+            // dracula->getViz()->displayState(next_conf);
             std::vector<double> next_conf_vec = du::e_to_v(next_conf);
             ConvertToArray(next_conf_vec, robot_state.q);
             ConvertToArray(next_conf_vec, robot_state.q_d);
             milliseconds current_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
             int64_t delta_ms = int64_t( (current_ms - start_ms).count() );
             period = franka::Duration(delta_ms);
+            // while (0 == lcm_.handleTimeout(10)) {}// || iiwa_status_.utime == -1) { }
         }
         return -1; 
     };
