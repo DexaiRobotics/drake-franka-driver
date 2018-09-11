@@ -276,6 +276,8 @@ private:
         lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
         lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
 
+        robot_alive_ = true;
+
         // first, load some parameters
         momap::log()->info("Starting sim robot.");
         parameters::Parameters params = parameters::loadYamlParameters(param_yaml_);
@@ -286,18 +288,21 @@ private:
         next_conf[5] = 1.5;
         franka::RobotState robot_state; // internal state; mapping to franka state
         franka::Duration period;
-        milliseconds start_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
+        milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
 
         while(1){
-            franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period); 
-            // dracula->getViz()->displayState(next_conf);
             std::vector<double> next_conf_vec = du::e_to_v(next_conf);
             ConvertToArray(next_conf_vec, robot_state.q);
             ConvertToArray(next_conf_vec, robot_state.q_d);
+
+            franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period);
+            next_conf = du::v_to_e(ConvertToVector(cmd_pos.q)); 
+            dracula->getViz()->displayState(next_conf);
+
             milliseconds current_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
-            int64_t delta_ms = int64_t( (current_ms - start_ms).count() );
+            int64_t delta_ms = int64_t( (current_ms - last_ms).count() );            
             period = franka::Duration(delta_ms);
-            // while (0 == lcm_.handleTimeout(10)) {}// || iiwa_status_.utime == -1) { }
+            last_ms = current_ms;
         }
         return -1; 
     };
