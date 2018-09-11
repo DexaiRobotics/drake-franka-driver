@@ -264,6 +264,8 @@ private:
     };
 
     int RunSim(){
+        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
+
         // first, load some parameters
         momap::log()->info("Starting sim robot.");
         parameters::Parameters params = parameters::loadYamlParameters(param_yaml_);
@@ -271,6 +273,7 @@ private:
         Dracula *dracula = new Dracula(params);
         dracula->getViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
+        next_conf[5] = 0.5;
         franka::RobotState robot_state; // internal state; mapping to franka state
         franka::Duration period;
         milliseconds start_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
