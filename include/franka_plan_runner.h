@@ -266,9 +266,9 @@ private:
     int RunSim(){
         // first, load some parameters
         momap::log()->info("Starting sim robot.");
-        parameters::Parameters params;
+        parameters::Parameters params = parameters::loadYamlParameters(param_yaml_);
         int verbose = 5;
-        Dracula *dracula = make_dracula(param_yaml_, params, verbose);
+        Dracula *dracula = new Dracula(params);
         dracula->getViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
         franka::RobotState robot_state; // internal state; mapping to franka state
