@@ -268,7 +268,7 @@ private:
 
     void HandleLcm(){
         while (true) {
-            lcm_.handleTimeout(10);
+            lcm_.handleTimeout(0);
         }
     }
 
