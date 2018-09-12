@@ -335,7 +335,7 @@ private:
 
             plan_.mutex.unlock();
             reading_plan = false;
-            read_cv.notify_one();
+            edit_cv.notify_one();
         } else {
             std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
             desired_next = du::v_to_e( ConvertToVector(current_conf) );
@@ -467,7 +467,7 @@ private:
 
         plan_.mutex.unlock();
         editing_plan = false;
-        edit_cv.notify_one();
+        read_cv.notify_one();
 
         // PiecewisePolynomial<double>::Cubic(input_time, knots, knot_dot, knot_dot)));
         ++plan_number_;
