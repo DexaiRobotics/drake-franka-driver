@@ -332,7 +332,7 @@ private:
 
             plan_.mutex.unlock();
         } else {
-            std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
+            std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
             desired_next = du::v_to_e( ConvertToVector(current_conf) );
         }
         
