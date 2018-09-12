@@ -221,17 +221,26 @@ public:
         // }
     };
     int Run(){
+        // start LCM threads; independent of sim vs. real robot
+        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
+        lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
+        int return_value = -1; //
         if(ip_addr_ == home_addr){
-            return RunSim();
+            return_value = RunSim();
         } else {
-            return RunFranka();
+            return_value = RunFranka();
         }
+        // clean-up threads if they're still alive.
+        if (lcm_publish_status_thread.joinable()) {
+            lcm_publish_status_thread.join();
+        }
+        if (lcm_handle_thread.joinable()) {
+            lcm_handle_thread.join();
+        }
+        return return_value;
     }
 private: 
     int RunFranka(){
-        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
-        lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
-
         try {
             // Connect to robot.
             franka::Robot robot(ip_addr_);
@@ -268,34 +277,21 @@ private:
 
         } catch (const franka::Exception& ex) {
             running_ = false;
-            std::cerr << ex.what() << std::endl;
+            momap::log()->error("drake::franka_driver::RunFranka Caught expection: {}", ex.what() );
+            return -99; // bad things happened. 
         }
-        if (lcm_publish_status_thread.joinable()) {
-            lcm_publish_status_thread.join();
-        }
-        return 0;
+        return 0; 
+        
     };
-
-    void HandleLcm(){
-        while (true) {
-            lcm_.handleTimeout(0);
-        }
-    }
-
     int RunSim(){
-        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
-        lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
-
-        robot_alive_ = true;
-
-        // first, load some parameters
+        robot_alive_ = true; // the sim robot *always* starts as planned
         momap::log()->info("Starting sim robot.");
+        // first, load some parameters
         parameters::Parameters params = parameters::loadYamlParameters(param_yaml_);
-        int verbose = 5;
         Dracula *dracula = new Dracula(params);
         dracula->getViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
-        next_conf[5] = 1.5;
+        next_conf[5] = 1.5; // set robot in a starting position which is not in collision
         franka::RobotState robot_state; // internal state; mapping to franka state
         franka::Duration period;
         milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
@@ -314,7 +310,7 @@ private:
             period = franka::Duration(delta_ms);
             last_ms = current_ms;
         }
-        return -1; 
+        return 0; 
     };
 
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
@@ -376,6 +372,13 @@ private:
         }
         return output;
     };
+
+    void HandleLcm(){
+        while (true) {
+            lcm_.handleTimeout(0);
+        }
+    }
+
     void PublishLcmStatus(){ //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
         while (running_) {
             // Sleep to achieve the desired print rate.
