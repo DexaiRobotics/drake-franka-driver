@@ -191,10 +191,8 @@ private:
     std::thread lcm_publish_status_thread;
     std::thread lcm_handle_thread;
     int sign_{};
-    std::condition_variable not_reading;
     std::atomic_bool editing_plan{false};
     std::condition_variable not_editing;
-    std::atomic_bool reading_plan{false};
 
     // Set print rate for comparing commanded vs. measured torques.
     const double lcm_publish_rate = 200.0; //Hz
@@ -321,7 +319,6 @@ private:
 
         std::unique_lock<std::mutex> lck(plan_.mutex);
         not_editing.wait(lck, [this](){return editing_plan == false;});
-        reading_plan = true;
 
         if (plan_.plan) {
             if (plan_number_ != cur_plan_number) {
@@ -333,7 +330,6 @@ private:
             const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
             desired_next = plan_.plan->value(cur_traj_time_s);
 
-            reading_plan = false;
             plan_.mutex.unlock();
         } else {
             std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
@@ -476,15 +472,14 @@ private:
         momap::log()->info("Received stop command. Discarding plan.");
 
         std::unique_lock<std::mutex> lck(plan_.mutex);
-        not_reading.wait(lck, [this](){return editing_plan == false;});
         editing_plan = true;
 
         plan_.has_data = false;
         plan_.plan.release();
 
-        plan_.mutex.unlock();
         editing_plan = false;
-        not_reading.notify_one();
+        plan_.mutex.unlock();
+        not_editing.notify_one();
 
     };
 
