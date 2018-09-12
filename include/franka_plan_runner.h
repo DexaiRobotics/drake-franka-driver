@@ -320,9 +320,7 @@ private:
         Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
 
         std::unique_lock<std::mutex> lck(plan_.mutex);
-
         edit_cv.wait(lck, [this](){return editing_plan == false;});
-
         reading_plan = true;
 
         if (plan_.plan) {
@@ -334,6 +332,7 @@ private:
 
             const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
             desired_next = plan_.plan->value(cur_traj_time_s);
+
             plan_.mutex.unlock();
             reading_plan = false;
             read_cv.notify_one();
@@ -405,71 +404,69 @@ private:
             return;
         }
 
-
         std::unique_lock<std::mutex> lck(plan_.mutex);
-
         edit_cv.wait(lck, [this](){return editing_plan == false;});
         editing_plan = true;
 
-            piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
-            momap::log()->info("after");
+        piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
+        momap::log()->info("after");
 
-            if (piecewise_polynomial.get_number_of_segments()<1)
+        if (piecewise_polynomial.get_number_of_segments()<1)
+        {
+            momap::log()->info("Discarding plan, invalid piecewise polynomial.");
+            return;
+        }
+
+        momap::log()->info("utime: {}", rst->utime);
+        momap::log()->info("start time: {}", piecewise_polynomial.start_time());
+        momap::log()->info("end time: {}", piecewise_polynomial.end_time());
+
+        //Naive implementation of velocity check
+        const int velocity_check_samples = 100;
+        PPType piecewise_polynomial_derivative = piecewise_polynomial.derivative();
+        double step_size = (piecewise_polynomial.end_time()-piecewise_polynomial.start_time())/velocity_check_samples; //FIXME: numer
+        double test_time = piecewise_polynomial.start_time();
+        while(test_time<piecewise_polynomial.end_time())
+        {
+            VectorXd sampled_velocity = piecewise_polynomial_derivative.value(test_time);
+            //Check dimension
+            if (sampled_velocity.size()!= rst->dof)
             {
-                momap::log()->info("Discarding plan, invalid piecewise polynomial.");
+                momap::log()->info("Discarding plan, invalid piecewise polynomial derivative.");
                 return;
             }
-
-            momap::log()->info("utime: {}", rst->utime);
-            momap::log()->info("start time: {}", piecewise_polynomial.start_time());
-            momap::log()->info("end time: {}", piecewise_polynomial.end_time());
-
-            //Naive implementation of velocity check
-            const int velocity_check_samples = 100;
-            PPType piecewise_polynomial_derivative = piecewise_polynomial.derivative();
-            double step_size = (piecewise_polynomial.end_time()-piecewise_polynomial.start_time())/velocity_check_samples; //FIXME: numer
-            double test_time = piecewise_polynomial.start_time();
-            while(test_time<piecewise_polynomial.end_time())
-            {
-                VectorXd sampled_velocity = piecewise_polynomial_derivative.value(test_time);
-                //Check dimension
-                if (sampled_velocity.size()!= rst->dof)
-                {
-                    momap::log()->info("Discarding plan, invalid piecewise polynomial derivative.");
-                    return;
-                }
-                for (int joint = 0; joint < rst->dof; joint++)
-                {
-                    if (sampled_velocity(joint)>rst->robot_joints[joint].velocity_upper_limit||
-                    sampled_velocity(joint)<rst->robot_joints[joint].velocity_lower_limit)
-                    {
-                        momap::log()->info("Discarding plan, joint velocity out of bounds.");
-                        momap::log()->info("sampled joint {} velocity: {}", joint, sampled_velocity(joint));
-                        momap::log()->info("lower limit: {} upper limit: {}", rst->robot_joints[joint].velocity_lower_limit, rst->robot_joints[joint].velocity_upper_limit);
-                        return;
-                    }
-                }
-                test_time+=step_size;
-            }
-
-            //Start position == goal position check
-            VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
             for (int joint = 0; joint < rst->dof; joint++)
             {
-                if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
+                if (sampled_velocity(joint)>rst->robot_joints[joint].velocity_upper_limit||
+                sampled_velocity(joint)<rst->robot_joints[joint].velocity_lower_limit)
                 {
-                    momap::log()->info("Discarding plan, mismatched start position.");
+                    momap::log()->info("Discarding plan, joint velocity out of bounds.");
+                    momap::log()->info("sampled joint {} velocity: {}", joint, sampled_velocity(joint));
+                    momap::log()->info("lower limit: {} upper limit: {}", rst->robot_joints[joint].velocity_lower_limit, rst->robot_joints[joint].velocity_upper_limit);
                     return;
                 }
             }
+            test_time+=step_size;
+        }
 
-            plan_.has_data = true;
-            //TODO: add end position==goal position check (upstream)
-            plan_.plan.release();
-            plan_.plan.reset(&piecewise_polynomial);
-            plan_.mutex.unlock();
-            editing_plan = false;
-        
+        //Start position == goal position check
+        VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
+        for (int joint = 0; joint < rst->dof; joint++)
+        {
+            if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
+            {
+                momap::log()->info("Discarding plan, mismatched start position.");
+                return;
+            }
+        }
+
+        plan_.has_data = true;
+        //TODO: add end position==goal position check (upstream)
+        plan_.plan.release();
+        plan_.plan.reset(&piecewise_polynomial);
+
+        plan_.mutex.unlock();
+        editing_plan = false;
         edit_cv.notify_one();
 
         // PiecewisePolynomial<double>::Cubic(input_time, knots, knot_dot, knot_dot)));
@@ -479,12 +476,14 @@ private:
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_plan_t*) {
         momap::log()->info("Received stop command. Discarding plan.");
-        std::unique_lock<std::mutex> lck(plan_.mutex);
 
+        std::unique_lock<std::mutex> lck(plan_.mutex);
         edit_cv.wait(lck, [this](){return editing_plan == false;});
         editing_plan = true;
+
         plan_.has_data = false;
         plan_.plan.release();
+
         plan_.mutex.unlock();
         editing_plan = false;
         edit_cv.notify_one();
