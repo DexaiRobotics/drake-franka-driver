@@ -191,9 +191,9 @@ private:
     std::thread lcm_publish_status_thread;
     std::thread lcm_handle_thread;
     int sign_{};
-    std::condition_variable edit_cv;
+    std::condition_variable not_reading;
     std::atomic_bool editing_plan{false};
-    std::condition_variable read_cv;
+    std::condition_variable not_editing;
     std::atomic_bool reading_plan{false};
 
     // Set print rate for comparing commanded vs. measured torques.
@@ -320,7 +320,7 @@ private:
         Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
 
         std::unique_lock<std::mutex> lck(plan_.mutex);
-        edit_cv.wait(lck, [this](){return editing_plan == false;});
+        not_editing.wait(lck, [this](){return editing_plan == false;});
         reading_plan = true;
 
         if (plan_.plan) {
@@ -333,9 +333,8 @@ private:
             const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
             desired_next = plan_.plan->value(cur_traj_time_s);
 
-            plan_.mutex.unlock();
             reading_plan = false;
-            edit_cv.notify_one();
+            plan_.mutex.unlock();
         } else {
             std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
             desired_next = du::v_to_e( ConvertToVector(current_conf) );
@@ -405,7 +404,6 @@ private:
         }
 
         std::unique_lock<std::mutex> lck(plan_.mutex);
-        edit_cv.wait(lck, [this](){return editing_plan == false;});
         editing_plan = true;
 
         piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
@@ -465,9 +463,9 @@ private:
         plan_.plan.release();
         plan_.plan.reset(&piecewise_polynomial);
 
-        plan_.mutex.unlock();
         editing_plan = false;
-        read_cv.notify_one();
+        plan_.mutex.unlock();
+        not_editing.notify_one();
 
         // PiecewisePolynomial<double>::Cubic(input_time, knots, knot_dot, knot_dot)));
         ++plan_number_;
@@ -478,7 +476,7 @@ private:
         momap::log()->info("Received stop command. Discarding plan.");
 
         std::unique_lock<std::mutex> lck(plan_.mutex);
-        edit_cv.wait(lck, [this](){return editing_plan == false;});
+        not_reading.wait(lck, [this](){return editing_plan == false;});
         editing_plan = true;
 
         plan_.has_data = false;
@@ -486,7 +484,7 @@ private:
 
         plan_.mutex.unlock();
         editing_plan = false;
-        edit_cv.notify_one();
+        not_reading.notify_one();
 
     };
 
