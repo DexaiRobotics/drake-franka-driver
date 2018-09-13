@@ -8,6 +8,9 @@ export DRACULA_BUILD_PATH="$DRACULA_SOURCE_PATH/build"
 export DRACULA_INCLUDE_DIR="$DRACULA_SOURCE_PATH/dracula/include"
 export DRACULA_LIBRARIES="$DRACULA_BUILD_PATH/dracula/libdracula.so"
 
+LOCAL_PYTHON=`which python`
+export LOCAL_PYTHON_PATH=`dirname $LOCAL_PYTHON`
+
 if [ "$(uname)" == "Darwin" ]; then
     export DRACULA_LIBRARIES="$DRACULA_BUILD_PATH/dracula/libdracula.dylib"
 fi
