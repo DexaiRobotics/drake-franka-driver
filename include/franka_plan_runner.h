@@ -90,6 +90,7 @@ const char* const kLcmStatusChannel = "FRANKA_STATUS";
 const char* const kLcmPlanChannel = "FRANKA_PLAN";
 const char* const kLcmInterfaceChannel = "FRANKA_SIMPLE_INTERFACE";
 const char* const kLcmStopChannel = "STOP";
+const char* const kLCMURL = "udpm://239.255.76.67:7667?ttl=2";
 const int kNumJoints = 7;
 const std::string home_addr = "192.168.1.1"; 
 
@@ -199,7 +200,7 @@ private:
     double franka_time;
 
 public:
-    FrankaPlanRunner(const std::string ip_addr, const std::string param_yaml) : ip_addr_(ip_addr), param_yaml_(param_yaml), plan_number_(0)
+    FrankaPlanRunner(const std::string ip_addr, const std::string param_yaml) : ip_addr_(ip_addr), param_yaml_(param_yaml), plan_number_(0), lcm_(kLCMURL)
     {
         lcm_.subscribe(kLcmPlanChannel, &FrankaPlanRunner::HandlePlan, this);
         // lcm_.subscribe(kLcmPlanChannel, &RobotPlanRunner::HandleSimpleCommand, this);
