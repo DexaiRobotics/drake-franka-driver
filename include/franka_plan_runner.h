@@ -318,10 +318,10 @@ private:
 
         Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
 
-        std::unique_lock<std::mutex> lck(plan_.mutex);
-        not_editing.wait(lck, [this](){return editing_plan == false;});
+        // std::unique_lock<std::mutex> lck(plan_.mutex);
+        // not_editing.wait(lck, [this](){return editing_plan == false;});
 
-        if (plan_.plan) {
+        if (plan_.mutex.try_lock() && plan_.plan) {
             if (plan_number_ != cur_plan_number) {
                 momap::log()->info("Starting new plan.");
                 start_time_us = cur_time_us;
