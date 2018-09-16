@@ -90,6 +90,7 @@ const char* const kLcmStatusChannel = "FRANKA_STATUS";
 const char* const kLcmPlanChannel = "FRANKA_PLAN";
 const char* const kLcmInterfaceChannel = "FRANKA_SIMPLE_INTERFACE";
 const char* const kLcmStopChannel = "STOP";
+const char* const kLCMURL = "udpm://239.255.76.67:7667?ttl=2";
 const int kNumJoints = 7;
 const std::string home_addr = "192.168.1.1"; 
 
@@ -199,7 +200,7 @@ private:
     double franka_time;
 
 public:
-    FrankaPlanRunner(const std::string ip_addr, const std::string param_yaml) : ip_addr_(ip_addr), param_yaml_(param_yaml), plan_number_(0)
+    FrankaPlanRunner(const std::string ip_addr, const std::string param_yaml) : ip_addr_(ip_addr), param_yaml_(param_yaml), plan_number_(0), lcm_(kLCMURL)
     {
         lcm_.subscribe(kLcmPlanChannel, &FrankaPlanRunner::HandlePlan, this);
         // lcm_.subscribe(kLcmPlanChannel, &RobotPlanRunner::HandleSimpleCommand, this);
@@ -316,26 +317,26 @@ private:
         cur_time_us = int64_t(franka_time * 1.0e6); 
 
         Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
+        std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
+        desired_next = du::v_to_e( ConvertToVector(current_conf) );
 
-        std::unique_lock<std::mutex> lck(plan_.mutex);
-        not_editing.wait(lck, [this](){return editing_plan == false;});
+        // std::unique_lock<std::mutex> lck(plan_.mutex);
+        // not_editing.wait(lck, [this](){return editing_plan == false;});
 
-        if (plan_.plan) {
-            if (plan_number_ != cur_plan_number) {
-                momap::log()->info("Starting new plan.");
-                start_time_us = cur_time_us;
-                cur_plan_number = plan_number_;
-            }
+        if (plan_.mutex.try_lock() ){
+            // momap::log()->info("got the lock!");
+            if (plan_.plan) {
+                if (plan_number_ != cur_plan_number) {
+                    momap::log()->info("Starting new plan.");
+                    start_time_us = cur_time_us;
+                    cur_plan_number = plan_number_;
+                }
 
-            const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
-            desired_next = plan_.plan->value(cur_traj_time_s);
-
+                const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
+                desired_next = plan_.plan->value(cur_traj_time_s);
+            } 
             plan_.mutex.unlock();
-        } else {
-            std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
-            desired_next = du::v_to_e( ConvertToVector(current_conf) );
         }
-        
         // TODO: debug lines which move robot, remove soon @dmsj
         // if (desired_next(0) > 1.5 && sign_ > 0){
         //     sign_ = -1;
