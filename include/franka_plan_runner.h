@@ -317,26 +317,26 @@ private:
         cur_time_us = int64_t(franka_time * 1.0e6); 
 
         Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
+        std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
+        desired_next = du::v_to_e( ConvertToVector(current_conf) );
 
         // std::unique_lock<std::mutex> lck(plan_.mutex);
         // not_editing.wait(lck, [this](){return editing_plan == false;});
 
-        if (plan_.mutex.try_lock() && plan_.plan) {
-            if (plan_number_ != cur_plan_number) {
-                momap::log()->info("Starting new plan.");
-                start_time_us = cur_time_us;
-                cur_plan_number = plan_number_;
-            }
+        if (plan_.mutex.try_lock() ){
+            // momap::log()->info("got the lock!");
+            if (plan_.plan) {
+                if (plan_number_ != cur_plan_number) {
+                    momap::log()->info("Starting new plan.");
+                    start_time_us = cur_time_us;
+                    cur_plan_number = plan_number_;
+                }
 
-            const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
-            desired_next = plan_.plan->value(cur_traj_time_s);
-
+                const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
+                desired_next = plan_.plan->value(cur_traj_time_s);
+            } 
             plan_.mutex.unlock();
-        } else {
-            std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
-            desired_next = du::v_to_e( ConvertToVector(current_conf) );
         }
-        
         // TODO: debug lines which move robot, remove soon @dmsj
         // if (desired_next(0) > 1.5 && sign_ > 0){
         //     sign_ = -1;
