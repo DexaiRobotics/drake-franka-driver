@@ -53,6 +53,7 @@ include_directories(
 	$ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
 	${Franka_INCLUDE_DIRS}
 	${PYTHON_INCLUDE_DIRS}
+    $ENV{CTPL_INCLUDE_DIR}
 	externals/StopWatch
 	)
 

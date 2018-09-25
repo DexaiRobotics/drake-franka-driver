@@ -88,6 +88,7 @@ namespace franka_driver {
 
 const char* const kLcmStatusChannel = "FRANKA_STATUS";
 const char* const kLcmPlanChannel = "FRANKA_PLAN";
+const char* const kLcmPlanReceivedChannel = "FRANKA_PLAN_RECEIVED";
 const char* const kLcmInterfaceChannel = "FRANKA_SIMPLE_INTERFACE";
 const char* const kLcmStopChannel = "STOP";
 const char* const kLCMURL = "udpm://239.255.76.67:7667?ttl=2";
@@ -400,11 +401,18 @@ private:
             return;
         }
 
+        lcmt_iiwa_status plan_received_status;
+        ResizeStatusMessage(plan_received_status);
+        plan_received_status.utime = rst->utime;
+        //$ publish confirmation that plan was received with same utime
+        //$ TODO: use a different, simpler LCM type for this?
+        lcm_.publish(kLcmPlanReceivedChannel, &plan_received_status);
+        momap::log()->info("Published confirmation of received plan");
+
         std::unique_lock<std::mutex> lck(plan_.mutex);
         editing_plan = true;
 
         piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
-        momap::log()->info("after");
 
         if (piecewise_polynomial.get_number_of_segments()<1)
         {
