@@ -39,12 +39,12 @@ parameters:
   material: ''
   prompt_robot_motion: false
   replay_mode: false
-  lcm_status_channel: 'FRANKA_STATUS'
-  lcm_plan_channel: 'FRANKA_PLAN'
-  lcm_plan_received_channel: 'FRANKA_PLAN_RECEIVED' 
-  lcm_stop_channel: 'STOP'
+  lcm_status_channel: FRANKA_0_STATUS
+  lcm_plan_channel: FRANKA_0_PLAN
+  lcm_plan_received_channel: FRANKA_0_PLAN_RECEIVED
+  lcm_stop_channel: FRANKA_0_STOP
   lcm_solenoid_state_channel: ''
-  lcm_url: 'udpm://239.255.76.67:7667?ttl=2'
+  lcm_url: udpm://239.255.76.67:7667?ttl=2
   robot_ip: '192.168.1.1' # sim
   ros_wrist_camera_ns: ''
   ros_head_camera_ns: ''
