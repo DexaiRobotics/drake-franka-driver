@@ -86,12 +86,6 @@ namespace du = dracula_utils;
 namespace drake {
 namespace franka_driver {
 
-// const char* const kLcmStatusChannel = "FRANKA_STATUS";
-// const char* const kLcmPlanChannel = "FRANKA_PLAN";
-// const char* const kLcmPlanReceivedChannel = "FRANKA_PLAN_RECEIVED";
-// const char* const kLcmInterfaceChannel = "FRANKA_SIMPLE_INTERFACE";
-// const char* const kLcmStopChannel = "STOP";
-// const char* const kLCMURL = "udpm://239.255.76.67:7667?ttl=2";
 const int kNumJoints = 7;
 const std::string home_addr = "192.168.1.1"; 
 
@@ -202,7 +196,7 @@ private:
     double franka_time;
 
 public:
-    FrankaPlanRunner(const std::string ip_addr, const parameters::Parameters params) : ip_addr_(ip_addr), p(params), plan_number_(0), lcm_(params.lcm_url)
+    FrankaPlanRunner(const parameters::Parameters params) : p(params), ip_addr_(params.robot_ip), plan_number_(0), lcm_(params.lcm_url)
     {
         lcm_.subscribe(p.lcm_plan_channel, &FrankaPlanRunner::HandlePlan, this);
         // lcm_.subscribe(kLcmPlanChannel, &RobotPlanRunner::HandleSimpleCommand, this);

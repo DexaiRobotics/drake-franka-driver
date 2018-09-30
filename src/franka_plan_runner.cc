@@ -15,12 +15,12 @@
 namespace drake {
 namespace franka_driver {
 
-int do_main(std::string robot_ip_addr, std::string param_yaml="dracula_test.yaml") {
+int do_main(std::string param_yaml="franka_test.yaml") {
     create_momap_log("franka_plan_runner");
     int verbose = 0;
     momap::log()->info("Loading parameters: {}", param_yaml);
     parameters::Parameters params = parameters::loadYamlParameters(param_yaml, verbose);
-    FrankaPlanRunner frankaPlanRunner(robot_ip_addr, params);
+    FrankaPlanRunner frankaPlanRunner(params);
     return frankaPlanRunner.Run(); 
 }
 
@@ -29,23 +29,16 @@ int do_main(std::string robot_ip_addr, std::string param_yaml="dracula_test.yaml
 
 
 int main(int argc, char** argv) {
-    if (argc != 2 && argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <robot-hostname>" << " <param.yaml> (optional)" << std::endl;
+    if (argc != 1 && argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <params_filepath>" << std::endl;
         return -1;
     }
-    std::string ip_addr = argv[1];
-    std::remove( ip_addr.begin(), ip_addr.end(), ' ' );
-    if (argc == 2){
-        if (ip_addr == drake::franka_driver::home_addr ){
-            std::cerr << "ip addr " << ip_addr << " == " << drake::franka_driver::home_addr << ". No param.yaml provided. Exiting." << std::endl;
-            return -1; 
-        }
-        return drake::franka_driver::do_main(argv[1]);
+
+    if (argc == 1){
+        momap::log()->info("Loading default parameters with sim robot: franka_test.yaml");
+        return drake::franka_driver::do_main();
     } else {
-        if (ip_addr != drake::franka_driver::home_addr ){
-            std::cerr << "ip addr " << ip_addr << " != " << drake::franka_driver::home_addr << ". Ignoring param.yaml spec." << std::endl;
-            return -1; 
-        }
-        return drake::franka_driver::do_main(ip_addr, argv[2]);
+        std::string param_yaml = argv[1];
+        return drake::franka_driver::do_main(param_yaml);
     }
 }

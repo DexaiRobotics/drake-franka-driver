@@ -9,11 +9,14 @@ find_package(Threads REQUIRED)
 
 # SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
-set(EXECUTABLE_OUTPUT_PATH "${CMAKE_BINARY_DIR}/bin")
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
+
+configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
+configure_file(tests/data/franka_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
+file(COPY tests/data/meshes DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Find LCM
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
@@ -90,9 +93,6 @@ target_link_libraries( ArrayToVectorPerformance
 					   ${PYTHON_LIBRARIES}
 					   fcl
 					 )
-
-configure_file($ENV{DRACULA_SOURCE_PATH}/dracula/tests/data/dracula_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
-configure_file($ENV{DRACULA_SOURCE_PATH}/dracula/tests/data/dracula_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 
 # install the lcm driver
 # install(TARGETS ${driver_name}
