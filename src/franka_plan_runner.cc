@@ -17,7 +17,10 @@ namespace franka_driver {
 
 int do_main(std::string robot_ip_addr, std::string param_yaml="dracula_test.yaml") {
     create_momap_log("franka_plan_runner");
-    FrankaPlanRunner frankaPlanRunner(robot_ip_addr, param_yaml);
+    int verbose = 2;
+    momap::log()->info("Loading parameters: {}", param_yaml);
+    parameters::Parameters params = parameters::loadYamlParameters(param_yaml, verbose);
+    FrankaPlanRunner frankaPlanRunner(robot_ip_addr, params);
     return frankaPlanRunner.Run(); 
 }
 
