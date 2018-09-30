@@ -86,12 +86,6 @@ namespace du = dracula_utils;
 namespace drake {
 namespace franka_driver {
 
-const char* const kLcmStatusChannel = "FRANKA_STATUS";
-const char* const kLcmPlanChannel = "FRANKA_PLAN";
-const char* const kLcmPlanReceivedChannel = "FRANKA_PLAN_RECEIVED";
-const char* const kLcmInterfaceChannel = "FRANKA_SIMPLE_INTERFACE";
-const char* const kLcmStopChannel = "STOP";
-const char* const kLCMURL = "udpm://239.255.76.67:7667?ttl=2";
 const int kNumJoints = 7;
 const std::string home_addr = "192.168.1.1"; 
 
@@ -178,8 +172,9 @@ void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
 
 class FrankaPlanRunner {
 private:
-    std::string ip_addr_;
     std::string param_yaml_; 
+    parameters::Parameters p;
+    std::string ip_addr_;
     std::atomic_bool running_{false};
     std::atomic_bool robot_alive_{false};
     ::lcm::LCM lcm_;
@@ -201,11 +196,11 @@ private:
     double franka_time;
 
 public:
-    FrankaPlanRunner(const std::string ip_addr, const std::string param_yaml) : ip_addr_(ip_addr), param_yaml_(param_yaml), plan_number_(0), lcm_(kLCMURL)
+    FrankaPlanRunner(const parameters::Parameters params) : p(params), ip_addr_(params.robot_ip), plan_number_(0), lcm_(params.lcm_url)
     {
-        lcm_.subscribe(kLcmPlanChannel, &FrankaPlanRunner::HandlePlan, this);
+        lcm_.subscribe(p.lcm_plan_channel, &FrankaPlanRunner::HandlePlan, this);
         // lcm_.subscribe(kLcmPlanChannel, &RobotPlanRunner::HandleSimpleCommand, this);
-        lcm_.subscribe(kLcmStopChannel, &FrankaPlanRunner::HandleStop, this);
+        lcm_.subscribe(p.lcm_stop_channel, &FrankaPlanRunner::HandleStop, this);
         running_ = true;
         franka_time = 0.0; 
 
@@ -213,6 +208,12 @@ public:
         cur_time_us = -1;
         start_time_us = -1;
         sign_ = +1; 
+
+        momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
+        momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
+        momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
+        momap::log()->info("Status channel: {}", p.lcm_status_channel);
+    
     };
 
     ~FrankaPlanRunner(){
@@ -287,8 +288,7 @@ private:
         robot_alive_ = true; // the sim robot *always* starts as planned
         momap::log()->info("Starting sim robot.");
         // first, load some parameters
-        parameters::Parameters params = parameters::loadYamlParameters(param_yaml_);
-        Dracula *dracula = new Dracula(params);
+        Dracula *dracula = new Dracula(p);
         dracula->getViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
         next_conf[5] = 1.5; // set robot in a starting position which is not in collision
@@ -385,7 +385,7 @@ private:
                 if (robot_data_.has_data) {
                     lcmt_iiwa_status franka_status = ConvertToLcmStatus(robot_data_.robot_state); 
                     // publish data over lcm
-                    lcm_.publish(kLcmStatusChannel, &franka_status);
+                    lcm_.publish(p.lcm_status_channel, &franka_status);
                     robot_data_.has_data = false;
                 }
                 robot_data_.mutex.unlock();
@@ -406,7 +406,7 @@ private:
         plan_received_status.utime = rst->utime;
         //$ publish confirmation that plan was received with same utime
         //$ TODO: use a different, simpler LCM type for this?
-        lcm_.publish(kLcmPlanReceivedChannel, &plan_received_status);
+        lcm_.publish(p.lcm_plan_received_channel, &plan_received_status);
         momap::log()->info("Published confirmation of received plan");
 
         std::unique_lock<std::mutex> lck(plan_.mutex);
