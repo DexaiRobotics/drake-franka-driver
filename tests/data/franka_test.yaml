@@ -1,0 +1,121 @@
+parameters:
+  approach_frame: ''
+  container_corner_transform:
+  - -0.073 # -0.051
+  - -0.1725 #  -0.152
+  - 0.18
+  container_dimensions:
+  - 0.146
+  - 0.345
+  - 0.180
+  container_frame: ''
+  container_sampling:
+  - 0.044
+  - 0.041
+  - 0.0275
+  dispense_frame: ''
+  exit_frame: ''
+  gravity_vector:
+  - 0.0
+  - 0.0
+  - -1.0
+  kCollisionEpsilonConservative: 0.0025
+  kCollisionEpsilonContainer: 0.002
+  kCollisionEpsilonMin: 0.001
+  kContainerSampleMargin: 0.02
+  kFailedSolveSum: 0.1
+  kLooseJointDistance: 0.25
+  kLooseOrientationEpsilon: 0.55
+  kLoosePositionEpsilon: 0.025
+  kMaxJointDistanceBetweenKnots: 0.07
+  kMediumJointDistance: 0.125
+  kMediumOrientationEpsilon: 0.2
+  kMediumPositionEpsilon: 0.01
+  kSplineSampleFreq: 10.0
+  kTightJointDistance: 0.01
+  kTightOrientationEpsilon: 0.01
+  kTightPositionEpsilon: 0.001
+  log_dir_name: ''
+  material: ''
+  prompt_robot_motion: false
+  replay_mode: false
+  lcm_status_channel: 'FRANKA_STATUS'
+  lcm_plan_channel: 'FRANKA_PLAN'
+  lcm_plan_received_channel: 'FRANKA_PLAN_RECEIVED' 
+  lcm_stop_channel: 'STOP'
+  lcm_solenoid_state_channel: ''
+  lcm_url: 'udpm://239.255.76.67:7667?ttl=2'
+  robot_ip: '192.168.1.1' # sim
+  ros_wrist_camera_ns: ''
+  ros_head_camera_ns: ''
+  ros_force_torque_topic: ''
+  robot_dof: 7
+  robot_high_joint_limits:
+      - 2.89 #170
+      - 1.76 #120
+      - 2.89 #170
+      - -0.07 #120
+      - 2.89 #170
+      - 3.75 #120
+      - 2.89 #175
+  robot_low_joint_limits:
+      - -2.89
+      - -1.76
+      - -2.89
+      - -3.07
+      - -2.89
+      - -0.01
+      - -2.89
+  robot_max_velocities:
+      - 2.17 # 85 deg/sec
+      - 2.17 # 85 deg/sec
+      - 2.17 # 100 deg/sec
+      - 2.17 # 75 deg/sec
+      - 2.61 # 130 deg/sec
+      - 2.61 # 135 deg/sec
+      - 2.61 # 135 deg/sec
+  robot_max_accelerations:
+      - 15 # 320 N-m max torque
+      - 7.5
+      - 10
+      - 12.5
+      - 15
+      - 20
+      - 20
+  robot_max_jerks:
+      - 7500
+      - 3750
+      - 5000
+      - 6250
+      - 7500
+      - 10000
+      - 10000
+  robot_name: franka
+  safe_z: 0.4
+  splineType: FirstOrderHold
+  action_overlap_factor: 1.65
+  action_type: 3
+  tool_axis:
+  - 0.0
+  - 0.0
+  - 1.0
+  tool_changer_frame: ''
+  tool_face_normal:
+  - 0.0
+  - -1.0
+  - 0.0
+  tool_frame: ''
+  tool_radius: 0.0275
+  traj_lib_dir_name: ''
+  urdf: franka_test.urdf
+  urdf_simple_geo: franka_test.urdf
+  urdf_complex_geo: franka_test.urdf
+  urdf_utensil_in_bin: franka_test.urdf
+  urdf_no_utensil: franka_test.urdf
+  urdf_utensil_attached: franka_test.urdf
+  urdf_dir: ''
+  workstation_name: franka_test
+  utensil_size: ''
+  utensil_type: ''
+  world_frame: base_link
+  yaml_test_dbl: 9.87654321
