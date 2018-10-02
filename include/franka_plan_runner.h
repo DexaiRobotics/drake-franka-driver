@@ -295,9 +295,8 @@ private:
             franka::Robot robot(ip_addr_);
             setDefaultBehavior(robot);
             robot_alive_ = true; 
-
-            // First move the robot to a suitable joint configuration
-            // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
+            // First move the robot to a suitabcurrent_desiredle joint configuration
+            // std::array<double, 7> q_goal = {current_desired{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
             // MotionGenerator motion_generator(0.5, q_goal);
             // std::cout << "WARNING: This example will move the robot! "
             //         << "Please make sure to have the user stop button at hand!" << std::endl
@@ -352,10 +351,9 @@ private:
             // std::array<double, 7> tau_d_calculated;
             // for (size_t i = 0; i < 7; i++) {
             //     tau_d_calculated[i] =
-            //         k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + coriolis[i];
-            // }
-
-            // // The following line is only necessary for printing the rate limited torque. As we activated
+            //         k_gains[i] * (state.q_d[current_desiredi] - state.q[i]) - d_gains[i] * state.dq[i] + coriolis[i];
+            // }current_desired
+            // // The following line is only necurrent_desiredcessary for printing the rate limited torque. As we activated
             // // rate limiting for the control loop (activated by default), the torque would anyway be
             // // adjusted!
             // std::array<double, 7> tau_d_rate_limited =
@@ -499,10 +497,11 @@ private:
 
         Eigen::Matrix4d desired_next = Eigen::Matrix4d::Zero();
         desired_next = Eigen::Map<Eigen::Matrix<double,4,4>>(current_desired.data()); 
+        Eigen::Matrix4d current_pose = Eigen::Map<Eigen::Matrix<double,4,4>>(current_actual.data()); 
         // std::cout << du::v_to_e( ConvertToVector(current_desired) ).transpose() << std::endl;
         // Eigen::VectorXd = du::v_to_e( ConvertToVector(current_desired) );
 
-        std::cout << std::endl << desired_next << std::endl; 
+        // std::cout << std::endl << desired_next << std::endl; 
 
         if (plan_.mutex.try_lock() ){
             // momap::log()->info("got the lock!");
@@ -514,9 +513,37 @@ private:
                 }
 
                 // const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
-                // drake::math::RotationMatrixd r_goal(plan_.goal_q);
-                // desired_next.block(0, 3, 3, 1) = plan_.goal_xyz;
-                // desired_next.block(0, 0, 3, 3) = r_goal.matrix(); 
+                drake::math::RotationMatrixd r_goal(plan_.goal_q);
+                
+                drake::math::RotationMatrix<double> r_z = drake::math::RotationMatrix<double>(
+                    drake::AngleAxis<double>(-M_PI/2, drake::Vector3<double>::UnitZ()) );
+                    
+                desired_next.block(0, 0, 3, 3) = r_z.matrix() * r_goal.matrix(); 
+                desired_next.block(0, 3, 3, 1) = r_z.matrix() * plan_.goal_xyz;
+
+                current_desired[12] += (desired_next(12) - current_desired[12]) / 10000.0;
+                current_desired[13] += (desired_next(13) - current_desired[13]) / 10000.0;
+                current_desired[14] += (desired_next(14) - current_desired[14]) / 10000.0;
+
+                // Eigen::Matrix4d delta_mat = desired_next - current_pose;
+
+                // desired_next = 0.1*delta_mat + current_pose; 
+
+                std::cout << std::endl 
+                    << "########\n"
+                    << current_pose << "\n#######\n" << std::endl;
+
+                std::cout << std::endl 
+                    << "&&&&&&&\n"
+                    << desired_next << "\n&&&&&&&\n" << std::endl;
+
+                std::cout << current_desired[12] << std::endl;
+                std::cout << current_desired[13] << std::endl;
+                std::cout << current_desired[14] << std::endl;
+
+                //  for(int i=0; i<current_desired.size(); i++){
+                //     current_desired[i] = desired_next(i);
+                // }
             } 
             plan_.mutex.unlock();
         }
