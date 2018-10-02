@@ -105,6 +105,9 @@ struct RobotPiecewisePolynomial {
     std::mutex mutex;
     bool has_data;
     std::unique_ptr<PiecewisePolynomial<double>> plan;
+    bool cartesian_move;
+    Eigen::Vector3d goal_xyz;
+    Eigen::Quaterniond goal_q; 
 };
 
 template <typename T, std::size_t SIZE>
@@ -209,6 +212,9 @@ public:
         start_time_us = -1;
         sign_ = +1; 
 
+        plan_.has_data = false; 
+        plan_.cartesian_move = false; 
+
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
         momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
@@ -242,6 +248,48 @@ public:
     }
 private: 
     int RunFranka(){
+        // const double print_rate = 10.0;
+        // struct {
+        //     std::mutex mutex;
+        //     bool has_data;
+        //     std::array<double, 7> tau_d_last;
+        //     franka::RobotState robot_state;
+        //     std::array<double, 7> gravity;
+        // } print_data{};
+
+        // Start print thread.
+        // std::thread print_thread([print_rate, &print_data, this]() {
+        //     while (this->running_) {
+        //     // Sleep to achieve the desired print rate.
+        //     std::this_thread::sleep_for(
+        //         std::chrono::milliseconds(static_cast<int>((1.0 / print_rate * 1000.0))));
+
+        //     // Try to lock data to avoid read write collisions.
+        //     if (print_data.mutex.try_lock()) {
+        //         if (print_data.has_data) {
+        //         std::array<double, 7> tau_error{};
+        //         double error_rms(0.0);
+        //         std::array<double, 7> tau_d_actual{};
+        //         for (size_t i = 0; i < 7; ++i) {
+        //             tau_d_actual[i] = print_data.tau_d_last[i] + print_data.gravity[i];
+        //             tau_error[i] = tau_d_actual[i] - print_data.robot_state.tau_J[i];
+        //             error_rms += std::pow(tau_error[i], 2.0) / tau_error.size();
+        //         }
+        //         error_rms = std::sqrt(error_rms);
+
+        //         // Print data to console
+        //         std::cout << "tau_error [Nm]: " << du::v_to_e(ConvertToVector(tau_error)).transpose() << std::endl
+        //                     << "tau_commanded [Nm]: " << du::v_to_e(ConvertToVector(tau_d_actual)).transpose() << std::endl
+        //                     << "tau_measured [Nm]: " << du::v_to_e(ConvertToVector(print_data.robot_state.tau_J)).transpose() << std::endl
+        //                     // << "root mean square of tau_error [Nm]: " << error_rms << std::endl
+        //                     << "-----------------------" << std::endl;
+        //         print_data.has_data = false;
+        //         }
+        //         print_data.mutex.unlock();
+        //     }
+        //     }
+        // });
+
         try {
             // Connect to robot.
             franka::Robot robot(ip_addr_);
@@ -249,14 +297,15 @@ private:
             robot_alive_ = true; 
 
             // First move the robot to a suitable joint configuration
-            std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
-            MotionGenerator motion_generator(0.5, q_goal);
-            std::cout << "WARNING: This example will move the robot! "
-                    << "Please make sure to have the user stop button at hand!" << std::endl
-                    << "Press Enter to continue..." << std::endl;
-            std::cin.ignore();
-            robot.control(motion_generator);
-            std::cout << "Finished moving to initial joint configuration." << std::endl;
+            // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
+            // MotionGenerator motion_generator(0.5, q_goal);
+            // std::cout << "WARNING: This example will move the robot! "
+            //         << "Please make sure to have the user stop button at hand!" << std::endl
+            //         << "Press Enter to continue..." << std::endl;
+            // std::cin.ignore();
+            // robot.control(motion_generator);
+            // std::cout << "Finished moving to initial joint configuration." << std::endl;
+            std::cout << "Ready." << std::endl;
 
             // Set additional parameters always before the control loop, NEVER in the control loop!
             // Set collision behavior.
@@ -274,13 +323,84 @@ private:
                         const franka::RobotState& robot_state, franka::Duration period) -> franka::JointPositions {
                 return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
             };
-            robot.control(joint_position_callback);
+
+            std::function<franka::CartesianPose(const franka::RobotState&, franka::Duration)>
+                cartesian_position_callback = [&, this](
+                        const franka::RobotState& robot_state, franka::Duration period) -> franka::CartesianPose {
+                return this->FrankaPlanRunner::CartesianPositionCallback(robot_state, period);
+            };
+
+
+            // // Set gains for the joint impedance control.
+            // // Stiffness
+            // // const std::array<double, 7> k_gains = {{600.0, 600.0, 600.0, 600.0, 250.0, 150.0, 50.0}};
+            // // Damping
+            // const std::array<double, 7> k_gains = {{200.0, 200.0, 200.0, 200.0, 100.0, 100.0, 50.0}};
+            // const std::array<double, 7> d_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
+
+            // // Define callback for the joint torque control loop.
+            // std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
+            //     impedance_control_callback =
+            //         [&print_data, &model, k_gains, d_gains, this](
+            //             const franka::RobotState& state, franka::Duration /*period*/) -> franka::Torques {
+            // // Read current coriolis terms from model.
+            // std::array<double, 7> coriolis = model.coriolis(state);
+
+            // // Compute torque command from joint impedance control law.
+            // // Note: The answer to our Cartesian pose inverse kinematics is always in state.q_d with one
+            // // time step delay.
+            // std::array<double, 7> tau_d_calculated;
+            // for (size_t i = 0; i < 7; i++) {
+            //     tau_d_calculated[i] =
+            //         k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + coriolis[i];
+            // }
+
+            // // The following line is only necessary for printing the rate limited torque. As we activated
+            // // rate limiting for the control loop (activated by default), the torque would anyway be
+            // // adjusted!
+            // std::array<double, 7> tau_d_rate_limited =
+            //     franka::limitRate(franka::kMaxTorqueRate, tau_d_calculated, state.tau_J_d);
+
+            // // Update data to print.
+            // // if (print_data.mutex.try_lock()) {
+            // //     print_data.has_data = true;
+            // //     print_data.robot_state = state;
+            // //     print_data.tau_d_last = tau_d_rate_limited;
+            // //     print_data.gravity = model.gravity(state);
+            // //     print_data.mutex.unlock();
+            // // }
+
+            // // Send torque command.
+            // return tau_d_rate_limited;
+            // };
+
+            bool stop_cmd = false; 
+            while(!stop_cmd){
+                // std::cout << "Executing motion." << std::endl;
+                try {
+                    // robot.control(joint_position_callback);
+                    if(!plan_.cartesian_move){
+                        robot.control(joint_position_callback); //impedance_control_callback
+                    } else {
+                        robot.control(cartesian_position_callback); //
+                    }
+                } catch (const franka::ControlException& e) {
+                    std::cout << e.what() << std::endl;
+                    std::cout << "Running error recovery..." << std::endl;
+                    robot.automaticErrorRecovery();
+                }
+            }
+            // old command; TODO: remove
+            // robot.control(joint_position_callback);
 
         } catch (const franka::Exception& ex) {
             running_ = false;
             momap::log()->error("drake::franka_driver::RunFranka Caught expection: {}", ex.what() );
-            return -99; // bad things happened. 
+            // return -99; // bad things happened. 
         }
+        // if (print_thread.joinable()) {
+        //     print_thread.join();
+        // }
         return 0; 
         
     };
@@ -326,7 +446,7 @@ private:
 
         if (plan_.mutex.try_lock() ){
             // momap::log()->info("got the lock!");
-            if (plan_.plan) {
+            if (plan_.plan && !plan_.cartesian_move) {
                 if (plan_number_ != cur_plan_number) {
                     momap::log()->info("Starting new plan.");
                     start_time_us = cur_time_us;
@@ -362,8 +482,67 @@ private:
 
         // TODO: remove with a better way to quit @dmsj
         // if (time >= 60.0) {
-        if (0) {
-            std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
+        if (plan_.plan && static_cast<double>(cur_time_us - start_time_us) / 1e6 > plan_.plan->end_time()) {
+            // std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
+            // franka_time = 0.0;
+            return franka::MotionFinished(output);
+        }
+        return output;
+    };
+
+    franka::CartesianPose CartesianPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
+        franka_time += period.toSec();
+
+        cur_time_us = int64_t(franka_time * 1.0e6); 
+        std::array<double, 16> current_desired = robot_state.O_T_EE_d;
+        std::array<double, 16> current_actual = robot_state.O_T_EE_c;
+
+        Eigen::Matrix4d desired_next = Eigen::Matrix4d::Zero();
+        desired_next = Eigen::Map<Eigen::Matrix<double,4,4>>(current_desired.data()); 
+        // std::cout << du::v_to_e( ConvertToVector(current_desired) ).transpose() << std::endl;
+        // Eigen::VectorXd = du::v_to_e( ConvertToVector(current_desired) );
+
+        std::cout << std::endl << desired_next << std::endl; 
+
+        if (plan_.mutex.try_lock() ){
+            // momap::log()->info("got the lock!");
+            if (plan_.plan && plan_.cartesian_move) {
+                if (plan_number_ != cur_plan_number) {
+                    momap::log()->info("Starting new plan.");
+                    start_time_us = cur_time_us;
+                    cur_plan_number = plan_number_;
+                }
+
+                // const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
+                // drake::math::RotationMatrixd r_goal(plan_.goal_q);
+                // desired_next.block(0, 3, 3, 1) = plan_.goal_xyz;
+                // desired_next.block(0, 0, 3, 3) = r_goal.matrix(); 
+            } 
+            plan_.mutex.unlock();
+        }
+        // TODO: debug lines which move robot, remove soon @dmsj
+        // if (desired_next(0) > 1.5 && sign_ > 0){
+        //     sign_ = -1;
+        //     momap::log()->info("set sign: {}", sign_);
+        // } else if (desired_next(0) < -1.5 && sign_ < 0){
+        //     sign_ = +1; 
+        //     momap::log()->info("set sign: {}", sign_);
+        // }
+        // desired_next(0) += 0.001*sign_; 
+
+        // set desired position based on interpolated spline
+        franka::CartesianPose output = current_desired;
+        // Update data to publish.
+        if (robot_data_.mutex.try_lock()) {
+            robot_data_.has_data = true;
+            robot_data_.robot_state = robot_state;
+            robot_data_.mutex.unlock();
+        }
+
+        // TODO: remove with a better way to quit @dmsj
+        if (!plan_.cartesian_move) {
+            // std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
+            // franka_time = 0.0;
             return franka::MotionFinished(output);
         }
         return output;
@@ -411,62 +590,84 @@ private:
 
         std::unique_lock<std::mutex> lck(plan_.mutex);
         editing_plan = true;
-
-        piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
-
-        if (piecewise_polynomial.get_number_of_segments()<1)
-        {
-            momap::log()->info("Discarding plan, invalid piecewise polynomial.");
-            return;
-        }
-
         momap::log()->info("utime: {}", rst->utime);
-        momap::log()->info("start time: {}", piecewise_polynomial.start_time());
-        momap::log()->info("end time: {}", piecewise_polynomial.end_time());
+        Eigen::Vector3d goal_xyz( rst->cartesian_goal.translation.x
+                                , rst->cartesian_goal.translation.y
+                                , rst->cartesian_goal.translation.z);
+        Eigen::Quaterniond goal_q(rst->cartesian_goal.rotation.w
+                                , rst->cartesian_goal.rotation.x
+                                , rst->cartesian_goal.rotation.y
+                                , rst->cartesian_goal.rotation.z);
 
-        //Naive implementation of velocity check
-        const int velocity_check_samples = 100;
-        PPType piecewise_polynomial_derivative = piecewise_polynomial.derivative();
-        double step_size = (piecewise_polynomial.end_time()-piecewise_polynomial.start_time())/velocity_check_samples; //FIXME: numer
-        double test_time = piecewise_polynomial.start_time();
-        while(test_time<piecewise_polynomial.end_time())
-        {
-            VectorXd sampled_velocity = piecewise_polynomial_derivative.value(test_time);
-            //Check dimension
-            if (sampled_velocity.size()!= rst->dof)
+        momap::log()->warn("Goal XYZ: {}, Q: {}", goal_xyz.transpose(), du::equat_to_evec(goal_q).transpose());
+
+        if(goal_xyz.cwiseAbs().sum() > 1.0e-3){
+            momap::log()->warn("we made inside handle plan special case!"); 
+            plan_.cartesian_move = true;
+            plan_.goal_xyz = goal_xyz;
+            plan_.goal_q = goal_q; 
+        } else {
+             plan_.cartesian_move = false;
+            //  plan_.cartesian_goal = du::momap::ZeroRobotState(rst->dof); 
+        
+
+            piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
+
+            if (piecewise_polynomial.get_number_of_segments()<1)
             {
-                momap::log()->info("Discarding plan, invalid piecewise polynomial derivative.");
+                momap::log()->info("Discarding plan, invalid piecewise polynomial.");
                 return;
             }
+
+            
+            momap::log()->info("start time: {}", piecewise_polynomial.start_time());
+            momap::log()->info("end time: {}", piecewise_polynomial.end_time());
+
+            //Naive implementation of velocity check
+            const int velocity_check_samples = 100;
+            PPType piecewise_polynomial_derivative = piecewise_polynomial.derivative();
+            double step_size = (piecewise_polynomial.end_time()-piecewise_polynomial.start_time())/velocity_check_samples; //FIXME: numer
+            double test_time = piecewise_polynomial.start_time();
+            while(test_time<piecewise_polynomial.end_time())
+            {
+                VectorXd sampled_velocity = piecewise_polynomial_derivative.value(test_time);
+                //Check dimension
+                if (sampled_velocity.size()!= rst->dof)
+                {
+                    momap::log()->info("Discarding plan, invalid piecewise polynomial derivative.");
+                    return;
+                }
+                for (int joint = 0; joint < rst->dof; joint++)
+                {
+                    if (sampled_velocity(joint)>rst->robot_joints[joint].velocity_upper_limit||
+                    sampled_velocity(joint)<rst->robot_joints[joint].velocity_lower_limit)
+                    {
+                        momap::log()->info("Discarding plan, joint velocity out of bounds.");
+                        momap::log()->info("sampled joint {} velocity: {}", joint, sampled_velocity(joint));
+                        momap::log()->info("lower limit: {} upper limit: {}", rst->robot_joints[joint].velocity_lower_limit, rst->robot_joints[joint].velocity_upper_limit);
+                        return;
+                    }
+                }
+                test_time+=step_size;
+            }
+
+            //Start position == goal position check
+            VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
             for (int joint = 0; joint < rst->dof; joint++)
             {
-                if (sampled_velocity(joint)>rst->robot_joints[joint].velocity_upper_limit||
-                sampled_velocity(joint)<rst->robot_joints[joint].velocity_lower_limit)
+                if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
                 {
-                    momap::log()->info("Discarding plan, joint velocity out of bounds.");
-                    momap::log()->info("sampled joint {} velocity: {}", joint, sampled_velocity(joint));
-                    momap::log()->info("lower limit: {} upper limit: {}", rst->robot_joints[joint].velocity_lower_limit, rst->robot_joints[joint].velocity_upper_limit);
+                    momap::log()->info("Discarding plan, mismatched start position.");
                     return;
                 }
             }
-            test_time+=step_size;
-        }
-
-        //Start position == goal position check
-        VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
-        for (int joint = 0; joint < rst->dof; joint++)
-        {
-            if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
-            {
-                momap::log()->info("Discarding plan, mismatched start position.");
-                return;
-            }
+            //TODO: add end position==goal position check (upstream)
+            plan_.plan.release();
+            plan_.plan.reset(&piecewise_polynomial);
         }
 
         plan_.has_data = true;
-        //TODO: add end position==goal position check (upstream)
-        plan_.plan.release();
-        plan_.plan.reset(&piecewise_polynomial);
+        
 
         editing_plan = false;
         plan_.mutex.unlock();
