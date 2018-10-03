@@ -345,7 +345,7 @@ private:
             // Damping
             const std::array<double, 7> d_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
 
-            const std::array<double, 7> i_gains = {{1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.2}};
+            const std::array<double, 7> i_gains = {{10.0, 10.0, 10.0, 10.0, 5.0, 5.0, 2.0}};
 
             std::array<double, 7> i_error = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
 
@@ -384,7 +384,7 @@ private:
                     // robot.control(cartesian_position_callback);
                     i_error = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
                     if(!plan_.cartesian_move && plan_.has_data){
-                        robot.control(impedance_control_callback, joint_position_callback); //impedance_control_callback
+                        robot.control(joint_position_callback); //impedance_control_callback
                     } else if(plan_.cartesian_move && plan_.has_data) {
                         robot.control(impedance_control_callback, cartesian_position_callback); //
                     } else{
