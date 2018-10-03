@@ -515,6 +515,8 @@ private:
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.plan.release();
             plan_.has_data = false; 
+            PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+            plan_.utime = -1;
             plan_.cartesian_move = false; 
             plan_.mutex.unlock();
             return franka::MotionFinished(output);
@@ -614,6 +616,7 @@ private:
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.has_data = false;
             PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+            plan_.utime = -1;
             plan_.cartesian_move = false; 
             plan_.mutex.unlock();
             return franka::MotionFinished(output);
