@@ -226,16 +226,17 @@ public:
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
         momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
+        momap::log()->info("Plan complete channel: {}", p.lcm_plan_complete_channel);
         momap::log()->info("Status channel: {}", p.lcm_status_channel);
     
     };
 
-    ~FrankaPlanRunner(){
+    ~FrankaPlanRunner() {
         // if (lcm_publish_status_thread.joinable()) {
         //     lcm_publish_status_thread.join();
         // }
     };
-    int Run(){
+    int Run() {
         // start LCM threads; independent of sim vs. real robot
         lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
         lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
@@ -255,7 +256,7 @@ public:
         return return_value;
     }
 private: 
-    int RunFranka(){
+    int RunFranka() {
         // const double print_rate = 10.0;
         // struct {
         //     std::mutex mutex;
@@ -423,7 +424,7 @@ private:
         return 0; 
         
     };
-    int RunSim(){
+    int RunSim() {
         robot_alive_ = true; // the sim robot *always* starts as planned
         momap::log()->info("Starting sim robot.");
         // first, load some parameters
@@ -470,7 +471,7 @@ private:
         
 
         // std::unique_lock<std::mutex> lck(plan_.mutex);
-        // not_editing.wait(lck, [this](){return editing_plan == false;});
+        // not_editing.wait(lck, [this]() {return editing_plan == false;});
         double error = DBL_MAX; 
         if (plan_.mutex.try_lock() ){
             // momap::log()->info("got the lock!");
@@ -732,13 +733,14 @@ private:
         // // return output;
     };
 
-    void HandleLcm(){
+    void HandleLcm() {
         while (true) {
             lcm_.handleTimeout(0);
+            usleep(1e3 * 1); //$ sleep 1ms
         }
     }
 
-    void PublishLcmStatus(){ //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
+    void PublishLcmStatus() { //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
         while (running_) {
             // Sleep to achieve the desired print rate.
             std::this_thread::sleep_for(
