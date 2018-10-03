@@ -104,6 +104,7 @@ struct RobotData {
 struct RobotPiecewisePolynomial {
     std::mutex mutex;
     bool has_data;
+    int64_t utime;
     std::unique_ptr<PiecewisePolynomial<double>> plan;
     bool cartesian_move;
     Eigen::Matrix4d cartesian_goal;
@@ -184,6 +185,7 @@ private:
     ::lcm::LCM lcm_;
     int plan_number_{};
     int cur_plan_number{};
+    int64_t cur_plan_utime_{};
     int64_t cur_time_us{};
     int64_t start_time_us{};
     RobotPiecewisePolynomial plan_;
@@ -215,6 +217,7 @@ public:
         sign_ = +1; 
 
         plan_.has_data = false; 
+        plan_.utime = -1;
         plan_.cartesian_move = false; 
         plan_.cartesian_goal = Eigen::Matrix4d::Zero();
         plan_.v_xyz = Eigen::Vector3d::Zero();
@@ -610,6 +613,7 @@ private:
             std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.has_data = false;
+            PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
             plan_.cartesian_move = false; 
             plan_.mutex.unlock();
             return franka::MotionFinished(output);
@@ -748,6 +752,14 @@ private:
             }
         }
     };
+
+    //$ TODO: use a different, simpler LCM type for this?
+    void PublishUtimeToChannel(int64_t utime, std::string lcm_channel) {
+        lcmt_iiwa_status dummy_status;
+        ResizeStatusMessage(dummy_status);
+        dummy_status.utime = utime;
+        lcm_.publish(lcm_channel, &dummy_status);
+    }
     
     void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&, const robot_spline_t* rst)
     {
@@ -757,17 +769,15 @@ private:
             return;
         }
 
-        lcmt_iiwa_status plan_received_status;
-        ResizeStatusMessage(plan_received_status);
-        plan_received_status.utime = rst->utime;
-        //$ publish confirmation that plan was received with same utime
-        //$ TODO: use a different, simpler LCM type for this?
-        lcm_.publish(p.lcm_plan_received_channel, &plan_received_status);
-        momap::log()->info("Published confirmation of received plan");
-
         std::unique_lock<std::mutex> lck(plan_.mutex);
         editing_plan = true;
+
         momap::log()->info("utime: {}", rst->utime);
+        plan_.utime = rst->utime;
+        //$ publish confirmation that plan was received with same utime
+        PublishUtimeToChannel(plan_.utime, p.lcm_plan_received_channel);
+        momap::log()->info("Published confirmation of received plan");
+
         franka_time = 0.0;
         Eigen::Vector3d goal_xyz( rst->cartesian_goal.translation.x
                                 , rst->cartesian_goal.translation.y
@@ -874,6 +884,7 @@ private:
         editing_plan = true;
 
         plan_.has_data = false;
+        plan_.utime = -1;
         plan_.plan.release();
 
         editing_plan = false;
