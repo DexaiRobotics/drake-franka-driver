@@ -345,7 +345,7 @@ private:
             // Damping
             const std::array<double, 7> d_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
 
-            const std::array<double, 7> i_gains = {{10.0, 10.0, 10.0, 10.0, 5.0, 5.0, 2.0}};
+            const std::array<double, 7> i_gains = {{20.0, 20.0, 20.0, 20.0, 10.0, 10.0, 4.0}};
 
             std::array<double, 7> i_error = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
 
@@ -362,7 +362,7 @@ private:
                 // time step delay.
                 std::array<double, 7> tau_d_calculated;
                 for (size_t i = 0; i < 7; i++) {
-                    i_error[i] += (state.q_d[i] - state.q[i]);
+                    i_error[i] += 0.5*(state.q_d[i] - state.q[i]);
                     tau_d_calculated[i] =
                         k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + coriolis[i]
                         + i_gains[i] * i_error[i];
@@ -823,6 +823,12 @@ private:
                 if (sampled_velocity.size()!= rst->dof)
                 {
                     momap::log()->info("Discarding plan, invalid piecewise polynomial derivative.");
+                    plan_.has_data = false;
+                    plan_.cartesian_move = false;
+                    plan_.cartesian_goal = Eigen::Matrix4d::Zero();
+                    plan_.end_time_us = 0;
+                    plan_.v_xyz = Eigen::Vector3d::Zero();
+                    plan_.plan.release();
                     return;
                 }
                 for (int joint = 0; joint < rst->dof; joint++)
@@ -833,6 +839,12 @@ private:
                         momap::log()->info("Discarding plan, joint velocity out of bounds.");
                         momap::log()->info("sampled joint {} velocity: {}", joint, sampled_velocity(joint));
                         momap::log()->info("lower limit: {} upper limit: {}", rst->robot_joints[joint].velocity_lower_limit, rst->robot_joints[joint].velocity_upper_limit);
+                        plan_.has_data = false;
+                        plan_.cartesian_move = false;
+                        plan_.cartesian_goal = Eigen::Matrix4d::Zero();
+                        plan_.end_time_us = 0;
+                        plan_.v_xyz = Eigen::Vector3d::Zero();
+                        plan_.plan.release();
                         return;
                     }
                 }
@@ -846,6 +858,13 @@ private:
                 if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
                 {
                     momap::log()->info("Discarding plan, mismatched start position.");
+                    plan_.has_data = false;
+                    plan_.cartesian_move = false;
+                    plan_.cartesian_goal = Eigen::Matrix4d::Zero();
+                    plan_.end_time_us = 0;
+                    plan_.v_xyz = Eigen::Vector3d::Zero();
+                    plan_.plan.release();
+
                     return;
                 }
             }
