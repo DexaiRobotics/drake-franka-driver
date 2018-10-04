@@ -42,6 +42,7 @@ parameters:
   lcm_status_channel: FRANKA_0_STATUS
   lcm_plan_channel: FRANKA_0_PLAN
   lcm_plan_received_channel: FRANKA_0_PLAN_RECEIVED
+  lcm_plan_complete_channel: FRANKA_0_PLAN_COMPLETE
   lcm_stop_channel: FRANKA_0_STOP
   lcm_solenoid_state_channel: ''
   lcm_url: udpm://239.255.76.67:7667?ttl=2
