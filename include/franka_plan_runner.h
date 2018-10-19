@@ -197,6 +197,7 @@ private:
     std::atomic_bool editing_plan{false};
     std::condition_variable not_editing;
     std::array<double, 16> initial_pose;
+    Eigen::MatrixXd joint_limits;
 
     // Set print rate for comparing commanded vs. measured torques.
     const double lcm_publish_rate = 200.0; //Hz
@@ -257,6 +258,9 @@ public:
     }
 private: 
     int RunFranka() {
+        Dracula *dracula = new Dracula(p);
+        joint_limits = dracula->getCS()->getJointLimits();
+        std::cout << joint_limits.transpose() << std::endl; 
         // const double print_rate = 10.0;
         // struct {
         //     std::mutex mutex;
@@ -318,10 +322,10 @@ private:
             // Set additional parameters always before the control loop, NEVER in the control loop!
             // Set collision behavior.
             robot.setCollisionBehavior(
-                {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}}, {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}},
-                {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}}, {{20.0, 20.0, 18.0, 18.0, 16.0, 14.0, 12.0}},
-                {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}}, {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}},
-                {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}}, {{20.0, 20.0, 20.0, 25.0, 25.0, 25.0}});
+                {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}}, {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}}, {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}}, {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
+                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}}, {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}});
 
             // Load the kinematics and dynamics model.
             franka::Model model = robot.loadModel();
@@ -366,10 +370,10 @@ private:
                 // time step delay.
                 std::array<double, 7> tau_d_calculated;
                 for (size_t i = 0; i < 7; i++) {
-                    i_error[i] += 0.5*(state.q_d[i] - state.q[i]);
+                    i_error[i] += 0.2*(state.q_d[i] - state.q[i]);
                     tau_d_calculated[i] =
                         k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + coriolis[i]
-                        + i_gains[i] * i_error[i];
+                        + 0.25*d_gains[i] * i_error[i];
                 }
 
                 // The following line is only necessary for printing the rate limited torque. As we activated
@@ -485,6 +489,14 @@ private:
                 const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
                 desired_next = plan_.plan->value(cur_traj_time_s);
 
+                for (int j = 0; j < desired_next.size(); j++) {
+                    if (desired_next(j) > joint_limits(j, 1) ){
+                        desired_next(j) = joint_limits(j,1);
+                    } else if ( desired_next(j) < joint_limits(j, 0)) {
+                        desired_next(j) = joint_limits(j,0);
+                    }
+                }
+
                 error = ( du::v_to_e( ConvertToVector(current_conf) ) - plan_.plan->value(plan_.plan->end_time()) ).norm();
             } 
             plan_.mutex.unlock();
@@ -509,21 +521,38 @@ private:
         // output = q_goal; 
        
         
-        if (plan_.plan && franka_time > plan_.plan->end_time() && error < 0.001) {
-            franka::JointPositions ret_val = current_conf;
-            std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
-           
-            std::unique_lock<std::mutex> lck(plan_.mutex);
-            plan_.plan.release();
-            plan_.has_data = false; 
-            PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-            plan_.utime = -1;
-            plan_.cartesian_move = false; 
-            plan_.mutex.unlock();
-            return franka::MotionFinished(output);
-        } else if(!plan_.has_data) {
+        if (plan_.plan) {
+            if (franka_time > plan_.plan->end_time()) {
+                if (error < 0.007) {
+                    franka::JointPositions ret_val = current_conf;
+                    std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
+                
+                    std::unique_lock<std::mutex> lck(plan_.mutex);
+                    plan_.plan.release();
+                    plan_.has_data = false; 
+                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                    plan_.utime = -1;
+                    plan_.cartesian_move = false; 
+                    plan_.mutex.unlock();
+                    return franka::MotionFinished(output);
+                }
+                else {
+                    momap::log()->info("Plan running overtime and not converged, error: {}", error);
+                    momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
+                    momap::log()->info("q_d: {}", desired_next.transpose());
+                }
+            }
+            else {
+                // momap::log()->info("Running plan, end time not reached yet");
+            }
+        } 
+        else if (!plan_.has_data) {
             output =  current_conf; 
             return franka::MotionFinished(output);
+        } 
+        else 
+        {
+            momap::log()->info("plan_.plan false and plan_.has_data, what?");
         }
         // TODO: remove with a better way to quit @dmsj
         // if (time >= 60.0) {
@@ -612,7 +641,7 @@ private:
             robot_data_.mutex.unlock();
         }
 
-        if (plan_.end_time_us > 0 && dt_us > plan_.end_time_us && error < 0.001 ) {
+        if (plan_.end_time_us > 0 && dt_us > plan_.end_time_us && error < 0.002 ) {
             std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.has_data = false;
