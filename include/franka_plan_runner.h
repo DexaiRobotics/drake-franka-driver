@@ -435,7 +435,7 @@ private:
         Dracula *dracula = new Dracula(p);
         dracula->getViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
-        next_conf[5] = 1.5; // set robot in a starting position which is not in collision
+        next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542, -2.5114236381136448, 0.6720116891296624, 1.9928838396072361, -1.2954019628351783; // set robot in a starting position which is not in collision
         franka::RobotState robot_state; // internal state; mapping to franka state
         franka::Duration period;
         milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
