@@ -442,6 +442,10 @@ private:
         milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
 
         while(1){
+
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate )));
+
             std::vector<double> next_conf_vec = du::e_to_v(next_conf);
             ConvertToArray(next_conf_vec, robot_state.q);
             ConvertToArray(next_conf_vec, robot_state.q_d);
