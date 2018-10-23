@@ -177,6 +177,7 @@ void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
 
 class FrankaPlanRunner {
 private:
+    Dracula *dracula = nullptr;
     std::string param_yaml_; 
     parameters::Parameters p;
     std::string ip_addr_;
@@ -211,6 +212,10 @@ public:
         lcm_.subscribe(p.lcm_stop_channel, &FrankaPlanRunner::HandleStop, this);
         running_ = true;
         franka_time = 0.0; 
+
+        dracula = new Dracula(p);
+        joint_limits = dracula->getCS()->getJointLimits();
+        momap::log()->info("Joint limits: {}", joint_limits.transpose());
 
         cur_plan_number = plan_number_;
         cur_time_us = -1;
@@ -258,9 +263,6 @@ public:
     }
 private: 
     int RunFranka() {
-        Dracula *dracula = new Dracula(p);
-        joint_limits = dracula->getCS()->getJointLimits();
-        std::cout << joint_limits.transpose() << std::endl; 
         // const double print_rate = 10.0;
         // struct {
         //     std::mutex mutex;
@@ -432,7 +434,6 @@ private:
         robot_alive_ = true; // the sim robot *always* starts as planned
         momap::log()->info("Starting sim robot.");
         // first, load some parameters
-        Dracula *dracula = new Dracula(p);
         dracula->getViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
         next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542, -2.5114236381136448, 0.6720116891296624, 1.9928838396072361, -1.2954019628351783; // set robot in a starting position which is not in collision
@@ -441,6 +442,10 @@ private:
         milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
 
         while(1){
+
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate )));
+
             std::vector<double> next_conf_vec = du::e_to_v(next_conf);
             ConvertToArray(next_conf_vec, robot_state.q);
             ConvertToArray(next_conf_vec, robot_state.q_d);
