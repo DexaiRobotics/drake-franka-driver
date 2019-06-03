@@ -10,7 +10,10 @@ In order to build the driver, use the following steps:
 
 2. `git clone https://github.com/DexaiRobotics/drake-franka-driver.git`
 3. `cd drake-franka-driver`
-4. `./setup.sh`
+4. `git submodule update --init`
+5. `cd externals/libfranka`
+6. `git submodule update --init`
+7. `./setup.sh`
 ## running the driver
 Once built, the executable `drake-franka-driver` can be found in the `build/` directory. In order to run the driver, execute:
 `./drake-franka-driver <robot_name> <robot_ip_address>` 
