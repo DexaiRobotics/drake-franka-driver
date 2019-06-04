@@ -107,7 +107,7 @@ target_link_libraries( ArrayToVectorPerformance
 enable_testing()
 
 set(GTEST_SRC_FILES
-    tests/test_sprax.cc
+    tests/test_test.cc
 )
 
 foreach(_file ${GTEST_SRC_FILES})
