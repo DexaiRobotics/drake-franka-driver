@@ -21,10 +21,9 @@ echo "####### make will use $num_threads jobs to build target: $target #######"
 source scripts/setup_env.sh
 # git submodule update --init
 
-# cd externals
-# cd libfranka
-# git submodule update --init
-cd externals/libfranka
+cd externals
+git submodule update --init --recursive
+cd libfranka
 if [ ! -d "build" ]; then
   mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
   cmake --build . -j
