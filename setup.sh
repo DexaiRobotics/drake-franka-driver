@@ -26,7 +26,7 @@ git submodule update --init --recursive
 cd libfranka
 if [ ! -d "build" ]; then
   mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
-  cmake --build . -j
+  cmake --build . -j $num_threads --target franka
   cd ..
 fi
 cd ../..
