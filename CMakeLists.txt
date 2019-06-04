@@ -56,7 +56,7 @@ include_directories(
 	$ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
 	${Franka_INCLUDE_DIRS}
 	${PYTHON_INCLUDE_DIRS}
-    $ENV{CTPL_INCLUDE_DIR}
+	$ENV{CTPL_INCLUDE_DIR}
 	externals/StopWatch
 	)
 
@@ -69,15 +69,15 @@ add_executable(${driver_name}
 	src/examples_common.cpp
 	)
 target_link_libraries(${driver_name}
-                      ${Franka_LIBRARIES}
-                      ${LCM_NAMESPACE}lcm 
-                      gflags
-					  drake::drake
-					  Threads::Threads
-                      $ENV{DRACULA_LIBRARIES}
-					  ${PYTHON_LIBRARIES}
-					  fcl
-                      )
+	${Franka_LIBRARIES}
+	${LCM_NAMESPACE}lcm 
+	gflags
+	drake::drake
+	Threads::Threads
+	$ENV{DRACULA_LIBRARIES}
+	${PYTHON_LIBRARIES}
+	fcl
+	)
 
 add_executable( ArrayToVectorPerformance 
 				src/test_vector_performance.cc
