@@ -36,7 +36,7 @@ find_package(fcl REQUIRED)
 
 set(Python2_ROOT_DIR $ENV{LOCAL_PYTHON_PATH})
 find_package( Python2 2.7.12 REQUIRED Interpreter Development)
-set(PYTHON_LIBRARIES ${Python2_LIBRARIES} ) 
+set(PYTHON_LIBRARIES ${Python2_LIBRARIES} )
 set(PYTHON_INCLUDE_DIRS "${Python2_INCLUDE_DIRS}"
     "${Python2_LIBRARY_DIRS}/python2.7/dist-packages/numpy/core/include"
     "${Python2_LIBRARY_DIRS}/python2.7/site-packages/numpy/core/include")
@@ -50,49 +50,49 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # add include dir for Franka headers
 include_directories(
-	include
-	$ENV{DRACULA_INCLUDE_DIR}
-	$ENV{DRACULA_INCLUDE_DIR}/../tests
-	$ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
-	${Franka_INCLUDE_DIRS}
-	${PYTHON_INCLUDE_DIRS}
+    include
+    $ENV{DRACULA_INCLUDE_DIR}
+    $ENV{DRACULA_INCLUDE_DIR}/../tests
+    $ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
+    ${Franka_INCLUDE_DIRS}
+    ${PYTHON_INCLUDE_DIRS}
     $ENV{CTPL_INCLUDE_DIR}
-	externals/StopWatch
-	)
+    externals/StopWatch
+)
 
 
 # build the lcm driver that uses Franka Robot Interface (FRI)
 # add_definitions(-std=c++14)
 set(driver_name franka_plan_runner)
-add_executable(${driver_name} 
-	src/franka_plan_runner.cc
-	src/examples_common.cpp
-	)
+add_executable(${driver_name}
+    src/franka_plan_runner.cc
+    src/examples_common.cpp
+)
 target_link_libraries(${driver_name}
-                      ${Franka_LIBRARIES}
-                      ${LCM_NAMESPACE}lcm 
-                      gflags
-					  drake::drake
-					  Threads::Threads
-                      $ENV{DRACULA_LIBRARIES}
-					  ${PYTHON_LIBRARIES}
-					  fcl
-                      )
+    ${Franka_LIBRARIES}
+    ${LCM_NAMESPACE}lcm
+    gflags
+    drake::drake
+    Threads::Threads
+    $ENV{DRACULA_LIBRARIES}
+    ${PYTHON_LIBRARIES}
+    fcl
+)
 
-add_executable( ArrayToVectorPerformance 
-				src/test_vector_performance.cc
-				externals/StopWatch/StopWatch.cpp
-			   )
+add_executable( ArrayToVectorPerformance
+    src/test_vector_performance.cc
+    externals/StopWatch/StopWatch.cpp
+)
 target_link_libraries( ArrayToVectorPerformance
-					   ${Franka_LIBRARIES}
-                       ${LCM_NAMESPACE}lcm 
-                       gflags
-					   drake::drake
-					   Threads::Threads
-                       $ENV{DRACULA_LIBRARIES}
-					   ${PYTHON_LIBRARIES}
-					   fcl
-					 )
+    ${Franka_LIBRARIES}
+    ${LCM_NAMESPACE}lcm
+    gflags
+    drake::drake
+    Threads::Threads
+    $ENV{DRACULA_LIBRARIES}
+    ${PYTHON_LIBRARIES}
+    fcl
+)
 
 # install the lcm driver
 # install(TARGETS ${driver_name}
@@ -100,3 +100,21 @@ target_link_libraries( ArrayToVectorPerformance
 #     LIBRARY DESTINATION lib
 # ARCHIVE DESTINATION lib)
 
+
+#-------------------
+# Unit Testing
+#-------------------
+enable_testing()
+
+set(GTEST_SRC_FILES
+    tests/test_test.cc
+)
+
+foreach(_file ${GTEST_SRC_FILES})
+    get_filename_component(_name ${_file} NAME_WE)
+    add_executable(${_name} ${_file})
+    target_link_libraries(${_name}
+    gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
+    add_test(${_name} ${_name})
+    set_tests_properties(${_name} PROPERTIES TIMEOUT 270)
+endforeach()

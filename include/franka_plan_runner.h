@@ -68,7 +68,7 @@
 #include <lcmtypes/robot_spline_t.hpp>
 
 #include "trajectory_solver.h"
-#include "log_momap.h"
+#include "momap/momap_log.h"
 #include "dracula_utils.h"
 #include "mock_dracula.h"
 
@@ -214,7 +214,7 @@ public:
         franka_time = 0.0; 
 
         dracula = new Dracula(p);
-        joint_limits = dracula->getCS()->getJointLimits();
+        joint_limits = dracula->GetCS()->GetJointLimits();
         momap::log()->info("Joint limits: {}", joint_limits.transpose());
 
         cur_plan_number = plan_number_;
@@ -444,7 +444,7 @@ private:
         robot_alive_ = true; // the sim robot *always* starts as planned
         momap::log()->info("Starting sim robot.");
         // first, load some parameters
-        dracula->getViz()->loadRobot();
+        dracula->MutableViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
         next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542, -2.5114236381136448, 0.6720116891296624, 1.9928838396072361, -1.2954019628351783; // set robot in a starting position which is not in collision
         franka::RobotState robot_state; // internal state; mapping to franka state
@@ -462,7 +462,7 @@ private:
 
             franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period);
             next_conf = du::v_to_e(ConvertToVector(cmd_pos.q)); 
-            dracula->getViz()->displayState(next_conf);
+            dracula->GetViz()->displayState(next_conf);
 
             milliseconds current_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
             int64_t delta_ms = int64_t( (current_ms - last_ms).count() );            
