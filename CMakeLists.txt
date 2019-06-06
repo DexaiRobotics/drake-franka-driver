@@ -68,6 +68,18 @@ add_executable(${driver_name}
     src/franka_plan_runner.cc
     src/examples_common.cpp
 )
+
+#NEW CODE
+set(test_name send_stop)
+add_executable(${test_name}
+    src/send_stop.cc
+)
+
+target_link_libraries(${test_name}
+    ${LCM_NAMESPACE}lcm
+)
+
+
 target_link_libraries(${driver_name}
     ${Franka_LIBRARIES}
     ${LCM_NAMESPACE}lcm

@@ -1,0 +1,6 @@
+package stop_cmd;
+
+struct stop_cmd
+{
+    string msg;
+}

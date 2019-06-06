@@ -66,6 +66,7 @@
 
 // #include <momap/momap_robot_plan_v1.h>
 #include <lcmtypes/robot_spline_t.hpp>
+#include "../src/stop_cmd/stop_cmd.hpp"
 
 #include "trajectory_solver.h"
 #include "momap/momap_log.h"
@@ -110,6 +111,7 @@ struct RobotPiecewisePolynomial {
     Eigen::Matrix4d cartesian_goal;
     Eigen::Vector3d v_xyz;
     int64_t end_time_us;
+    bool paused;
 };
 
 template <typename T, std::size_t SIZE>
@@ -228,6 +230,7 @@ public:
         plan_.cartesian_goal = Eigen::Matrix4d::Zero();
         plan_.v_xyz = Eigen::Vector3d::Zero();
         plan_.end_time_us = 0;
+        plan_.paused = false;
 
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
@@ -397,8 +400,8 @@ private:
                 return tau_d_rate_limited;
             };
 
-            bool stop_cmd = false; 
-            while(!stop_cmd){
+            bool stop_signal = false; 
+            while(!stop_signal){
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
                     // robot.control(cartesian_position_callback);
@@ -452,7 +455,10 @@ private:
         milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
 
         while(1){
-
+            // if(plan_.paused){
+            //     //momap::log()->info("Paused");
+            //     continue;
+            // }
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate )));
 
@@ -473,7 +479,11 @@ private:
     };
 
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
-        franka_time += period.toSec();
+        //If plan is paused, keep same franka_time as before
+        if (!plan_.paused){
+            franka_time += period.toSec();
+        }
+        
         cur_time_us = int64_t(franka_time * 1.0e6); 
 
         // Update data to publish.
@@ -945,19 +955,28 @@ private:
     };
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
-        const robot_plan_t*) {
-        momap::log()->info("Received stop command. Discarding plan.");
+        const stop_cmd::stop_cmd* msg) {
+        if(!plan_.paused){
+            momap::log()->info("Received stop command. Discarding plan.");
+            std::unique_lock<std::mutex> lck(plan_.mutex);
+            // editing_plan = true;
 
-        std::unique_lock<std::mutex> lck(plan_.mutex);
-        editing_plan = true;
+            // plan_.has_data = false;
+            // plan_.utime = -1;
+            // plan_.plan.release();
 
-        plan_.has_data = false;
-        plan_.utime = -1;
-        plan_.plan.release();
-
-        editing_plan = false;
-        plan_.mutex.unlock();
-        not_editing.notify_one();
+            // editing_plan = false;
+            plan_.paused = true;
+            plan_.mutex.unlock();
+            not_editing.notify_one();
+        }
+        else if(plan_.paused){
+            momap::log()->info("Received continue command. Continuing plan.");
+            std::unique_lock<std::mutex> lck(plan_.mutex);
+            plan_.paused = false;
+            plan_.mutex.unlock();
+        }
+        
 
     };
 
