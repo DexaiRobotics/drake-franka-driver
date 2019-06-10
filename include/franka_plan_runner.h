@@ -14,6 +14,7 @@
 #ifndef ROBOT_PLAN_RUNNER_H
 #define ROBOT_PLAN_RUNNER_H
 
+#include <math.h>
 #include <array>
 #include <atomic>
 
@@ -201,10 +202,14 @@ private:
     std::condition_variable not_editing;
     std::array<double, 16> initial_pose;
     Eigen::MatrixXd joint_limits;
+    bool pausing;
+    long timestep;
+    float target_stop_time;
 
     // Set print rate for comparing commanded vs. measured torques.
     const double lcm_publish_rate = 200.0; //Hz
     double franka_time;
+    Eigen::VectorXd max_accels;
 
 public:
     FrankaPlanRunner(const parameters::Parameters params) : p(params), ip_addr_(params.robot_ip), plan_number_(0), lcm_(params.lcm_url)
@@ -214,6 +219,7 @@ public:
         lcm_.subscribe(p.lcm_stop_channel, &FrankaPlanRunner::HandleStop, this);
         running_ = true;
         franka_time = 0.0; 
+        max_accels = params.robot_max_accelerations;
 
         dracula = new Dracula(p);
         joint_limits = dracula->GetCS()->GetJointLimits();
@@ -478,9 +484,36 @@ private:
         return 0; 
     };
 
+    double stop_period(double period){
+        double a = 2 / target_stop_time;
+        double current_time = period * (this->target_stop_time-4/(a*(exp(a*this->timestep)+1)));
+        double prev_time = period * (this->target_stop_time-4/(a*(exp(a*(this->timestep-1))+1)));
+        return current_time - prev_time;
+    }
+
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
         //If plan is paused, keep same franka_time as before
-        if (!plan_.paused){
+        if (plan_.paused){
+            if(target_stop_time == 0){
+                std::array<double,7> vel = robot_state.dq;
+                cout << "VELOCITIES: ";
+                for(int j = 0; j < 7; j++){
+                    cout << vel[0];
+                }
+                cout << endl;
+                float target_stop_time = 0;
+                for(int i = 0; i < 7; i++){
+                    float stop_time = vel[i] / this->max_accels[i];
+                    if(stop_time > target_stop_time){
+                        target_stop_time = stop_time;
+                    }
+                }
+            }
+
+            franka_time += stop_period(period.toSec());
+            timestep++;
+        }
+        else{
             franka_time += period.toSec();
         }
         
@@ -969,11 +1002,17 @@ private:
             plan_.paused = true;
             plan_.mutex.unlock();
             not_editing.notify_one();
+
+            this->target_stop_time = 0;
+            this->timestep = 1;
+
         }
         else if(plan_.paused){
             momap::log()->info("Received continue command. Continuing plan.");
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = false;
+            this->timestep = 0;
+
             plan_.mutex.unlock();
         }
         
