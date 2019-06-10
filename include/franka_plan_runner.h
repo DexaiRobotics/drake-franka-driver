@@ -520,9 +520,10 @@ private:
                 for(int i = 0; i < 7; i++){
                     float stop_time = vel[i] / this->max_accels[i];
                     if(stop_time > temp_target_stop_time){
-                        this->target_stop_time = stop_time;
+                        temp_target_stop_time = stop_time;
                     }
                 }
+                this->target_stop_time = 5*temp_target_stop_time;
             }
 
             franka_time += stop_period(period.toSec());
