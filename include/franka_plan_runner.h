@@ -456,6 +456,8 @@ private:
         dracula->MutableViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
         next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542, -2.5114236381136448, 0.6720116891296624, 1.9928838396072361, -1.2954019628351783; // set robot in a starting position which is not in collision
+        Eigen::VectorXd prev_conf;
+        std::vector<double> vel(7,1);
         franka::RobotState robot_state; // internal state; mapping to franka state
         franka::Duration period;
         milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
@@ -471,23 +473,36 @@ private:
             std::vector<double> next_conf_vec = du::e_to_v(next_conf);
             ConvertToArray(next_conf_vec, robot_state.q);
             ConvertToArray(next_conf_vec, robot_state.q_d);
+            ConvertToArray(vel, robot_state.dq);
 
+ 
             franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period);
+
+            prev_conf = next_conf.replicate(1,1);
+
             next_conf = du::v_to_e(ConvertToVector(cmd_pos.q)); 
             dracula->GetViz()->displayState(next_conf);
+
+            next_conf_vec = du::e_to_v(next_conf);
+            std::vector<double> prev_conf_vec =  du::e_to_v(prev_conf);
+
+            for(int i=0; i<7; i++){
+                vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double) period.toSec();                
+            }
 
             milliseconds current_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
             int64_t delta_ms = int64_t( (current_ms - last_ms).count() );            
             period = franka::Duration(delta_ms);
             last_ms = current_ms;
+
         }
         return 0; 
     };
 
     double stop_period(double period){
         double a = 2 / target_stop_time;
-        double current_time = period * (this->target_stop_time-4/(a*(exp(a*this->timestep)+1)));
-        double prev_time = period * (this->target_stop_time-4/(a*(exp(a*(this->timestep-1))+1)));
+        double current_time = period * (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
+        double prev_time = period * (this->target_stop_time-4/(a*(exp(a*period*(this->timestep-1))+1)));
         return current_time - prev_time;
     }
 
@@ -498,19 +513,21 @@ private:
                 std::array<double,7> vel = robot_state.dq;
                 cout << "VELOCITIES: ";
                 for(int j = 0; j < 7; j++){
-                    cout << vel[0];
+                    cout << vel[j] << " " ;
                 }
                 cout << endl;
-                float target_stop_time = 0;
+                float temp_target_stop_time = 0;
                 for(int i = 0; i < 7; i++){
                     float stop_time = vel[i] / this->max_accels[i];
-                    if(stop_time > target_stop_time){
-                        target_stop_time = stop_time;
+                    if(stop_time > temp_target_stop_time){
+                        this->target_stop_time = stop_time;
                     }
                 }
             }
 
             franka_time += stop_period(period.toSec());
+            cout.precision(17);
+            cout << "PERIOD: " << fixed << stop_period(period.toSec()) << endl;
             timestep++;
         }
         else{
@@ -1011,7 +1028,7 @@ private:
             momap::log()->info("Received continue command. Continuing plan.");
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = false;
-            this->timestep = 0;
+            this->timestep = 1;
 
             plan_.mutex.unlock();
         }
