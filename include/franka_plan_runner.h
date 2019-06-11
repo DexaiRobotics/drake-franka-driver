@@ -242,7 +242,7 @@ public:
         plan_.v_xyz = Eigen::Vector3d::Zero();
         plan_.end_time_us = 0;
         plan_.paused = false;
-
+	plan_.unpausing = false;
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
         momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
@@ -523,7 +523,7 @@ private:
                         temp_target_stop_time = stop_time;
                     }
                 }
-                this->target_stop_time = 5*temp_target_stop_time;
+                this->target_stop_time = temp_target_stop_time;
                 this->stop_epsilon = period.toSec() / 20;
             }
 
