@@ -541,7 +541,7 @@ private:
                 std::unique_lock<std::mutex> lck(plan_.mutex);
                 plan_.unpausing = false;
                 plan_.mutex.unlock();
-                not_editing.notify_one();
+                not_editing.notify_one();   
             }
             double new_stop = stop_period(period.toSec());
             franka_time += new_stop;
