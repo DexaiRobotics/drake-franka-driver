@@ -203,9 +203,9 @@ private:
     std::condition_variable not_editing;
     std::array<double, 16> initial_pose;
     Eigen::MatrixXd joint_limits;
-    bool unpausing = false;
     long timestep;
     float target_stop_time;
+    const float STOP_EPSILON = 20; //make this a yaml parameter
     float stop_epsilon;
     float stop_duration;
 
@@ -242,7 +242,7 @@ public:
         plan_.v_xyz = Eigen::Vector3d::Zero();
         plan_.end_time_us = 0;
         plan_.paused = false;
-	plan_.unpausing = false;
+        plan_.unpausing = false;
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
         momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
@@ -524,7 +524,7 @@ private:
                     }
                 }
                 this->target_stop_time = temp_target_stop_time;
-                this->stop_epsilon = period.toSec() / 20;
+                this->stop_epsilon = period.toSec() / STOP_EPSILON;
             }
 
             double new_stop = stop_period(period.toSec());
