@@ -113,6 +113,7 @@ struct RobotPiecewisePolynomial {
     Eigen::Vector3d v_xyz;
     int64_t end_time_us;
     bool paused;
+    bool unpausing;
 };
 
 template <typename T, std::size_t SIZE>
@@ -202,9 +203,13 @@ private:
     std::condition_variable not_editing;
     std::array<double, 16> initial_pose;
     Eigen::MatrixXd joint_limits;
-    bool pausing;
+    bool unpausing = false;
     long timestep;
     float target_stop_time;
+    float stop_epsilon;
+    float stop_duration;
+
+
 
     // Set print rate for comparing commanded vs. measured torques.
     const double lcm_publish_rate = 200.0; //Hz
@@ -503,7 +508,7 @@ private:
         double a = 2 / target_stop_time;
         double current_time = period * (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
         double prev_time = period * (this->target_stop_time-4/(a*(exp(a*period*(this->timestep-1))+1)));
-        return current_time - prev_time;
+        return 1000 * (current_time - prev_time);
     }
 
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
@@ -511,11 +516,6 @@ private:
         if (plan_.paused){
             if(target_stop_time == 0){
                 std::array<double,7> vel = robot_state.dq;
-                cout << "VELOCITIES: ";
-                for(int j = 0; j < 7; j++){
-                    cout << vel[j] << " " ;
-                }
-                cout << endl;
                 float temp_target_stop_time = 0;
                 for(int i = 0; i < 7; i++){
                     float stop_time = vel[i] / this->max_accels[i];
@@ -524,12 +524,31 @@ private:
                     }
                 }
                 this->target_stop_time = 5*temp_target_stop_time;
+                this->stop_epsilon = period.toSec() / 20;
             }
 
-            franka_time += stop_period(period.toSec());
+            double new_stop = stop_period(period.toSec());
+            franka_time += new_stop;
             cout.precision(17);
-            cout << "PERIOD: " << fixed << stop_period(period.toSec()) << endl;
+            cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
             timestep++;
+            if(new_stop > this->stop_epsilon){
+                this->stop_duration++;
+            }
+        }
+        else if(!plan_.paused && plan_.unpausing){
+            if(timestep == 0){
+                std::unique_lock<std::mutex> lck(plan_.mutex);
+                plan_.unpausing = false;
+                plan_.mutex.unlock();
+                not_editing.notify_one();
+            }
+            double new_stop = stop_period(period.toSec());
+            franka_time += new_stop;
+            cout.precision(17);
+            cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+            timestep++;
+            
         }
         else{
             franka_time += period.toSec();
@@ -1023,15 +1042,18 @@ private:
 
             this->target_stop_time = 0;
             this->timestep = 1;
+            this->stop_duration = 0;
 
         }
         else if(plan_.paused){
             momap::log()->info("Received continue command. Continuing plan.");
+            this->timestep = -1 * this->stop_duration;
+            cout << "STOP DURATION: " << stop_duration << endl;
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = false;
-            this->timestep = 1;
-
+            plan_.unpausing = true;
             plan_.mutex.unlock();
+            not_editing.notify_one();
         }
         
 
