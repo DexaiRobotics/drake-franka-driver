@@ -242,6 +242,7 @@ public:
         plan_.v_xyz = Eigen::Vector3d::Zero();
         plan_.end_time_us = 0;
         plan_.paused = false;
+        plan_.unpaused = false;
 
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
@@ -523,7 +524,7 @@ private:
                         temp_target_stop_time = stop_time;
                     }
                 }
-                this->target_stop_time = 5*temp_target_stop_time;
+                this->target_stop_time = temp_target_stop_time;
                 this->stop_epsilon = period.toSec() / 20;
             }
 
@@ -541,7 +542,7 @@ private:
                 std::unique_lock<std::mutex> lck(plan_.mutex);
                 plan_.unpausing = false;
                 plan_.mutex.unlock();
-                not_editing.notify_one();
+                not_editing.notify_one();   
             }
             double new_stop = stop_period(period.toSec());
             franka_time += new_stop;
