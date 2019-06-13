@@ -571,11 +571,6 @@ private:
         std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
         desired_next = du::v_to_e( ConvertToVector(current_cmd) );
         
-        // cout << "RESULT: "; 
-        // for(int i=0; i < current_conf.size(); i++){
-        //     cout << current_conf[i];
-        // }
-        // cout << endl;
 
         // std::unique_lock<std::mutex> lck(plan_.mutex);
         // not_editing.wait(lck, [this]() {return editing_plan == false;});
@@ -658,19 +653,7 @@ private:
             momap::log()->info("plan_.plan false and plan_.has_data, what?");
         }
         // TODO: remove with a better way to quit @dmsj
-        // if (time >= 60.0) {
-        // cout << "OUTPUT: "; 
-        // for(int i=0; i < current_cmd.size(); i++){
-        //     cout << current_cmd[i];
-        // }
-        // cout << endl;
-
-        //std::array<double, 7> current_cmd = robot_state.q_d;
-        cout << "VEL: "; 
-        for(int i=0; i < current_cmd.size(); i++){
-            cout << robot_state.dq[i] << " (" << robot_state.dq_d[i] <<")";
-        }
-        cout << endl;
+        
         return output;
     };
 
