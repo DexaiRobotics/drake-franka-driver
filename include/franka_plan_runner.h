@@ -571,7 +571,11 @@ private:
         std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
         desired_next = du::v_to_e( ConvertToVector(current_cmd) );
         
-        cout << "RESULT: " << current_conf << endl;
+        cout << "RESULT: "; 
+        for(int i=0; i < current_conf.size(); i++){
+            cout << current_conf[i];
+        }
+        cout << endl;
         // std::unique_lock<std::mutex> lck(plan_.mutex);
         // not_editing.wait(lck, [this]() {return editing_plan == false;});
         double error = DBL_MAX; 
@@ -654,7 +658,11 @@ private:
         }
         // TODO: remove with a better way to quit @dmsj
         // if (time >= 60.0) {
-        cout << "OUTPUT: " << output << endl;
+        cout << "OUTPUT: "; 
+        for(int i=0; i < current_cmd.size(); i++){
+            cout << current_cmd[i];
+        }
+        cout << endl;
         return output;
     };
 
