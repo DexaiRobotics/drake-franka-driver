@@ -505,6 +505,9 @@ private:
     };
 
     double stop_period(double period){
+        /*Logistic growth function: f - 4 / [a(e^{ax}+1] where
+        f = target_stop time*/
+
         double a = 2 / target_stop_time;
         double current_time = period * (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
         double prev_time = period * (this->target_stop_time-4/(a*(exp(a*period*(this->timestep-1))+1)));
@@ -512,9 +515,9 @@ private:
     }
 
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
-        //If plan is paused, keep same franka_time as before
+        //If plan is paused
         if (plan_.paused){
-            if(target_stop_time == 0){
+            if(target_stop_time == 0){ //if target_stop_time not set, set target_stop_time
                 std::array<double,7> vel = robot_state.dq;
                 float temp_target_stop_time = 0;
                 for(int i = 0; i < 7; i++){
