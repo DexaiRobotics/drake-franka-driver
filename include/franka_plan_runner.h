@@ -504,9 +504,10 @@ private:
         return 0; 
     };
 
-    double stop_period(double period){
-        /*Logistic growth function: f - 4 / [a(e^{ax}+1] where
-        f = target_stop time*/
+    double StopPeriod(double period){
+        /*Logistic growth function: t' = f - 4 / [a(e^{at}+1] where
+        f = target_stop time, t' = franka time, t = real time
+        Returns delta t', the period that should be incremented to franka time*/
 
         double a = 2 / target_stop_time;
         double current_time = period * (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
@@ -530,7 +531,7 @@ private:
                 this->stop_epsilon = period.toSec() / STOP_EPSILON;
             }
 
-            double new_stop = stop_period(period.toSec());
+            double new_stop = StopPeriod(period.toSec());
             franka_time += new_stop;
             cout.precision(17);
             cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
@@ -539,14 +540,14 @@ private:
                 this->stop_duration++;
             }
         }
-        else if(!plan_.paused && plan_.unpausing){
-            if(timestep == 0){
+        else if(!plan_.paused && plan_.unpausing){ //robot is unpausing
+            if(timestep == 0){ //if robot has reached full speed again
                 std::unique_lock<std::mutex> lck(plan_.mutex);
                 plan_.unpausing = false;
                 plan_.mutex.unlock();
                 not_editing.notify_one();   
             }
-            double new_stop = stop_period(period.toSec());
+            double new_stop = StopPeriod(period.toSec());
             franka_time += new_stop;
             cout.precision(17);
             cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
@@ -1031,13 +1032,6 @@ private:
         if(!plan_.paused){
             momap::log()->info("Received stop command. Discarding plan.");
             std::unique_lock<std::mutex> lck(plan_.mutex);
-            // editing_plan = true;
-
-            // plan_.has_data = false;
-            // plan_.utime = -1;
-            // plan_.plan.release();
-
-            // editing_plan = false;
             plan_.paused = true;
             plan_.mutex.unlock();
             not_editing.notify_one();
@@ -1049,8 +1043,8 @@ private:
         }
         else if(plan_.paused){
             momap::log()->info("Received continue command. Continuing plan.");
-            this->timestep = -1 * this->stop_duration;
-            cout << "STOP DURATION: " << stop_duration << endl;
+            this->timestep = -1 * this->stop_duration; //how long unpausing should take
+            // cout << "STOP DURATION: " << stop_duration << endl;
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = false;
             plan_.unpausing = true;
