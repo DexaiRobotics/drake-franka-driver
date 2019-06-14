@@ -516,6 +516,7 @@ private:
     }
 
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
+        momap::log()->info("ddq_d: {}\n" robot_state.ddq_d);
         //If plan is paused
         if (plan_.paused){
             if(target_stop_time == 0){ //if target_stop_time not set, set target_stop_time
