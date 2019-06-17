@@ -508,7 +508,6 @@ private:
         /*Logistic growth function: t' = f - 4 / [a(e^{at}+1] where
         f = target_stop time, t' = franka time, t = real time
         Returns delta t', the period that should be incremented to franka time*/
-
         double a = 2 / target_stop_time;
         double current_time = period * (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
         double prev_time = period * (this->target_stop_time-4/(a*(exp(a*period*(this->timestep-1))+1)));
@@ -518,11 +517,11 @@ private:
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
         // momap::log()->info("ddq_d: {}\n" robot_state.ddq_d);
         //If plan is paused
-        if (plan_.paused){
-            if(target_stop_time == 0){ //if target_stop_time not set, set target_stop_time
+        if (plan_.paused) {
+            if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
                 std::array<double,7> vel = robot_state.dq;
                 float temp_target_stop_time = 0;
-                for(int i = 0; i < 7; i++){
+                for (int i = 0; i < 7; i++) {
                     float stop_time = vel[i] / this->max_accels[i];
                     if(stop_time > temp_target_stop_time){
                         temp_target_stop_time = stop_time;
@@ -540,9 +539,8 @@ private:
             if(new_stop > this->stop_epsilon){
                 this->stop_duration++;
             }
-        }
-        else if(!plan_.paused && plan_.unpausing){ //robot is unpausing
-            if(timestep == 0){ //if robot has reached full speed again
+        } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
+            if (timestep == 0) { //if robot has reached full speed again
                 std::unique_lock<std::mutex> lck(plan_.mutex);
                 plan_.unpausing = false;
                 plan_.mutex.unlock();
@@ -555,7 +553,7 @@ private:
             timestep++;
             
         }
-        else{
+        else {
             franka_time += period.toSec();
         }
         
