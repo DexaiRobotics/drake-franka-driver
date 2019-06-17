@@ -1,7 +1,7 @@
-package robot_msgs;
+package stop_cmd;
 
 // simple boolean message
-struct bool_t
+struct stop_cmd
 {
     // microseconds since the epoch
     int64_t  utime;

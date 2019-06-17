@@ -67,7 +67,7 @@
 
 // #include <momap/momap_robot_plan_v1.h>
 #include <lcmtypes/robot_spline_t.hpp>
-#include "../src/stop_cmd/stop_cmd.hpp"
+#include "../lcmtypes/stop_cmd/stop_cmd.hpp"
 
 #include "trajectory_solver.h"
 #include "momap/momap_log.h"
@@ -177,6 +177,13 @@ void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
   lcm_status_.joint_torque_measured.resize(kNumJoints, 0);
   lcm_status_.joint_torque_commanded.resize(kNumJoints, 0);
   lcm_status_.joint_torque_external.resize(kNumJoints, 0);
+}
+
+int64_t get_current_utime() {
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+    int64_t current_utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
+    return current_utime;
 }
 
 class FrankaPlanRunner {

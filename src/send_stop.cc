@@ -1,20 +1,29 @@
 #include <iostream>
 #include "lcm/lcm-cpp.hpp"
-#include "stop_cmd/stop_cmd.hpp"
+#include "../lcmtypes/stop_cmd/stop_cmd.hpp"
+#include <sys/time.h>
 
 using namespace std;
+
+int64_t get_current_utime() {
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+    int64_t current_utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
+    return current_utime;
+}
+
 
 int main()
 {
 	lcm::LCM lcm;
-	if(!lcm.good())
-		return 1;
+	if(!lcm.good()) return 1;
 	while(1){
 		stop_cmd::stop_cmd cmd;
 		string a;
 		cout << "Enter cmd: ";
 		cin >> a;
-		cmd.msg = a;
+		cmd.utime = get_current_utime();
+		cmd.data = true;
 		lcm.publish("FRANKA_0_STOP", &cmd);
 		cout << "published STOP";
 	}

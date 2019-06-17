@@ -9,15 +9,18 @@
 
 #include <lcm/lcm_coretypes.h>
 
-#include <string>
 
 namespace stop_cmd
 {
 
+/// simple boolean message
 class stop_cmd
 {
     public:
-        std::string msg;
+        /// microseconds since the epoch
+        int64_t    utime;
+
+        int8_t     data;
 
     public:
         /**
@@ -115,9 +118,10 @@ int stop_cmd::_encodeNoHash(void *buf, int offset, int maxlen) const
 {
     int pos = 0, tlen;
 
-    char* msg_cstr = const_cast<char*>(this->msg.c_str());
-    tlen = __string_encode_array(
-        buf, offset + pos, maxlen - pos, &msg_cstr, 1);
+    tlen = __int64_t_encode_array(buf, offset + pos, maxlen - pos, &this->utime, 1);
+    if(tlen < 0) return tlen; else pos += tlen;
+
+    tlen = __boolean_encode_array(buf, offset + pos, maxlen - pos, &this->data, 1);
     if(tlen < 0) return tlen; else pos += tlen;
 
     return pos;
@@ -127,14 +131,11 @@ int stop_cmd::_decodeNoHash(const void *buf, int offset, int maxlen)
 {
     int pos = 0, tlen;
 
-    int32_t __msg_len__;
-    tlen = __int32_t_decode_array(
-        buf, offset + pos, maxlen - pos, &__msg_len__, 1);
+    tlen = __int64_t_decode_array(buf, offset + pos, maxlen - pos, &this->utime, 1);
     if(tlen < 0) return tlen; else pos += tlen;
-    if(__msg_len__ > maxlen - pos) return -1;
-    this->msg.assign(
-        static_cast<const char*>(buf) + offset + pos, __msg_len__ - 1);
-    pos += __msg_len__;
+
+    tlen = __boolean_decode_array(buf, offset + pos, maxlen - pos, &this->data, 1);
+    if(tlen < 0) return tlen; else pos += tlen;
 
     return pos;
 }
@@ -142,13 +143,14 @@ int stop_cmd::_decodeNoHash(const void *buf, int offset, int maxlen)
 int stop_cmd::_getEncodedSizeNoHash() const
 {
     int enc_size = 0;
-    enc_size += this->msg.size() + 4 + 1;
+    enc_size += __int64_t_encoded_array_size(NULL, 1);
+    enc_size += __boolean_encoded_array_size(NULL, 1);
     return enc_size;
 }
 
 uint64_t stop_cmd::_computeHash(const __lcm_hash_ptr *)
 {
-    uint64_t hash = 0x2adc216270494dceLL;
+    uint64_t hash = 0xb140141aa43a8d03LL;
     return (hash<<1) + ((hash>>63)&1);
 }
 
