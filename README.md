@@ -14,7 +14,7 @@ In order to build the driver, use the following steps:
 5. `cd externals/libfranka && git submodule update --init`
 6. `cd .. && ../setup.sh` (if using docker, run inside docker image)
 
-
+When running `setup.sh` if you get an error that the cmake for Franka cannot be found, try removing `libfranka/build` and rerunning setup
 
 ## running the driver
 Once built, the executable `drake-franka-driver` can be found in the `build/` directory. In order to run the driver, execute:
