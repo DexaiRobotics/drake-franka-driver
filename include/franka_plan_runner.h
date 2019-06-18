@@ -1034,7 +1034,7 @@ private:
     };
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
-        const stop_cmd::stop_cmd* msg) {
+        const robot_msgs::bool_t* msg) {
         if(!plan_.paused){
             momap::log()->info("Received stop command. Discarding plan.");
             std::unique_lock<std::mutex> lck(plan_.mutex);

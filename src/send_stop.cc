@@ -1,6 +1,6 @@
 #include <iostream>
 #include "lcm/lcm-cpp.hpp"
-#include "../lcmtypes/stop_cmd/stop_cmd.hpp"
+#include <robot_msgs/bool_t.hpp>
 #include <sys/time.h>
 
 using namespace std;
@@ -18,7 +18,7 @@ int main()
 	lcm::LCM lcm;
 	if(!lcm.good()) return 1;
 	while(1){
-		stop_cmd::stop_cmd cmd;
+		robot_msgs::bool_t cmd;
 		string a;
 		cout << "Enter cmd: ";
 		cin >> a;
