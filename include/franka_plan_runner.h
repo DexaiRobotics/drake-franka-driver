@@ -67,7 +67,7 @@
 
 // #include <momap/momap_robot_plan_v1.h>
 #include <lcmtypes/robot_spline_t.hpp>
-#include "../lcmtypes/stop_cmd/stop_cmd.hpp"
+#include <robot_msgs/bool_t.hpp>
 
 #include "trajectory_solver.h"
 #include "momap/momap_log.h"
