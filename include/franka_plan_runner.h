@@ -516,9 +516,9 @@ private:
         f = target_stop time, t' = franka time, t = real time
         Returns delta t', the period that should be incremented to franka time*/
         double a = 2 / target_stop_time;
-        double current_time = period * (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
-        double prev_time = period * (this->target_stop_time-4/(a*(exp(a*period*(this->timestep-1))+1)));
-        return 1000 * (current_time - prev_time);
+        double current_time = (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
+        double prev_time = (this->target_stop_time-4/(a*(exp(a*period*(this->timestep-1))+1)));
+        return (current_time - prev_time);
     }
 
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
