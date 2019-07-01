@@ -23,7 +23,6 @@ int main()
 		cout << "Enter cmd: ";
 		cin >> a;
 		cmd.utime = get_current_utime();
-		cout << "RECIEVED:" << a;
 		if(a == "s"){
 			cmd.data = true;
 			cout << "published STOP\n";
