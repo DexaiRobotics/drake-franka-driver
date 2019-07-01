@@ -1035,7 +1035,7 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(!plan_.paused){
+        if(msg && !plan_.paused){
             momap::log()->info("Received stop command. Discarding plan.");
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = true;
@@ -1047,7 +1047,7 @@ private:
             this->stop_duration = 0;
 
         }
-        else if(plan_.paused){
+        else if(!msg && plan_.paused){
             momap::log()->info("Received continue command. Continuing plan.");
             this->timestep = -1 * this->stop_duration; //how long unpausing should take
             // cout << "STOP DURATION: " << stop_duration << endl;

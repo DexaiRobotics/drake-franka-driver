@@ -23,7 +23,7 @@ int main()
 		cout << "Enter cmd: ";
 		cin >> a;
 		cmd.utime = get_current_utime();
-		cmd.data = true;
+		cmd.data = a == "s"
 		lcm.publish("FRANKA_0_STOP", &cmd);
 		cout << "published STOP";
 	}
