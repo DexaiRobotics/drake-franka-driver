@@ -1047,7 +1047,7 @@ private:
             this->stop_duration = 0;
 
         }
-        else if(msg->data && plan_.paused){
+        else if(!msg->data && plan_.paused){
             momap::log()->info("Received continue command. Continuing plan.");
             this->timestep = -1 * this->stop_duration; //how long unpausing should take
             // cout << "STOP DURATION: " << stop_duration << endl;
