@@ -23,9 +23,19 @@ int main()
 		cout << "Enter cmd: ";
 		cin >> a;
 		cmd.utime = get_current_utime();
-		cmd.data = a == "s";
+		cout << "RECIEVED:" << a;
+		if(a == "s"){
+			cmd.data = true;
+			cout << "published STOP\n";
+		} else if(a == "c"){
+			cmd.data = false;
+			cout << "published CONTINUE\n";
+		}
+		else{
+			continue;
+		}
 		lcm.publish("FRANKA_0_STOP", &cmd);
-		cout << "published STOP";
+		
 	}
 	return 0;
 }
