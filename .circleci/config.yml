@@ -28,7 +28,7 @@ jobs:
             ls -lahFG .
             cd ..
 
-      - checkout
+      - checkout:
 
       - run:
           name: build and test

@@ -6,14 +6,15 @@ Note: the c++ drake-franka-driver depends on `drake` and `drake-lcmtypes` so it 
 ### pre-requisites
 1. Install `lcm` system-wide. We recommend `brew install lcm`
 2. Install [Drake](https://drake.mit.edu/) to `/opt/drake/` as is standard 
+*NOTE* ignore steps 1 and 2 if running inside docker
 In order to build the driver, use the following steps:
 
-2. `git clone https://github.com/DexaiRobotics/drake-franka-driver.git`
-3. `cd drake-franka-driver`
-4. `git submodule update --init`
-5. `cd externals/libfranka`
-6. `git submodule update --init`
-7. `./setup.sh`
+3. `git clone https://github.com/DexaiRobotics/drake-franka-driver.git`
+4. `cd drake-franka-driver && git submodule update --init`
+5. `cd externals/libfranka && git submodule update --init`
+6. `cd .. && ../setup.sh` (if using docker, run inside docker image)
+
+When running `setup.sh` if you get an error that the cmake for Franka cannot be found, try removing `libfranka/build` and rerunning setup
 
 ## running the driver
 Once built, the executable `drake-franka-driver` can be found in the `build/` directory. In order to run the driver, execute:

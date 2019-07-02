@@ -1,0 +1,9 @@
+package robot_msgs;
+
+// simple boolean message
+struct bool_t
+{
+    // microseconds since the epoch
+    int64_t  utime;
+    boolean  data;
+}

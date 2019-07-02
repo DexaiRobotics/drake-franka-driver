@@ -14,6 +14,7 @@
 #ifndef ROBOT_PLAN_RUNNER_H
 #define ROBOT_PLAN_RUNNER_H
 
+#include <math.h>
 #include <array>
 #include <atomic>
 
@@ -66,6 +67,7 @@
 
 // #include <momap/momap_robot_plan_v1.h>
 #include <lcmtypes/robot_spline_t.hpp>
+#include <robot_msgs/bool_t.hpp>
 
 #include "trajectory_solver.h"
 #include "momap/momap_log.h"
@@ -110,6 +112,8 @@ struct RobotPiecewisePolynomial {
     Eigen::Matrix4d cartesian_goal;
     Eigen::Vector3d v_xyz;
     int64_t end_time_us;
+    bool paused;
+    bool unpausing;
 };
 
 template <typename T, std::size_t SIZE>
@@ -175,6 +179,13 @@ void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
   lcm_status_.joint_torque_external.resize(kNumJoints, 0);
 }
 
+int64_t get_current_utime() {
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+    int64_t current_utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
+    return current_utime;
+}
+
 class FrankaPlanRunner {
 private:
     Dracula *dracula = nullptr;
@@ -199,10 +210,18 @@ private:
     std::condition_variable not_editing;
     std::array<double, 16> initial_pose;
     Eigen::MatrixXd joint_limits;
+    long timestep;
+    float target_stop_time;
+    const float STOP_EPSILON = 20; //make this a yaml parameter
+    float stop_epsilon;
+    float stop_duration;
+
+
 
     // Set print rate for comparing commanded vs. measured torques.
     const double lcm_publish_rate = 200.0; //Hz
     double franka_time;
+    Eigen::VectorXd max_accels;
 
 public:
     FrankaPlanRunner(const parameters::Parameters params) : p(params), ip_addr_(params.robot_ip), plan_number_(0), lcm_(params.lcm_url)
@@ -212,6 +231,7 @@ public:
         lcm_.subscribe(p.lcm_stop_channel, &FrankaPlanRunner::HandleStop, this);
         running_ = true;
         franka_time = 0.0; 
+        max_accels = params.robot_max_accelerations;
 
         dracula = new Dracula(p);
         joint_limits = dracula->GetCS()->GetJointLimits();
@@ -228,7 +248,8 @@ public:
         plan_.cartesian_goal = Eigen::Matrix4d::Zero();
         plan_.v_xyz = Eigen::Vector3d::Zero();
         plan_.end_time_us = 0;
-
+        plan_.paused = false;
+        plan_.unpausing = false;
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
         momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
@@ -397,8 +418,8 @@ private:
                 return tau_d_rate_limited;
             };
 
-            bool stop_cmd = false; 
-            while(!stop_cmd){
+            bool stop_signal = false; 
+            while(!stop_signal){
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
                     // robot.control(cartesian_position_callback);
@@ -447,33 +468,98 @@ private:
         dracula->MutableViz()->loadRobot();
         Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(kNumJoints); // output state
         next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542, -2.5114236381136448, 0.6720116891296624, 1.9928838396072361, -1.2954019628351783; // set robot in a starting position which is not in collision
+        Eigen::VectorXd prev_conf;
+        std::vector<double> vel(7,1);
         franka::RobotState robot_state; // internal state; mapping to franka state
         franka::Duration period;
         milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
 
         while(1){
-
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate )));
 
             std::vector<double> next_conf_vec = du::e_to_v(next_conf);
             ConvertToArray(next_conf_vec, robot_state.q);
             ConvertToArray(next_conf_vec, robot_state.q_d);
+            ConvertToArray(vel, robot_state.dq);
 
+ 
             franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period);
+
+            prev_conf = next_conf.replicate(1,1);
+
             next_conf = du::v_to_e(ConvertToVector(cmd_pos.q)); 
             dracula->GetViz()->displayState(next_conf);
+
+            next_conf_vec = du::e_to_v(next_conf);
+            std::vector<double> prev_conf_vec =  du::e_to_v(prev_conf);
+
+            for(int i=0; i<7; i++){
+                vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double) period.toSec();                
+            }
 
             milliseconds current_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
             int64_t delta_ms = int64_t( (current_ms - last_ms).count() );            
             period = franka::Duration(delta_ms);
             last_ms = current_ms;
+
         }
         return 0; 
     };
 
+    double StopPeriod(double period){
+        /*Logistic growth function: t' = f - 4 / [a(e^{at}+1] where
+        f = target_stop time, t' = franka time, t = real time
+        Returns delta t', the period that should be incremented to franka time*/
+        double a = 2 / target_stop_time;
+        double current_time = (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
+        double prev_time = (this->target_stop_time-4/(a*(exp(a*period*(this->timestep-1))+1)));
+        return (current_time - prev_time);
+    }
+
     franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
-        franka_time += period.toSec();
+        // momap::log()->info("ddq_d: {}\n" robot_state.ddq_d);
+        //If plan is paused
+        if (plan_.paused) {
+            if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
+                std::array<double,7> vel = robot_state.dq;
+                float temp_target_stop_time = 0;
+                for (int i = 0; i < 7; i++) {
+                    float stop_time = vel[i] / this->max_accels[i];
+                    if(stop_time > temp_target_stop_time){
+                        temp_target_stop_time = stop_time;
+                    }
+                }
+                this->target_stop_time = temp_target_stop_time;
+                this->stop_epsilon = period.toSec() / STOP_EPSILON;
+            }
+
+            double new_stop = StopPeriod(period.toSec());
+            franka_time += new_stop;
+            cout.precision(17);
+            cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+            timestep++;
+            if(new_stop > this->stop_epsilon){
+                this->stop_duration++;
+            }
+        } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
+            if (timestep == 0) { //if robot has reached full speed again
+                std::unique_lock<std::mutex> lck(plan_.mutex);
+                plan_.unpausing = false;
+                plan_.mutex.unlock();
+                not_editing.notify_one();   
+            }
+            double new_stop = StopPeriod(period.toSec());
+            franka_time += new_stop;
+            cout.precision(17);
+            cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+            timestep++;
+            
+        }
+        else {
+            franka_time += period.toSec();
+        }
+        
         cur_time_us = int64_t(franka_time * 1.0e6); 
 
         // Update data to publish.
@@ -570,7 +656,6 @@ private:
             momap::log()->info("plan_.plan false and plan_.has_data, what?");
         }
         // TODO: remove with a better way to quit @dmsj
-        // if (time >= 60.0) {
         
         return output;
     };
@@ -945,19 +1030,30 @@ private:
     };
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
-        const robot_plan_t*) {
-        momap::log()->info("Received stop command. Discarding plan.");
+        const robot_msgs::bool_t* msg) {
+        if(msg->data && !plan_.paused){
+            momap::log()->info("Received pause command. Pausing plan.");
+            std::unique_lock<std::mutex> lck(plan_.mutex);
+            plan_.paused = true;
+            plan_.mutex.unlock();
+            not_editing.notify_one();
 
-        std::unique_lock<std::mutex> lck(plan_.mutex);
-        editing_plan = true;
+            this->target_stop_time = 0;
+            this->timestep = 1;
+            this->stop_duration = 0;
 
-        plan_.has_data = false;
-        plan_.utime = -1;
-        plan_.plan.release();
-
-        editing_plan = false;
-        plan_.mutex.unlock();
-        not_editing.notify_one();
+        }
+        else if(!msg->data && plan_.paused){
+            momap::log()->info("Received continue command. Continuing plan.");
+            this->timestep = -1 * this->stop_duration; //how long unpausing should take
+            // cout << "STOP DURATION: " << stop_duration << endl;
+            std::unique_lock<std::mutex> lck(plan_.mutex);
+            plan_.paused = false;
+            plan_.unpausing = true;
+            plan_.mutex.unlock();
+            not_editing.notify_one();
+        }
+        
 
     };
 
