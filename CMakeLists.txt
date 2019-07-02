@@ -69,7 +69,6 @@ add_executable(${driver_name}
     src/examples_common.cpp
 )
 
-#NEW CODE
 set(test_name send_stop)
 add_executable(${test_name}
     src/send_stop.cc

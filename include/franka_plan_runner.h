@@ -475,10 +475,6 @@ private:
         milliseconds last_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
 
         while(1){
-            // if(plan_.paused){
-            //     //momap::log()->info("Paused");
-            //     continue;
-            // }
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate )));
 
@@ -1036,7 +1032,7 @@ private:
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
         if(msg->data && !plan_.paused){
-            momap::log()->info("Received stop command. Discarding plan.");
+            momap::log()->info("Received pause command. Pausing plan.");
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = true;
             plan_.mutex.unlock();
