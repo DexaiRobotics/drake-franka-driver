@@ -537,13 +537,13 @@ private:
             double new_stop = StopPeriod(period.toSec());
             franka_time += new_stop;
             cout.precision(17);
-            cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+            // cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
             timestep++;
             if(new_stop > this->stop_epsilon){
                 this->stop_duration++;
             }
         } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
-            if (timestep == 0) { //if robot has reached full speed again
+            if (timestep >= 0) { //if robot has reached full speed again
                 std::unique_lock<std::mutex> lck(plan_.mutex);
                 plan_.unpausing = false;
                 plan_.mutex.unlock();
@@ -552,7 +552,7 @@ private:
             double new_stop = StopPeriod(period.toSec());
             franka_time += new_stop;
             cout.precision(17);
-            cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+            // cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
             timestep++;
             
         }
@@ -1031,7 +1031,7 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(msg->data && !plan_.paused){
+        if(plan_.has_data && msg->data && !plan_.paused){
             momap::log()->info("Received pause command. Pausing plan.");
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = true;
@@ -1043,7 +1043,7 @@ private:
             this->stop_duration = 0;
 
         }
-        else if(!msg->data && plan_.paused){
+        else if(plan_.has_data && !msg->data && plan_.paused){
             momap::log()->info("Received continue command. Continuing plan.");
             this->timestep = -1 * this->stop_duration; //how long unpausing should take
             // cout << "STOP DURATION: " << stop_duration << endl;
