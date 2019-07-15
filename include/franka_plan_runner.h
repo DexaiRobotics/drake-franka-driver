@@ -543,7 +543,7 @@ private:
                 this->stop_duration++;
             }
         } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
-            if (timestep > 0) { //if robot has reached full speed again
+            if (timestep >= 0) { //if robot has reached full speed again
                 std::unique_lock<std::mutex> lck(plan_.mutex);
                 plan_.unpausing = false;
                 plan_.mutex.unlock();
