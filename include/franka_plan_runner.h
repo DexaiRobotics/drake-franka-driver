@@ -552,7 +552,7 @@ private:
             double new_stop = StopPeriod(period.toSec());
             franka_time += new_stop;
             cout.precision(17);
-            cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+            cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
             timestep++;
             
         }

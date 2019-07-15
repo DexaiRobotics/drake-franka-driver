@@ -15,7 +15,7 @@ int64_t get_current_utime() {
 
 int main()
 {
-	lcm::LCM lcm;
+	lcm::LCM lcm("udpm://239.255.76.67:7667?ttl=2");
 	if(!lcm.good()) return 1;
 	while(1){
 		robot_msgs::bool_t cmd;
