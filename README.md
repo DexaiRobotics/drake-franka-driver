@@ -26,3 +26,4 @@ The `drake-franka-driver` listens for commands on the `<robot_name>_cmd` lcm cha
 ### listening to the robot response
 The `drake-franka-driver` reports the robot status on the `<robot_name>_status` lcm channel. By default this is set to `franka_0_status`. Status is reported in a `franka_status` struct.
 
+
