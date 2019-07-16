@@ -16,7 +16,6 @@ set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
 
 configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 configure_file(tests/data/franka_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
-file(COPY tests/data/meshes DESTINATION "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Find LCM
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
