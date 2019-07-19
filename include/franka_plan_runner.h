@@ -418,6 +418,19 @@ private:
                 return tau_d_rate_limited;
             };
 
+
+            //callback for inverseDynamics - i think all this code should be refactored at some point...
+            std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
+                inverse_dynamics_control_callback = 
+                [&, this](const franka::RobotState& robot_state, franka::Duration period) -> franka::Torques {
+                return this->FrankaPlanRunner::InverseDynamicsControlCallback(robot_state, period);
+            };
+
+
+
+
+
+
             bool stop_signal = false; 
             while(!stop_signal){
                 // std::cout << "top of loop: Executing motion." << std::endl;
@@ -861,6 +874,22 @@ private:
         // // }
         // // return output;
     };
+
+
+
+    franka::Torques InverseDynamicsControlCallback(const franka::RobotState& robot_state, franka::Duration period){
+        //traj input : plan_.plan
+        std::string urdf_path = ;
+        const double duration_per_call = 1; //arbitrary for now
+        const Eigen::VectorXd kp = Eigen::VectorXd::Zero(kNumJoints);
+        const Eigen::VectorXd ki = Eigen::VectorXd::Zero(kNumJoints);   
+        const Eigen::VectorXd kd = Eigen::VectorXd::Zero(kNumJoints);
+        const Eigen::Vector3d tau = {0,0,0};
+        const Eigen::Vector3d f = {0,0,0};
+        dracula-> GetMS()->InverseDynamicStep(urdf_path, *plan_.plan, duration_per_call, kp, ki, kd, tau, f);
+    }
+    
+
 
     void HandleLcm() {
         while (true) {
