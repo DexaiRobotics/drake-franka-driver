@@ -57,13 +57,15 @@
 #include <franka/exception.h>
 #include <franka/robot.h>
 #include <franka/duration.h>
-#include <franka/model.h>
 #include <franka/rate_limiting.h>
+#include <franka/model.h>
 
 #include "examples_common.h"
 
 #include <iostream>
 #include <memory>
+#include <chrono>
+#include <ctime>
 
 // #include <momap/momap_robot_plan_v1.h>
 #include <lcmtypes/robot_spline_t.hpp>
@@ -89,7 +91,7 @@ namespace drake {
 namespace franka_driver {
 
 const int kNumJoints = 7;
-const std::string home_addr = "192.168.1.1"; 
+const std::string home_addr = "192.168.1.1";
 
 
 using trajectories::PiecewisePolynomial;
@@ -105,12 +107,9 @@ struct RobotData {
 
 struct RobotPiecewisePolynomial {
     std::mutex mutex;
-    bool has_data;
+    std::atomic<bool> has_data;
     int64_t utime;
     std::unique_ptr<PiecewisePolynomial<double>> plan;
-    bool cartesian_move;
-    Eigen::Matrix4d cartesian_goal;
-    Eigen::Vector3d v_xyz;
     int64_t end_time_us;
     bool paused;
     bool unpausing;
@@ -129,11 +128,12 @@ void ConvertToArray(std::vector<T> &v, std::array<T, SIZE> &a){
 }
 
 
-void AssignToLcmStatus(franka::RobotState &robot_state, lcmt_iiwa_status &robot_status){
+// TODO: @dmsj - make this call ConvertToLcmStatus()
+static void AssignToLcmStatus(franka::RobotState &robot_state, lcmt_iiwa_status &robot_status){
     int num_joints_ = kNumJoints;
     struct timeval  tv;
     gettimeofday(&tv, NULL);
-
+    // TODO: @dmsj store both timeofday and franka_time
     robot_status.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec); //int64_t(1000.0 * robot_state.time.toMSec());
     robot_status.num_joints = num_joints_;
     // q
@@ -148,7 +148,7 @@ void AssignToLcmStatus(franka::RobotState &robot_state, lcmt_iiwa_status &robot_
 }
 
 lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState &robot_state){
-    lcmt_iiwa_status robot_status{}; 
+    lcmt_iiwa_status robot_status{};
     int num_joints_ = robot_state.q.size();
     struct timeval  tv;
     gettimeofday(&tv, NULL);
@@ -164,7 +164,7 @@ lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState &robot_state){
     robot_status.joint_torque_commanded = ConvertToVector(robot_state.tau_J_d);
     robot_status.joint_torque_external.resize(num_joints_, 0);
 
-    return robot_status; 
+    return robot_status;
 }
 
 void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
@@ -179,6 +179,7 @@ void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
   lcm_status_.joint_torque_external.resize(kNumJoints, 0);
 }
 
+// TODO: use this
 int64_t get_current_utime() {
     struct timeval  tv;
     gettimeofday(&tv, NULL);
@@ -189,7 +190,7 @@ int64_t get_current_utime() {
 class FrankaPlanRunner {
 private:
     Dracula *dracula = nullptr;
-    std::string param_yaml_; 
+    std::string param_yaml_;
     parameters::Parameters p;
     std::string ip_addr_;
     std::atomic_bool running_{false};
@@ -201,13 +202,12 @@ private:
     int64_t cur_time_us{};
     int64_t start_time_us{};
     RobotPiecewisePolynomial plan_;
-    RobotData robot_data_{}; 
+    RobotData robot_data_{};
     PPType piecewise_polynomial;
     std::thread lcm_publish_status_thread;
     std::thread lcm_handle_thread;
     int sign_{};
     std::atomic_bool editing_plan{false};
-    std::condition_variable not_editing;
     std::array<double, 16> initial_pose;
     Eigen::MatrixXd joint_limits;
     long timestep;
@@ -215,8 +215,16 @@ private:
     const float STOP_EPSILON = 20; //make this a yaml parameter
     float stop_epsilon;
     float stop_duration;
+    Eigen::VectorXd starting_conf;
+    std::array<double, 7> starting_franka_q;
+    Eigen::VectorXd integral_error; //make sure this doesn't get destroyed after each call of callback - ask sprax
 
+    // for inv dynamics :
+    bool run_inverse_dynamics_;
+    std::unique_ptr<drake::systems::Context<double>> mb_plant_context_; // for multibody plants
+    drake::multibody::MultibodyPlant<double> mb_plant_ ;
 
+    // PiecewisePolynomial<double> ref_vd_;// = plan_.plan->derivative(2); // might move this into setup
 
     // Set print rate for comparing commanded vs. measured torques.
     const double lcm_publish_rate = 200.0; //Hz
@@ -224,13 +232,13 @@ private:
     Eigen::VectorXd max_accels;
 
 public:
-    FrankaPlanRunner(const parameters::Parameters params) : p(params), ip_addr_(params.robot_ip), plan_number_(0), lcm_(params.lcm_url)
-    {
+    FrankaPlanRunner(const parameters::Parameters params)
+    : p(params), ip_addr_(params.robot_ip), plan_number_(0),
+    lcm_(params.lcm_url) {
         lcm_.subscribe(p.lcm_plan_channel, &FrankaPlanRunner::HandlePlan, this);
-        // lcm_.subscribe(kLcmPlanChannel, &RobotPlanRunner::HandleSimpleCommand, this);
         lcm_.subscribe(p.lcm_stop_channel, &FrankaPlanRunner::HandleStop, this);
         running_ = true;
-        franka_time = 0.0; 
+        franka_time = 0.0;
         max_accels = params.robot_max_accelerations;
 
         dracula = new Dracula(p);
@@ -240,13 +248,14 @@ public:
         cur_plan_number = plan_number_;
         cur_time_us = -1;
         start_time_us = -1;
-        sign_ = +1; 
+        sign_ = +1;
 
-        plan_.has_data = false; 
+        starting_franka_q = {{0,0,0,0,0,0,0}};
+        starting_conf = Eigen::VectorXd::Zero(kNumJoints);
+
+        plan_.has_data = false;
+        plan_.plan.release();
         plan_.utime = -1;
-        plan_.cartesian_move = false; 
-        plan_.cartesian_goal = Eigen::Matrix4d::Zero();
-        plan_.v_xyz = Eigen::Vector3d::Zero();
         plan_.end_time_us = 0;
         plan_.paused = false;
         plan_.unpausing = false;
@@ -255,7 +264,7 @@ public:
         momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
         momap::log()->info("Plan complete channel: {}", p.lcm_plan_complete_channel);
         momap::log()->info("Status channel: {}", p.lcm_status_channel);
-    
+
     };
 
     ~FrankaPlanRunner() {
@@ -282,7 +291,7 @@ public:
         }
         return return_value;
     }
-private: 
+private:
     int RunFranka() {
         // const double print_rate = 10.0;
         // struct {
@@ -330,7 +339,7 @@ private:
             // Connect to robot.
             franka::Robot robot(ip_addr_);
             setDefaultBehavior(robot);
-            robot_alive_ = true; 
+            robot_alive_ = true;
             // First move the robot to a suitabcurrent_desiredle joint configuration
             // std::array<double, 7> q_goal = {current_desired{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
             // MotionGenerator motion_generator(0.5, q_goal);
@@ -345,23 +354,20 @@ private:
             // Set additional parameters always before the control loop, NEVER in the control loop!
             // Set collision behavior.
 
-	    bool we_care_about_safety = false;
-	    if (we_care_about_safety) {
+        bool we_care_about_safety = true;
+        if (we_care_about_safety) {
             robot.setCollisionBehavior(
                 {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}}, {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
                 {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}}, {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
                 {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}}, {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
                 {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}}, {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}});
-	    } 
-	    else {
+        } else {
             robot.setCollisionBehavior(
                 {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}}, {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
                 {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}}, {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
                 {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}}, {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
                 {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}}, {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
-            }
-            // Load the kinematics and dynamics model.
-            franka::Model model = robot.loadModel();
+        }
 
             std::function<franka::JointPositions(const franka::RobotState&, franka::Duration)>
                 joint_position_callback = [&, this](
@@ -369,79 +375,30 @@ private:
                 return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
             };
 
-            // constexpr double kRadius = 0.3;
-            
-            // double time = 0.0;
 
-            std::function<franka::CartesianPose(const franka::RobotState&, franka::Duration)>
-                cartesian_position_callback = [&, this](
-                        const franka::RobotState& robot_state, franka::Duration period) -> franka::CartesianPose {
-                return this->FrankaPlanRunner::CartesianPositionCallback(robot_state, period);
-            };
-
-            
-            // Set gains for the joint impedance control.
-            // Stiffness
-            const std::array<double, 7> k_gains = {{600.0, 600.0, 600.0, 600.0, 250.0, 150.0, 50.0}};
-            // Damping
-            const std::array<double, 7> d_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
-
-            const std::array<double, 7> i_gains = {{20.0, 20.0, 20.0, 20.0, 10.0, 10.0, 4.0}};
-
-            std::array<double, 7> i_error = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
-
-            // Define callback for the joint torque control loop.
             std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
-                impedance_control_callback =
-                    [&](
-                        const franka::RobotState& state, franka::Duration /*period*/) -> franka::Torques {
-                // Read current coriolis terms from model.
-                std::array<double, 7> coriolis = model.coriolis(state);
-
-                // Compute torque command from joint impedance control law.
-                // Note: The answer to our Cartesian pose inverse kinematics is always in state.q_d with one
-                // time step delay.
-                std::array<double, 7> tau_d_calculated;
-                for (size_t i = 0; i < 7; i++) {
-                    i_error[i] += 0.2*(state.q_d[i] - state.q[i]);
-                    tau_d_calculated[i] =
-                        k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + coriolis[i]
-                        + 0.25*d_gains[i] * i_error[i];
-                }
-
-                // The following line is only necessary for printing the rate limited torque. As we activated
-                // rate limiting for the control loop (activated by default), the torque would anyway be
-                // adjusted!
-                std::array<double, 7> tau_d_rate_limited =
-                    franka::limitRate(franka::kMaxTorqueRate, tau_d_calculated, state.tau_J_d);
-                // Send torque command.
-                return tau_d_rate_limited;
-            };
-
-
-            //callback for inverseDynamics - i think all this code should be refactored at some point...
-            std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
-                inverse_dynamics_control_callback = 
-                [&, this](const franka::RobotState& robot_state, franka::Duration period) -> franka::Torques {
+                inverse_dynamics_control_callback = [&, this](
+                        const franka::RobotState& robot_state, franka::Duration period) -> franka::Torques {
                 return this->FrankaPlanRunner::InverseDynamicsControlCallback(robot_state, period);
             };
 
+            //for inverse dynamics
+            run_inverse_dynamics_ = true; // TODO : move this somewhere else in the class?
+            if(run_inverse_dynamics_){
+                MultibodySetUp(mb_plant_, mb_plant_context_, "/src/drake-franka-driver/tests/data/franka_test_with_mass.urdf" );
+                // std::cout << "done multibody setup" << '\n';
+                 // ref_vd_ = plan_.plan->derivative(2);
+            }
 
-
-
-
-
-            bool stop_signal = false; 
-            while(!stop_signal){
+            while(true){
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
-                    // robot.control(cartesian_position_callback);
-                    i_error = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
-                    if(!plan_.cartesian_move && plan_.has_data){
-                        robot.control(joint_position_callback); //impedance_control_callback
-                    } else if(plan_.cartesian_move && plan_.has_data) {
-                        robot.control(impedance_control_callback, cartesian_position_callback); //
-                    } else{
+                    if (plan_.has_data) {
+                        // robot.control(joint_position_callback); //impedance_control_callback
+                        robot.control(inverse_dynamics_control_callback);
+                    } else {
+                        // publish robot_status
+                        // TODO: add a timer to be closer to 200 Hz.
                         // std::cout << "only should be here when sitting.\n";
                         robot.read([this](const franka::RobotState& robot_state) {
                             if (this->robot_data_.mutex.try_lock()) {
@@ -450,30 +407,37 @@ private:
                                 this->robot_data_.mutex.unlock();
                             }
                             std::this_thread::sleep_for(
-                                    std::chrono::milliseconds(static_cast<int>(5.0)));
+                                    std::chrono::milliseconds(static_cast<int>( 1000.0 / lcm_publish_rate )));
                             return false;
                         });
                     }
+
                 } catch (const franka::ControlException& e) {
                     std::cout << e.what() << std::endl;
                     std::cout << "Running error recovery..." << std::endl;
-                    robot.automaticErrorRecovery();
+                    if (plan_.mutex.try_lock() ) {
+                        robot.automaticErrorRecovery();
+                        plan_.mutex.unlock();
+                    } else {
+                        momap::log()->error("failed to get a mutex after an error. returning -99.");
+                        return -99;
+                    }
+
                 }
             }
-            // old command; TODO: remove
-            // robot.control(joint_position_callback);
 
         } catch (const franka::Exception& ex) {
             running_ = false;
             momap::log()->error("drake::franka_driver::RunFranka Caught expection: {}", ex.what() );
-            // return -99; // bad things happened. 
+            // return -99; // bad things happened.
         }
         // if (print_thread.joinable()) {
         //     print_thread.join();
         // }
-        return 0; 
-        
+        return 0;
+
     };
+
     int RunSim() {
         robot_alive_ = true; // the sim robot *always* starts as planned
         momap::log()->info("Starting sim robot.");
@@ -496,28 +460,28 @@ private:
             ConvertToArray(next_conf_vec, robot_state.q_d);
             ConvertToArray(vel, robot_state.dq);
 
- 
+
             franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period);
 
             prev_conf = next_conf.replicate(1,1);
 
-            next_conf = du::v_to_e(ConvertToVector(cmd_pos.q)); 
+            next_conf = du::v_to_e(ConvertToVector(cmd_pos.q));
             dracula->GetViz()->displayState(next_conf);
 
             next_conf_vec = du::e_to_v(next_conf);
             std::vector<double> prev_conf_vec =  du::e_to_v(prev_conf);
 
             for(int i=0; i<7; i++){
-                vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double) period.toSec();                
+                vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double) period.toSec();
             }
 
             milliseconds current_ms = duration_cast< milliseconds >(system_clock::now().time_since_epoch());
-            int64_t delta_ms = int64_t( (current_ms - last_ms).count() );            
+            int64_t delta_ms = int64_t( (current_ms - last_ms).count() );
             period = franka::Duration(delta_ms);
             last_ms = current_ms;
 
         }
-        return 0; 
+        return 0;
     };
 
     double StopPeriod(double period){
@@ -530,79 +494,89 @@ private:
         return (current_time - prev_time);
     }
 
-    franka::JointPositions JointPositionCallback(const franka::RobotState& robot_state, franka::Duration period){
-        // momap::log()->info("ddq_d: {}\n" robot_state.ddq_d);
-        //If plan is paused
-        if (plan_.paused) {
-            if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
-                std::array<double,7> vel = robot_state.dq;
-                float temp_target_stop_time = 0;
-                for (int i = 0; i < 7; i++) {
-                    float stop_time = vel[i] / this->max_accels[i];
-                    if(stop_time > temp_target_stop_time){
-                        temp_target_stop_time = stop_time;
-                    }
-                }
-                this->target_stop_time = temp_target_stop_time;
-                this->stop_epsilon = period.toSec() / STOP_EPSILON;
-            }
+    franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
+                                                , franka::Duration period
+    ) {
+        franka::JointPositions output = robot_state.q_d; // should this be robot_state.q_d?
 
-            double new_stop = StopPeriod(period.toSec());
-            franka_time += new_stop;
-            cout.precision(17);
-            // cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
-            timestep++;
-            if(new_stop > this->stop_epsilon){
-                this->stop_duration++;
-            }
-        } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
-            if (timestep >= 0) { //if robot has reached full speed again
-                std::unique_lock<std::mutex> lck(plan_.mutex);
-                plan_.unpausing = false;
-                plan_.mutex.unlock();
-                not_editing.notify_one();   
-            }
-            double new_stop = StopPeriod(period.toSec());
-            franka_time += new_stop;
-            cout.precision(17);
-            // cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
-            timestep++;
-            
-        }
-        else {
-            franka_time += period.toSec();
-        }
-        
-        cur_time_us = int64_t(franka_time * 1.0e6); 
-
-        // Update data to publish.
-        if (robot_data_.mutex.try_lock()) {
-            robot_data_.has_data = true;
-            robot_data_.robot_state = robot_state;
-            robot_data_.mutex.unlock();
-        }
-
-        Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
-        std::array<double, 7> current_cmd = robot_state.q_d; // set to actual, not desired
-        std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
-        desired_next = du::v_to_e( ConvertToVector(current_cmd) );
-        
-
-        // std::unique_lock<std::mutex> lck(plan_.mutex);
-        // not_editing.wait(lck, [this]() {return editing_plan == false;});
-        double error = DBL_MAX; 
-        if (plan_.mutex.try_lock() ){
+        if ( plan_.mutex.try_lock() ) {
+            // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
-            if (plan_.plan && !plan_.cartesian_move) {
-                if (plan_number_ != cur_plan_number) {
-                    momap::log()->info("Starting new plan.");
-                    start_time_us = cur_time_us;
-                    cur_plan_number = plan_number_;
+
+            if (plan_.paused) {
+                if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
+                    std::array<double,7> vel = robot_state.dq;
+                    float temp_target_stop_time = 0;
+                    for (int i = 0; i < 7; i++) {
+                        float stop_time = vel[i] / this->max_accels[i];
+                        if(stop_time > temp_target_stop_time){
+                            temp_target_stop_time = stop_time;
+                        }
+                    }
+                    this->target_stop_time = temp_target_stop_time;
+                    this->stop_epsilon = period.toSec() / STOP_EPSILON;
                 }
 
-                const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
-                desired_next = plan_.plan->value(cur_traj_time_s);
+                double new_stop = StopPeriod(period.toSec());
+                franka_time += new_stop;
+                // cout.precision(17);
+                // cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+                timestep++;
+                if(new_stop > this->stop_epsilon){
+                    this->stop_duration++;
+                }
+            } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
+                if (timestep >= 0) { //if robot has reached full speed again
+                    std::unique_lock<std::mutex> lck(plan_.mutex);
+                    plan_.unpausing = false;
+                }
+                double new_stop = StopPeriod(period.toSec());
+                franka_time += new_stop;
+                // cout.precision(17);
+                // cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
+                timestep++;
 
+            }
+            else {
+                franka_time += period.toSec();
+            }
+
+            cur_time_us = int64_t(franka_time * 1.0e6);
+
+            // TODO: remove the need for this check. who cares if it is a new plan?
+            // TODO: make sure we've called motion finished and reset the timer?
+
+            if (plan_.plan && plan_number_ != cur_plan_number) {
+                momap::log()->info("Starting new plan at {} s.", franka_time);
+                start_time_us = cur_time_us; // implies that we should have call motion finished
+                cur_plan_number = plan_number_;
+                starting_conf = plan_.plan->value(0.0);
+                starting_franka_q = robot_state.q_d;
+                momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose());
+                momap::log()->warn("difference between where we are and where we think = {}",
+                                    ( du::v_to_e( ConvertToVector(starting_franka_q) ) - starting_conf ).norm() );
+
+            }
+
+            // Update data to publish.
+            // TODO: move to publish loop
+            if (robot_data_.mutex.try_lock()) {
+                robot_data_.has_data = true;
+                robot_data_.robot_state = robot_state;
+                robot_data_.mutex.unlock();
+            }
+
+            Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
+            std::array<double, 7> current_cmd = robot_state.q_d; // set to actual, not desired
+            std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
+            desired_next = du::v_to_e( ConvertToVector(current_cmd) );
+
+            double error = DBL_MAX;
+
+            // const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
+            if (plan_.plan) {
+                desired_next = plan_.plan->value(franka_time); //cur_traj_time_s
+                // TODO: remove - not DRY
                 for (int j = 0; j < desired_next.size(); j++) {
                     if (desired_next(j) > joint_limits(j, 1) ){
                         desired_next(j) = joint_limits(j,1);
@@ -610,286 +584,68 @@ private:
                         desired_next(j) = joint_limits(j,0);
                     }
                 }
+                Eigen::VectorXd delta = desired_next - starting_conf;
+                Eigen::VectorXd output_eigen = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta;
+                Eigen::VectorXd delta_end = plan_.plan->value(plan_.plan->end_time()) - starting_conf;
+                Eigen::VectorXd starting_q_eigen = du::v_to_e( ConvertToVector(starting_franka_q) );
+                Eigen::VectorXd output_end = starting_q_eigen + delta_end;
+                Eigen::VectorXd current_conf_eigen = du::v_to_e( ConvertToVector(current_conf) );
+                // error = ( du::v_to_e( ConvertToVector(current_conf) ) -  plan_.plan->value(plan_.plan->end_time()) ).norm();
+                error = ( current_conf_eigen -  output_end ).norm();
 
-                error = ( du::v_to_e( ConvertToVector(current_conf) ) - plan_.plan->value(plan_.plan->end_time()) ).norm();
-            } 
-            plan_.mutex.unlock();
-        }
-        // TODO: debug lines which move robot, remove soon @dmsj
-        // if (desired_next(0) > 1.5 && sign_ > 0){
-        //     sign_ = -1;
-        //     momap::log()->info("set sign: {}", sign_);
-        // } else if (desired_next(0) < -1.5 && sign_ < 0){
-        //     sign_ = +1; 
-        //     momap::log()->info("set sign: {}", sign_);
-        // }
-        // desired_next(0) += 0.001*sign_; 
+                // momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose());
+                // momap::log()->warn("starting_q_eigen = {}", starting_q_eigen.transpose());
+                // momap::log()->info("error: {}", error);
+                // momap::log()->info("current_conf_eigen: {}", current_conf_eigen.transpose());
+                // momap::log()->info("output_end: {}", output_end.transpose());
 
-        // set desired position based on interpolated spline
-        franka::JointPositions output = {{ desired_next[0], desired_next[1],
-                                           desired_next[2], desired_next[3],
-                                           desired_next[4], desired_next[5],
-                                           desired_next[6] }};
+                // set desired position based on interpolated spline
+                // output = {{ desired_next[0], desired_next[1],
+                //             desired_next[2], desired_next[3],
+                //             desired_next[4], desired_next[5],
+                //             desired_next[6] }};
 
-        // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
-        // output = q_goal; 
-       
-        
-        if (plan_.plan) {
-            if (franka_time > plan_.plan->end_time()) {
-                if (error < 0.007) {
-                    franka::JointPositions ret_val = current_conf;
-                    std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
-                
-                    std::unique_lock<std::mutex> lck(plan_.mutex);
-                    plan_.plan.release();
-                    plan_.has_data = false; 
-                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-                    plan_.utime = -1;
-                    plan_.cartesian_move = false; 
-                    plan_.mutex.unlock();
-                    return franka::MotionFinished(output);
-                }
-                else {
-                    momap::log()->info("Plan running overtime and not converged, error: {}", error);
-                    momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
-                    momap::log()->info("q_d: {}", desired_next.transpose());
-                }
-            }
-            else {
-                // momap::log()->info("Running plan, end time not reached yet");
-            }
-        } 
-        else if (!plan_.has_data) {
-            output =  current_conf; 
-            return franka::MotionFinished(output);
-        } 
-        else 
-        {
-            momap::log()->info("plan_.plan false and plan_.has_data, what?");
-        }
-        // TODO: remove with a better way to quit @dmsj
-        
-        return output;
-    };
+                output = {{ output_eigen[0], output_eigen[1],
+                            output_eigen[2], output_eigen[3],
+                            output_eigen[4], output_eigen[5],
+                            output_eigen[6] }};
 
-    franka::CartesianPose CartesianPositionCallback( const franka::RobotState& robot_state, franka::Duration period
-                                                    
-    ){
-        franka_time += period.toSec();
-        if (franka_time == 0.0) {
-            initial_pose = robot_state.O_T_EE_c;
-            start_time_us = 0;
-        }
+                // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
+                // output = q_goal;
 
-        cur_time_us = int64_t(franka_time * 1.0e6); 
-        int64_t dt_us = cur_time_us - start_time_us;
+                if (franka_time > plan_.plan->end_time()) {
+                    if (error < 0.007) { // TODO: replace with non arbitrary number
+                        franka::JointPositions ret_val = current_conf;
+                        std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
+                        plan_.plan.release();
+                        plan_.has_data = false;
+                        // plan_.utime = -1;
+                        plan_.mutex.unlock();
 
-        std::array<double, 16> new_pose = initial_pose;
-        Eigen::Vector3d delta_position(0.0, 0.0, 0.0);
-        if (plan_.mutex.try_lock() ){
-            // momap::log()->info("got the lock!");
-            if (plan_.cartesian_move && plan_.has_data) {
-                if (plan_number_ != cur_plan_number) {
-                    momap::log()->info("Starting new plan.");
-                    initial_pose = robot_state.O_T_EE_c;
-                    cur_plan_number = plan_number_;
-                    Eigen::Matrix4d current_pose = Eigen::Matrix4d::Zero(); 
-                    for(int jj=0; jj<initial_pose.size(); jj++){
-                        current_pose(jj) = initial_pose[jj]; 
+                        PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                        // return output;
+                        // plan_.mutex.unlock();
+                        return franka::MotionFinished(output);
                     }
-                    Eigen::Vector3d delta_xyz = plan_.cartesian_goal.block(0, 3, 3, 1) - current_pose.block(0, 3, 3, 1);
-                    double delta_time_s = delta_xyz.cwiseAbs().maxCoeff() / 0.01; // seconds
-                    plan_.end_time_us = int64_t(delta_time_s * 1.0e6); 
-                    plan_.v_xyz = delta_xyz / delta_time_s; 
-                    start_time_us = cur_time_us;
-                }
-                if (plan_.end_time_us > 0){
-                    dt_us = cur_time_us - start_time_us; 
-                    if(dt_us > plan_.end_time_us){
-                        delta_position = plan_.v_xyz * (plan_.end_time_us / 1.0e6);
-                    } else {
-                        double dt_frac =  (dt_us / plan_.end_time_us);
-                        double scale_factor = dt_frac - std::sin(2 * M_PI * dt_frac) / (2 * M_PI);
-                        delta_position = plan_.v_xyz * (dt_us / 1.0e6) * scale_factor;
+                    else {
+                        momap::log()->info("Plan running overtime and not converged, error: {}", error);
+                        // momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
+                        // momap::log()->info("q_d: {}", desired_next.transpose());
                     }
                 }
-
-                new_pose = initial_pose;
-
-                // new_pose[12] += delta_position(0);
-                new_pose[13] += delta_position(1);
-                // new_pose[14] += delta_position(2);
-
-                std::cout << "##########################\n";
-                std::cout << "dt_us: " << dt_us << std::endl; 
-                std::cout << "curr: " << robot_state.O_T_EE_c[12] << std::endl;
-                std::cout << "curr: " << robot_state.O_T_EE_c[13] << std::endl;
-                std::cout << "curr: " << robot_state.O_T_EE_c[14] << std::endl;
-                std::cout << "##########################\n";
-
-                std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&\n";
-                std::cout << "v_xyz: " << plan_.v_xyz.transpose() << std::endl;
-                std::cout << "new: " << new_pose[12] << std::endl;
-                std::cout << "new: " << new_pose[13] << std::endl;
-                std::cout << "new: " << new_pose[14] << std::endl;
-                std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&\n";
+            } else {
+                // momap::log()->error("Inside JPC but plan_.plan != True");
             }
+
             plan_.mutex.unlock();
-        }
-        else
-        {
-            std::cout << "failed to get Cartesian callback plan mutex" << std::endl;
+            return output;
+
         }
 
-        double error = (Eigen::Vector3d(new_pose[12], new_pose[13], new_pose[14]) - 
-                        Eigen::Vector3d(robot_state.O_T_EE_c[12], robot_state.O_T_EE_c[13], robot_state.O_T_EE_c[14]) ).norm();
-
-        franka::CartesianPose output = new_pose;
-
-         // Update data to publish.
-        if (robot_data_.mutex.try_lock()) {
-            robot_data_.has_data = true;
-            robot_data_.robot_state = robot_state;
-            robot_data_.mutex.unlock();
-        }
-
-        if (plan_.end_time_us > 0 && dt_us > plan_.end_time_us && error < 0.002 ) {
-            std::cout << std::endl << "Finished motion, shutting down example" << std::endl;
-            std::unique_lock<std::mutex> lck(plan_.mutex);
-            plan_.has_data = false;
-            PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-            plan_.utime = -1;
-            plan_.cartesian_move = false; 
-            plan_.mutex.unlock();
-            return franka::MotionFinished(output);
-        } else if (!plan_.has_data || !plan_.cartesian_move){
-            std::array<double, 16> current_pose = robot_state.O_T_EE_d;
-            output = current_pose;
-            return franka::MotionFinished(output);
-        }
-        return output;
-
-        // // 
-        // // std::array<double, 16> current_desired = robot_state.O_T_EE_d;
-        // // // std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&\n";
-        // // // std::cout << "cd: " << current_desired[12] << std::endl;
-        // // // std::cout << "cd: " << current_desired[13] << std::endl;
-        // // // std::cout << "cd: " << current_desired[14] << std::endl;
-        // // // std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&\n";
-
-        // // // std::array<double, 16> current_actual = robot_state.O_T_EE_c;
-
-        // // double max_linear_v = 0.03; /* m/s */
-        // // double max_angular_v = 0.03; /* rad/s */
-        // // double dt = 0.001; /* s */
-        // // double max_linear_step = max_linear_v * dt;
-        // // double max_angular_step = max_angular_v * dt;
-
-        // // if (plan_.mutex.try_lock() ){
-        // //     // momap::log()->info("got the lock!");
-        // //     if (plan_.plan && plan_.cartesian_move) {
-        // //         if (plan_number_ != cur_plan_number) {
-        // //             momap::log()->info("Starting new plan.");
-        // //             start_time_us = cur_time_us;
-        // //             cur_plan_number = plan_number_;
-        // //             std::array<double, 16> current_actual = robot_state.O_T_EE_c;
-        // //             plan_.cartesian_cmd = Eigen::Map<Eigen::Matrix<double,4,4>>(current_actual.data());
-
-        // //         }
-        // //         Eigen::Matrix4d current_cmd = Eigen::Map<Eigen::Matrix<double,4,4>>(current_desired.data());
-        // //         Eigen::Vector3d delta_xyz = plan_.cartesian_goal.block(0, 3, 3, 1) - current_cmd.block(0, 3, 3, 1);
-        // //         Eigen::Vector3d dir_xyz = delta_xyz.array().sign(); 
-        // //         for(int k=0; k<delta_xyz.size(); k++){
-        // //             if(fabs(delta_xyz(k)) > max_linear_step ){
-        // //                 delta_xyz(k) = max_linear_step * dir_xyz(k);
-        // //             }
-        // //         }
-
-        // //         // current_cmd.block(0, 3, 3, 1) += delta_xyz / 10.0; 
-
-        // //         //  for(int i=0; i<current_desired.size(); i++){
-        // //         //     current_desired[i] = plan_.cartesian_cmd(i);
-        // //         // }
-
-                
-
-        // //         current_desired[12] += delta_xyz(0)/10;
-        // //         current_desired[13] += delta_xyz(1)/10;
-        // //         current_desired[14] += delta_xyz(2)/10;
-
-        // //         // std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&\n";
-        // //         // std::cout << "d_xyz: " << delta_xyz.transpose() << std::endl;
-        // //         // std::cout << "new: " << current_desired[12] << std::endl;
-        // //         // std::cout << "new: " << current_desired[13] << std::endl;
-        // //         // std::cout << "new: " << current_desired[14] << std::endl;
-        // //         // std::cout << "&&&&&&&&&&&&&&&&&&&&&&&&&\n";
-
-        // //         // 
-
-        // //         // desired_next = 0.1*delta_mat + current_pose; 
-
-        // //         // std::cout << std::endl 
-        // //         //     << "########\n"
-        // //         //     << current_cmd << "\n#######\n" << std::endl;
-
-        // //         // std::cout << std::endl 
-        // //         //     << "&&&&&&&\n"
-        // //         //     << desired_next << "\n&&&&&&&\n" << std::endl;
-
-        // //         // std::cout << current_desired[12] << std::endl;
-        // //         // std::cout << current_desired[13] << std::endl;
-        // //         // std::cout << current_desired[14] << std::endl;
-
-        // //         //  for(int i=0; i<current_desired.size(); i++){
-        // //         //     current_desired[i] = desired_next(i);
-        // //         // }
-        // //     } 
-        // //     plan_.mutex.unlock();
-        // // }
-        // // // TODO: debug lines which move robot, remove soon @dmsj
-        // // // if (desired_next(0) > 1.5 && sign_ > 0){
-        // // //     sign_ = -1;
-        // // //     momap::log()->info("set sign: {}", sign_);
-        // // // } else if (desired_next(0) < -1.5 && sign_ < 0){
-        // // //     sign_ = +1; 
-        // // //     momap::log()->info("set sign: {}", sign_);
-        // // // }
-        // // // desired_next(0) += 0.001*sign_; 
-
-        // // // set desired position based on interpolated spline
-        // // franka::CartesianPose output = current_desired;
-        // // // Update data to publish.
-        // // if (robot_data_.mutex.try_lock()) {
-        // //     robot_data_.has_data = true;
-        // //     robot_data_.robot_state = robot_state;
-        // //     robot_data_.mutex.unlock();
-        // // }
-
-        // // // TODO: remove with a better way to quit @dmsj
-        // // if (!plan_.cartesian_move) {
-        // //     // std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
-        // //     // franka_time = 0.0;
-        // //     return franka::MotionFinished(output);
-        // // }
-        // // return output;
+        // we couldn't get the lock, so probably need to return motion::finished()
+        // plan_.mutex.unlock();
+        return franka::MotionFinished(output);
     };
-
-
-
-    franka::Torques InverseDynamicsControlCallback(const franka::RobotState& robot_state, franka::Duration period){
-        //traj input : plan_.plan
-        std::string urdf_path = ;
-        const double duration_per_call = 1; //arbitrary for now
-        const Eigen::VectorXd kp = Eigen::VectorXd::Zero(kNumJoints);
-        const Eigen::VectorXd ki = Eigen::VectorXd::Zero(kNumJoints);   
-        const Eigen::VectorXd kd = Eigen::VectorXd::Zero(kNumJoints);
-        const Eigen::Vector3d tau = {0,0,0};
-        const Eigen::Vector3d f = {0,0,0};
-        dracula-> GetMS()->InverseDynamicStep(urdf_path, *plan_.plan, duration_per_call, kp, ki, kd, tau, f);
-    }
-    
-
 
     void HandleLcm() {
         while (true) {
@@ -903,10 +659,11 @@ private:
             // Sleep to achieve the desired print rate.
             std::this_thread::sleep_for(
                 std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate )));
+
             // Try to lock data to avoid read write collisions.
             if (robot_data_.mutex.try_lock()) {
                 if (robot_data_.has_data) {
-                    lcmt_iiwa_status franka_status = ConvertToLcmStatus(robot_data_.robot_state); 
+                    lcmt_iiwa_status franka_status = ConvertToLcmStatus(robot_data_.robot_state);
                     // publish data over lcm
                     lcm_.publish(p.lcm_status_channel, &franka_status);
                     robot_data_.has_data = false;
@@ -923,7 +680,7 @@ private:
         dummy_status.utime = utime;
         lcm_.publish(lcm_channel, &dummy_status);
     }
-    
+
     void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&, const robot_spline_t* rst)
     {
         momap::log()->info("New plan received.");
@@ -931,8 +688,13 @@ private:
             momap::log()->info("Discarding plan, no status message received yet from the robot");
             return;
         }
+        // plan_.mutex.lock();
+        while( ! plan_.mutex.try_lock()) {
+            momap::log()->warn("trying to get a lock on the plan_.mutex. Sleeping 1 ms and trying again.");
+            std::this_thread::sleep_for(
+                    std::chrono::milliseconds(static_cast<int>( 1.0 )));
+        }
 
-        std::unique_lock<std::mutex> lck(plan_.mutex);
         editing_plan = true;
 
         momap::log()->info("utime: {}", rst->utime);
@@ -942,120 +704,45 @@ private:
         momap::log()->info("Published confirmation of received plan");
 
         franka_time = 0.0;
-        Eigen::Vector3d goal_xyz( rst->cartesian_goal.translation.x
-                                , rst->cartesian_goal.translation.y
-                                , rst->cartesian_goal.translation.z);
-        Eigen::Quaterniond goal_q(rst->cartesian_goal.rotation.w
-                                , rst->cartesian_goal.rotation.x
-                                , rst->cartesian_goal.rotation.y
-                                , rst->cartesian_goal.rotation.z);
+        piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
 
-        momap::log()->warn("Goal XYZ: {}, Q: {}", goal_xyz.transpose(), du::equat_to_evec(goal_q).transpose());
-
-        if(goal_xyz.cwiseAbs().sum() > 1.0e-3){
-            momap::log()->warn("we made inside handle plan special case!"); 
-            plan_.cartesian_move = true;
-            plan_.cartesian_goal = Eigen::Matrix4d::Zero();
-            plan_.end_time_us = 0;
-            plan_.v_xyz = Eigen::Vector3d::Zero();
-
-            drake::math::RotationMatrixd r_goal(goal_q);  
-            drake::math::RotationMatrix<double> r_z = drake::math::RotationMatrix<double>(
-                drake::AngleAxis<double>(-M_PI/2, drake::Vector3<double>::UnitZ()) );
-
-            plan_.cartesian_goal.block(0, 0, 3, 3) = r_z.matrix() * r_goal.matrix(); 
-            plan_.cartesian_goal.block(0, 3, 3, 1) = r_z.matrix() * goal_xyz;
-        } else {
-            plan_.cartesian_move = false;
-            plan_.cartesian_goal = Eigen::Matrix4d::Zero();
-            plan_.end_time_us = 0;
-            plan_.v_xyz = Eigen::Vector3d::Zero();
-        
-
-            piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
-
-            if (piecewise_polynomial.get_number_of_segments()<1)
-            {
-                momap::log()->info("Discarding plan, invalid piecewise polynomial.");
-                return;
-            }
-
-            
-            momap::log()->info("start time: {}", piecewise_polynomial.start_time());
-            momap::log()->info("end time: {}", piecewise_polynomial.end_time());
-
-            //Naive implementation of velocity check
-            const int velocity_check_samples = 100;
-            PPType piecewise_polynomial_derivative = piecewise_polynomial.derivative();
-            double step_size = (piecewise_polynomial.end_time()-piecewise_polynomial.start_time())/velocity_check_samples; //FIXME: numer
-            double test_time = piecewise_polynomial.start_time();
-            while(test_time<piecewise_polynomial.end_time())
-            {
-                VectorXd sampled_velocity = piecewise_polynomial_derivative.value(test_time);
-                //Check dimension
-                if (sampled_velocity.size()!= rst->dof)
-                {
-                    momap::log()->info("Discarding plan, invalid piecewise polynomial derivative.");
-                    plan_.has_data = false;
-                    plan_.cartesian_move = false;
-                    plan_.cartesian_goal = Eigen::Matrix4d::Zero();
-                    plan_.end_time_us = 0;
-                    plan_.v_xyz = Eigen::Vector3d::Zero();
-                    plan_.plan.release();
-                    return;
-                }
-                for (int joint = 0; joint < rst->dof; joint++)
-                {
-                    if (sampled_velocity(joint)>rst->robot_joints[joint].velocity_upper_limit||
-                    sampled_velocity(joint)<rst->robot_joints[joint].velocity_lower_limit)
-                    {
-                        momap::log()->info("Discarding plan, joint velocity out of bounds.");
-                        momap::log()->info("sampled joint {} velocity: {}", joint, sampled_velocity(joint));
-                        momap::log()->info("lower limit: {} upper limit: {}", rst->robot_joints[joint].velocity_lower_limit, rst->robot_joints[joint].velocity_upper_limit);
-                        plan_.has_data = false;
-                        plan_.cartesian_move = false;
-                        plan_.cartesian_goal = Eigen::Matrix4d::Zero();
-                        plan_.end_time_us = 0;
-                        plan_.v_xyz = Eigen::Vector3d::Zero();
-                        plan_.plan.release();
-                        return;
-                    }
-                }
-                test_time+=step_size;
-            }
-
-            //Start position == goal position check
-            VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
-            for (int joint = 0; joint < rst->dof; joint++)
-            {
-                if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
-                {
-                    momap::log()->info("Discarding plan, mismatched start position.");
-                    plan_.has_data = false;
-                    plan_.cartesian_move = false;
-                    plan_.cartesian_goal = Eigen::Matrix4d::Zero();
-                    plan_.end_time_us = 0;
-                    plan_.v_xyz = Eigen::Vector3d::Zero();
-                    plan_.plan.release();
-
-                    return;
-                }
-            }
-            //TODO: add end position==goal position check (upstream)
-            plan_.plan.release();
-            plan_.plan.reset(&piecewise_polynomial);
+        if (piecewise_polynomial.get_number_of_segments()<1)
+        {
+            momap::log()->info("Discarding plan, invalid piecewise polynomial.");
+            plan_.mutex.unlock();
+            return;
         }
 
-        plan_.has_data = true;
-        
+        momap::log()->info("start time: {}", piecewise_polynomial.start_time());
+        momap::log()->info("end time: {}", piecewise_polynomial.end_time());
 
+        // Start position == goal position check
+        // TODO: add end position==goal position check (upstream)
+        // TODO: change to append initial position and respline here
+        VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
+        for (int joint = 0; joint < rst->dof; joint++)
+        {
+            if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
+            {
+                momap::log()->info("Discarding plan, mismatched start position.");
+                plan_.has_data = false;
+                plan_.plan.release();
+                plan_.mutex.unlock();
+                return;
+            }
+        }
+
+        plan_.plan.release();
+        plan_.plan.reset(&piecewise_polynomial);
+        plan_.has_data = true;
+        plan_.paused = false;
+
+
+        ++plan_number_;
+        momap::log()->warn("Finished Handle Plan!");
         editing_plan = false;
         plan_.mutex.unlock();
-        not_editing.notify_one();
 
-        // PiecewisePolynomial<double>::Cubic(input_time, knots, knot_dot, knot_dot)));
-        ++plan_number_;
-        momap::log()->warn("Finished Handle Plan!"); 
     };
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
@@ -1065,7 +752,6 @@ private:
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = true;
             plan_.mutex.unlock();
-            not_editing.notify_one();
 
             this->target_stop_time = 0;
             this->timestep = 1;
@@ -1080,15 +766,29 @@ private:
             plan_.paused = false;
             plan_.unpausing = true;
             plan_.mutex.unlock();
-            not_editing.notify_one();
         }
-        
+
 
     };
+    ///
+    /// creates multibody plant and its context
+    /// param : mb_plant_ : is member of franka_plan_runner class, multibodyplant for calcinvdyn
+    /// param : mb_plant_context : is member of franka_plan_runner class, multibodyplant context
+    /// param : urdf_path : urdf to create multibodyplant
+    ///
+    void MultibodySetUp( drake::multibody::MultibodyPlant<double> &mb_plant_
+                        , std::unique_ptr<drake::systems::Context<double>> &mb_plant_context_
+                        , const std::string urdf_path);
 
-        
+    ///
+    /// callback for inverse dynamics control
+    ///
+    franka::Torques InverseDynamicsControlCallback(const franka::RobotState& robot_state, franka::Duration period);
+
+
+
 };
 } // robot_plan_runner
 } // drake
 
-#endif 
+#endif
