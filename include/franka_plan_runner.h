@@ -567,6 +567,7 @@ private:
                 Eigen::VectorXd output_end = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta_end; 
                 // error = ( du::v_to_e( ConvertToVector(current_conf) ) -  plan_.plan->value(plan_.plan->end_time()) ).norm();
                 error = ( du::v_to_e( ConvertToVector(current_conf) ) -  output_end ).norm();
+                momap::log()->info("error: {}", error);
                 // set desired position based on interpolated spline
                 // output = {{ desired_next[0], desired_next[1],
                 //             desired_next[2], desired_next[3],
@@ -597,8 +598,8 @@ private:
                     }
                     else {
                         momap::log()->info("Plan running overtime and not converged, error: {}", error);
-                        momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
-                        momap::log()->info("q_d: {}", desired_next.transpose());
+                        // momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
+                        // momap::log()->info("q_d: {}", desired_next.transpose());
                     }
                 }
             } else {
