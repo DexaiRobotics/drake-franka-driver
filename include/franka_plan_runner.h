@@ -212,6 +212,9 @@ private:
     const float STOP_EPSILON = 20; //make this a yaml parameter
     float stop_epsilon;
     float stop_duration;
+    Eigen::VectorXd starting_conf;
+    std::array<double, 7> starting_franka_q; 
+    
 
 
 
@@ -238,6 +241,9 @@ public:
         cur_time_us = -1;
         start_time_us = -1;
         sign_ = +1; 
+
+        starting_franka_q = {{0,0,0,0,0,0,0}}; 
+        starting_conf = Eigen::VectorXd::Zero(kNumJoints);
 
         plan_.has_data = false; 
         plan_.plan.release();
@@ -522,6 +528,8 @@ private:
                 momap::log()->info("Starting new plan at {} s.", franka_time);
                 start_time_us = cur_time_us; // implies that we should have call motion finished
                 cur_plan_number = plan_number_;
+                starting_conf = plan_.plan->value(0.0);
+                starting_franka_q = robot_state.q; 
 
             }
 
@@ -551,13 +559,19 @@ private:
                         desired_next(j) = joint_limits(j,0);
                     }
                 }
-
+                Eigen::VectorXd delta = desired_next - starting_conf; 
+                Eigen::VectorXd output_eigen = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta; 
                 error = ( du::v_to_e( ConvertToVector(current_conf) ) - plan_.plan->value(plan_.plan->end_time()) ).norm();
                 // set desired position based on interpolated spline
-                output = {{ desired_next[0], desired_next[1],
-                            desired_next[2], desired_next[3],
-                            desired_next[4], desired_next[5],
-                            desired_next[6] }};
+                // output = {{ desired_next[0], desired_next[1],
+                //             desired_next[2], desired_next[3],
+                //             desired_next[4], desired_next[5],
+                //             desired_next[6] }};
+
+                output = {{ output_eigen[0], output_eigen[1],
+                            output_eigen[2], output_eigen[3],
+                            output_eigen[4], output_eigen[5],
+                            output_eigen[6] }};
 
                 // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
                 // output = q_goal; 
