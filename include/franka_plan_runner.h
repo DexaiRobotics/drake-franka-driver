@@ -606,9 +606,9 @@ private:
                         plan_.mutex.unlock();
                         
                         PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-                        return output;
+                        // return output;
                         // plan_.mutex.unlock();
-                        // return franka::MotionFinished(output);
+                        return franka::MotionFinished(output);
                     }
                     else {
                         momap::log()->info("Plan running overtime and not converged, error: {}", error);
