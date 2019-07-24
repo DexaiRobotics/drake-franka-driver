@@ -530,44 +530,46 @@ private:
             double error = DBL_MAX; 
 
             const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
-            desired_next = plan_.plan->value(cur_traj_time_s);
-            // TODO: remove - not DRY
-            for (int j = 0; j < desired_next.size(); j++) {
-                if (desired_next(j) > joint_limits(j, 1) ){
-                    desired_next(j) = joint_limits(j,1);
-                } else if ( desired_next(j) < joint_limits(j, 0)) {
-                    desired_next(j) = joint_limits(j,0);
+            if (plan_.plan) {
+                desired_next = plan_.plan->value(cur_traj_time_s);
+                // TODO: remove - not DRY
+                for (int j = 0; j < desired_next.size(); j++) {
+                    if (desired_next(j) > joint_limits(j, 1) ){
+                        desired_next(j) = joint_limits(j,1);
+                    } else if ( desired_next(j) < joint_limits(j, 0)) {
+                        desired_next(j) = joint_limits(j,0);
+                    }
                 }
-            }
 
-            error = ( du::v_to_e( ConvertToVector(current_conf) ) - plan_.plan->value(plan_.plan->end_time()) ).norm();
-            // set desired position based on interpolated spline
-            output = {{ desired_next[0], desired_next[1],
-                        desired_next[2], desired_next[3],
-                        desired_next[4], desired_next[5],
-                        desired_next[6] }};
+                error = ( du::v_to_e( ConvertToVector(current_conf) ) - plan_.plan->value(plan_.plan->end_time()) ).norm();
+                // set desired position based on interpolated spline
+                output = {{ desired_next[0], desired_next[1],
+                            desired_next[2], desired_next[3],
+                            desired_next[4], desired_next[5],
+                            desired_next[6] }};
 
-            // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
-            // output = q_goal; 
-       
-            if (franka_time > plan_.plan->end_time()) {
-                if (error < 0.007) { // TODO: replace with non arbitrary number
-                    franka::JointPositions ret_val = current_conf;
-                    std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
-                    plan_.plan.release();
-                    plan_.has_data = false; 
-                    // plan_.utime = -1;
-                    plan_.mutex.unlock();
-                    
-                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-                    return output;
-                    // plan_.mutex.unlock();
-                    // return franka::MotionFinished(output);
-                }
-                else {
-                    momap::log()->info("Plan running overtime and not converged, error: {}", error);
-                    momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
-                    momap::log()->info("q_d: {}", desired_next.transpose());
+                // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
+                // output = q_goal; 
+        
+                if (franka_time > plan_.plan->end_time()) {
+                    if (error < 0.007) { // TODO: replace with non arbitrary number
+                        franka::JointPositions ret_val = current_conf;
+                        std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
+                        plan_.plan.release();
+                        plan_.has_data = false; 
+                        // plan_.utime = -1;
+                        plan_.mutex.unlock();
+                        
+                        PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                        return output;
+                        // plan_.mutex.unlock();
+                        // return franka::MotionFinished(output);
+                    }
+                    else {
+                        momap::log()->info("Plan running overtime and not converged, error: {}", error);
+                        momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
+                        momap::log()->info("q_d: {}", desired_next.transpose());
+                    }
                 }
             }
         
