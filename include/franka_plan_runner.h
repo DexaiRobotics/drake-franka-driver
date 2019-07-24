@@ -564,7 +564,7 @@ private:
                 }
                 Eigen::VectorXd delta = desired_next - starting_conf; 
                 Eigen::VectorXd output_eigen = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta; 
-                auto delta_end = plan_.plan->value(plan_.plan->end_time()) - starting_conf; 
+                Eigen::VectorXd delta_end = plan_.plan->value(plan_.plan->end_time()) - starting_conf; 
                 Eigen::VectorXd starting_q_eigen = du::v_to_e( ConvertToVector(starting_franka_q) );
                 Eigen::VectorXd output_end = starting_q_eigen + delta_end; 
                 Eigen::VectorXd current_conf_eigen = du::v_to_e( ConvertToVector(current_conf) );
