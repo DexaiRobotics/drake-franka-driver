@@ -211,10 +211,10 @@ private:
             urdf_path,
             multibody::joints::kFixed, tree.get()); //FindResourceOrThrow(urdf_path)
 
-            RobotPlanRunner runner(*tree);
-            runner.Run();
-            return 0;
-        }
+        RobotPlanRunner runner(*tree);
+        runner.Run();
+        return 0;
+    }
 
         // }  // namespace
         // }  // namespace kuka_iiwa_arm

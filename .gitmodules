@@ -1,6 +1,0 @@
-[submodule "externals/libfranka"]
-	path = externals/libfranka
-	url = git@github.com:DexaiRobotics/libfranka.git
-[submodule "externals/StopWatch"]
-	path = externals/StopWatch
-	url = git@github.com:KjellKod/StopWatch.git
