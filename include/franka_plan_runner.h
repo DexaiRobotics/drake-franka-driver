@@ -461,7 +461,7 @@ private:
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
                                                 , franka::Duration period
     ) {
-        franka::JointPositions output = robot_state.q; // should this be robot_state.q_d?
+        franka::JointPositions output = robot_state.q_d; // should this be robot_state.q_d?
         if ( plan_.mutex.try_lock() ) {
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
