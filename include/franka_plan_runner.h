@@ -530,6 +530,8 @@ private:
                 cur_plan_number = plan_number_;
                 starting_conf = plan_.plan->value(0.0);
                 starting_franka_q = robot_state.q; 
+                momap::log()->warn("difference between where we are and where we think = {}", 
+                                    ( du::v_to_e( ConvertToVector(starting_franka_q) ) + starting_conf ).norm() )
 
             }
 
@@ -543,14 +545,14 @@ private:
 
             Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
             std::array<double, 7> current_cmd = robot_state.q_d; // set to actual, not desired
-            std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
+            std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
             desired_next = du::v_to_e( ConvertToVector(current_cmd) );
             
             double error = DBL_MAX; 
 
-            const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
+            // const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
             if (plan_.plan) {
-                desired_next = plan_.plan->value(cur_traj_time_s);
+                desired_next = plan_.plan->value(franka_time); //cur_traj_time_s
                 // TODO: remove - not DRY
                 for (int j = 0; j < desired_next.size(); j++) {
                     if (desired_next(j) > joint_limits(j, 1) ){
