@@ -386,7 +386,14 @@ private:
                 } catch (const franka::ControlException& e) {
                     std::cout << e.what() << std::endl;
                     std::cout << "Running error recovery..." << std::endl;
-                    robot.automaticErrorRecovery();
+                    if (plan_.mutex.try_lock() ) {
+                        robot.automaticErrorRecovery();
+                        plan.mutex_.unlock(); 
+                    } else {
+                        momap::log()->error("failed to get a mutex after an error. returning -99.");
+                        return -99; 
+                    }
+                    
                 }
             }
 
@@ -571,6 +578,8 @@ private:
                         momap::log()->info("q_d: {}", desired_next.transpose());
                     }
                 }
+            } else {
+                momap::log()->error("Inside JPC but plan_.plan != True");
             }
         
             plan_.mutex.unlock();
