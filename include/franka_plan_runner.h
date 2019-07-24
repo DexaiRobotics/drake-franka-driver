@@ -538,11 +538,11 @@ private:
 
             // Update data to publish.
             // TODO: move to publish loop
-            if (robot_data_.mutex.try_lock()) {
-                robot_data_.has_data = true;
-                robot_data_.robot_state = robot_state;
-                robot_data_.mutex.unlock();
-            }
+            // if (robot_data_.mutex.try_lock()) {
+            //     robot_data_.has_data = true;
+            //     robot_data_.robot_state = robot_state;
+            //     robot_data_.mutex.unlock();
+            // }
 
             Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
             std::array<double, 7> current_cmd = robot_state.q_d; // set to actual, not desired
@@ -570,7 +570,7 @@ private:
                 Eigen::VectorXd current_conf_eigen = du::v_to_e( ConvertToVector(current_conf) );
                 // error = ( du::v_to_e( ConvertToVector(current_conf) ) -  plan_.plan->value(plan_.plan->end_time()) ).norm();
                 error = ( current_conf_eigen -  output_end ).norm();
-                
+
                 // momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose()); 
                 // momap::log()->warn("starting_q_eigen = {}", starting_q_eigen.transpose()); 
                 // momap::log()->info("error: {}", error);
