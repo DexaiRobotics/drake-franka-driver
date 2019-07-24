@@ -669,6 +669,8 @@ private:
             momap::log()->warn("Finished Handle Plan!"); 
             editing_plan = false;
             plan_.mutex.unlock();
+        } else {
+            momap::log()->error("Failed to lock the mutex! bad!"); 
         }
     };
 
