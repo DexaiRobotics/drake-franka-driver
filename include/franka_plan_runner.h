@@ -531,7 +531,7 @@ private:
                 starting_conf = plan_.plan->value(0.0);
                 starting_franka_q = robot_state.q; 
                 momap::log()->warn("difference between where we are and where we think = {}", 
-                                    ( du::v_to_e( ConvertToVector(starting_franka_q) ) + starting_conf ).norm() )
+                                    ( du::v_to_e( ConvertToVector(starting_franka_q) ) + starting_conf ).norm() );
 
             }
 
