@@ -623,7 +623,7 @@ private:
             momap::log()->info("Discarding plan, no status message received yet from the robot");
             return;
         }
-        if (plan_.mutex.try_lock()) {
+        if (plan_.mutex.lock()) {
             editing_plan = true;
         
             momap::log()->info("utime: {}", rst->utime);
