@@ -444,7 +444,7 @@ private:
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
                                                 , franka::Duration period
     ) {
-        franka::JointPositions output = robot_state.q; // should this be robot_state.qd?
+        franka::JointPositions output = robot_state.qd; // should this be robot_state.qd?
         if (plan_.mutex.try_lock() && plan_.plan && plan_.has_data) {
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
@@ -456,7 +456,7 @@ private:
                 start_time_us = cur_time_us; // implies that we should have call motion finished
                 cur_plan_number = plan_number_;
                 plan_.mutex.unlock();
-                output =  robot_state.q; // should this be robot_state.qd?
+                output =  robot_state.qd; // should this be robot_state.qd?
                 return franka::MotionFinished(output); 
             }
 
@@ -510,7 +510,7 @@ private:
 
             Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
             std::array<double, 7> current_cmd = robot_state.q_d; // set to actual, not desired
-            std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
+            std::array<double, 7> current_conf = robot_state.qd; // set to actual, not desired
             desired_next = du::v_to_e( ConvertToVector(current_cmd) );
             
             double error = DBL_MAX; 
