@@ -374,6 +374,16 @@ private:
                 try {
                     if (plan_.has_data) {
                         robot.control(joint_position_callback); //impedance_control_callback
+                        robot.read([this](const franka::RobotState& robot_state) {
+                            if (this->robot_data_.mutex.try_lock()) {
+                                this->robot_data_.has_data = true;
+                                this->robot_data_.robot_state = robot_state;
+                                this->robot_data_.mutex.unlock();
+                            }
+                            std::this_thread::sleep_for(
+                                    std::chrono::milliseconds(static_cast<int>( 1.0 )));
+                            return false;
+                        });
                     } else {
                         // publish robot_status
                         // TODO: add a timer to be closer to 200 Hz. 
@@ -385,7 +395,7 @@ private:
                                 this->robot_data_.mutex.unlock();
                             }
                             std::this_thread::sleep_for(
-                                    std::chrono::milliseconds(static_cast<int>( 1.0 / lcm_publish_rate )));
+                                    std::chrono::milliseconds(static_cast<int>( 1000.0 / lcm_publish_rate )));
                             return false;
                         });
                     }
