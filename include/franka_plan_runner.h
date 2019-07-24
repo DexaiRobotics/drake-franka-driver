@@ -369,10 +369,15 @@ private:
                         plan_.mutex.unlock(); 
                         robot.control(joint_position_callback); //impedance_control_callback
                     } else {
-                        // do nothing
+                        // publish robot_status
+                        // TODO: add a timer to be closer to 200 Hz. 
+                        if (robot_data_.mutex.try_lock()) {
+                            robot_data_.has_data = true;
+                            robot_data_.robot_state = robot_state;
+                            robot_data_.mutex.unlock();
+                        }
                         std::this_thread::sleep_for(
                             std::chrono::milliseconds(static_cast<int>((1.0 / lcm_publish_rate ))));
-                        
                     }
                     
                 } catch (const franka::ControlException& e) {
