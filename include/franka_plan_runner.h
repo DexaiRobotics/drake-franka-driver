@@ -469,17 +469,10 @@ private:
                                                 , franka::Duration period
     ) {
         franka::JointPositions output = robot_state.q_d; // should this be robot_state.q_d?
+
         if ( plan_.mutex.try_lock() ) {
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
-
-            // TODO: remove the need for this check. who cares if it is a new plan?
-            // TODO: make sure we've called motion finished and reset the timer?
-            if (plan_number_ != cur_plan_number) {
-                momap::log()->info("Starting new plan.");
-                start_time_us = cur_time_us; // implies that we should have call motion finished
-                cur_plan_number = plan_number_;
-            }
 
             if (plan_.paused) {
                 if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
@@ -520,6 +513,16 @@ private:
             }
 
             cur_time_us = int64_t(franka_time * 1.0e6); 
+
+            // TODO: remove the need for this check. who cares if it is a new plan?
+            // TODO: make sure we've called motion finished and reset the timer?
+
+            if (plan_number_ != cur_plan_number) {
+                momap::log()->info("Starting new plan at {} s.", franka_time);
+                start_time_us = cur_time_us; // implies that we should have call motion finished
+                cur_plan_number = plan_number_;
+
+            }
 
             // Update data to publish.
             // TODO: move to publish loop
@@ -639,7 +642,6 @@ private:
                     std::chrono::milliseconds(static_cast<int>( 1.0 )));
         }
         
-
         editing_plan = true;
     
         momap::log()->info("utime: {}", rst->utime);
@@ -680,6 +682,8 @@ private:
         plan_.plan.release();
         plan_.plan.reset(&piecewise_polynomial);
         plan_.has_data = true;
+        plan_.paused = false; 
+
 
         ++plan_number_;
         momap::log()->warn("Finished Handle Plan!"); 
