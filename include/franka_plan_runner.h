@@ -623,55 +623,54 @@ private:
             momap::log()->info("Discarding plan, no status message received yet from the robot");
             return;
         }
-        if (plan_.mutex.lock()) {
-            editing_plan = true;
-        
-            momap::log()->info("utime: {}", rst->utime);
-            plan_.utime = rst->utime;
-            //$ publish confirmation that plan was received with same utime
-            PublishUtimeToChannel(plan_.utime, p.lcm_plan_received_channel);
-            momap::log()->info("Published confirmation of received plan");
+        plan_.mutex.lock();
 
-            franka_time = 0.0;
-            piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
+        editing_plan = true;
+    
+        momap::log()->info("utime: {}", rst->utime);
+        plan_.utime = rst->utime;
+        //$ publish confirmation that plan was received with same utime
+        PublishUtimeToChannel(plan_.utime, p.lcm_plan_received_channel);
+        momap::log()->info("Published confirmation of received plan");
 
-            if (piecewise_polynomial.get_number_of_segments()<1)
+        franka_time = 0.0;
+        piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
+
+        if (piecewise_polynomial.get_number_of_segments()<1)
+        {
+            momap::log()->info("Discarding plan, invalid piecewise polynomial.");
+            plan_.mutex.unlock();
+            return;
+        }
+
+        momap::log()->info("start time: {}", piecewise_polynomial.start_time());
+        momap::log()->info("end time: {}", piecewise_polynomial.end_time());
+
+        // Start position == goal position check
+        // TODO: add end position==goal position check (upstream)
+        // TODO: change to append initial position and respline here
+        VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
+        for (int joint = 0; joint < rst->dof; joint++)
+        {
+            if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
             {
-                momap::log()->info("Discarding plan, invalid piecewise polynomial.");
+                momap::log()->info("Discarding plan, mismatched start position.");
+                plan_.has_data = false;
+                plan_.plan.release();
                 plan_.mutex.unlock();
                 return;
             }
-
-            momap::log()->info("start time: {}", piecewise_polynomial.start_time());
-            momap::log()->info("end time: {}", piecewise_polynomial.end_time());
-
-            // Start position == goal position check
-            // TODO: add end position==goal position check (upstream)
-            // TODO: change to append initial position and respline here
-            VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
-            for (int joint = 0; joint < rst->dof; joint++)
-            {
-                if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
-                {
-                    momap::log()->info("Discarding plan, mismatched start position.");
-                    plan_.has_data = false;
-                    plan_.plan.release();
-                    plan_.mutex.unlock();
-                    return;
-                }
-            }
-
-            plan_.plan.release();
-            plan_.plan.reset(&piecewise_polynomial);
-            plan_.has_data = true;
-
-            ++plan_number_;
-            momap::log()->warn("Finished Handle Plan!"); 
-            editing_plan = false;
-            plan_.mutex.unlock();
-        } else {
-            momap::log()->error("Failed to lock the mutex! bad!"); 
         }
+
+        plan_.plan.release();
+        plan_.plan.reset(&piecewise_polynomial);
+        plan_.has_data = true;
+
+        ++plan_number_;
+        momap::log()->warn("Finished Handle Plan!"); 
+        editing_plan = false;
+        plan_.mutex.unlock();
+        
     };
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
