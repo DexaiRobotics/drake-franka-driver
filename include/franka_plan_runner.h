@@ -524,7 +524,7 @@ private:
             // TODO: remove the need for this check. who cares if it is a new plan?
             // TODO: make sure we've called motion finished and reset the timer?
 
-            if (plan_number_ != cur_plan_number) {
+            if (plan_.plan && plan_number_ != cur_plan_number) {
                 momap::log()->info("Starting new plan at {} s.", franka_time);
                 start_time_us = cur_time_us; // implies that we should have call motion finished
                 cur_plan_number = plan_number_;
