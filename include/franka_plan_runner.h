@@ -444,6 +444,7 @@ private:
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
                                                 , franka::Duration period
     ) {
+        franka::JointPositions output = robot_state.q; // should this be robot_state.qd?
         if (plan_.mutex.try_lock() && plan_.plan && plan_.has_data) {
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
@@ -527,10 +528,10 @@ private:
 
             error = ( du::v_to_e( ConvertToVector(current_conf) ) - plan_.plan->value(plan_.plan->end_time()) ).norm();
             // set desired position based on interpolated spline
-            franka::JointPositions output = {{ desired_next[0], desired_next[1],
-                                            desired_next[2], desired_next[3],
-                                            desired_next[4], desired_next[5],
-                                            desired_next[6] }};
+            output = {{ desired_next[0], desired_next[1],
+                        desired_next[2], desired_next[3],
+                        desired_next[4], desired_next[5],
+                        desired_next[6] }};
 
             // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
             // output = q_goal; 
@@ -561,7 +562,6 @@ private:
         }
             
         // we couldn't get the lock, so probably need to return motion::finished()
-        output =  robot_state.q; // should this be robot_state.qd?
         return franka::MotionFinished(output);
     };
 
@@ -661,7 +661,6 @@ private:
             std::unique_lock<std::mutex> lck(plan_.mutex);
             plan_.paused = true;
             plan_.mutex.unlock();
-            not_editing.notify_one();
 
             this->target_stop_time = 0;
             this->timestep = 1;
@@ -676,7 +675,6 @@ private:
             plan_.paused = false;
             plan_.unpausing = true;
             plan_.mutex.unlock();
-            not_editing.notify_one();
         }
         
 
