@@ -556,7 +556,7 @@ private:
                     std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
                     plan_.plan.release();
                     plan_.has_data = false; 
-                    plan_.utime = -1;
+                    // plan_.utime = -1;
                     plan_.mutex.unlock();
                     
                     PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
