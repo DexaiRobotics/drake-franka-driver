@@ -104,7 +104,7 @@ struct RobotData {
 
 struct RobotPiecewisePolynomial {
     std::mutex mutex;
-    bool has_data;
+    std::atomic<bool> has_data;
     int64_t utime;
     std::unique_ptr<PiecewisePolynomial<double>> plan;
     int64_t end_time_us;
@@ -365,8 +365,7 @@ private:
             while(!stop_signal){
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
-                    if (plan_.mutex.try_lock() && plan_.plan && plan_.has_data) {
-                        plan_.mutex.unlock(); 
+                    if (plan_.has_data) {
                         robot.control(joint_position_callback); //impedance_control_callback
                     } else {
                         // publish robot_status
