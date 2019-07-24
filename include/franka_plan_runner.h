@@ -461,12 +461,8 @@ private:
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
                                                 , franka::Duration period
     ) {
-        franka::JointPositions output = robot_state.q_d; // should this be robot_state.qd?
-        if (plan_.has_data) {
-            if ( ! plan_.mutex.try_lock() ) {
-                momap::log()->error("failed to get a lock in the JPC!");
-                return output; 
-            }
+        franka::JointPositions output = robot_state.q; // should this be robot_state.q_d?
+        if ( plan_.mutex.try_lock() ) {
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
 
@@ -581,7 +577,7 @@ private:
         }
             
         // we couldn't get the lock, so probably need to return motion::finished()
-        plan_.mutex.unlock();
+        // plan_.mutex.unlock();
         return franka::MotionFinished(output);
     };
 
