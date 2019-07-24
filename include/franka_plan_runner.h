@@ -365,7 +365,16 @@ private:
             while(!stop_signal){
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
-                    robot.control(joint_position_callback); //impedance_control_callback
+                    if (plan_.mutex.try_lock() && plan_.plan && plan_.has_data) {
+                        plan_.mutex.unlock(); 
+                        robot.control(joint_position_callback); //impedance_control_callback
+                    } else {
+                        // do nothing
+                        std::this_thread::sleep_for(
+                            std::chrono::milliseconds(static_cast<int>((1.0 / lcm_publish_rate ))));
+                        
+                    }
+                    
                 } catch (const franka::ControlException& e) {
                     std::cout << e.what() << std::endl;
                     std::cout << "Running error recovery..." << std::endl;
