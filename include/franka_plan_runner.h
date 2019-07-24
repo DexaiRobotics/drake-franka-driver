@@ -556,8 +556,11 @@ private:
                     std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
                     plan_.plan.release();
                     plan_.has_data = false; 
-                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
                     plan_.utime = -1;
+                    plan_.mutex.unlock();
+                    
+                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                    return output;
                     // plan_.mutex.unlock();
                     // return franka::MotionFinished(output);
                 }
@@ -617,7 +620,13 @@ private:
             momap::log()->info("Discarding plan, no status message received yet from the robot");
             return;
         }
-        plan_.mutex.lock();
+        // plan_.mutex.lock();
+        while( ! plan_.mutex.try_lock()) {
+            momap::log()->warn("trying to get a lock on the plan_.mutex. Sleeping 1 ms and trying again.");
+            std::this_thread::sleep_for(
+                    std::chrono::milliseconds(static_cast<int>( 1.0 )));
+        }
+        
 
         editing_plan = true;
     
