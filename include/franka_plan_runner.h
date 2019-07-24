@@ -530,6 +530,7 @@ private:
                 cur_plan_number = plan_number_;
                 starting_conf = plan_.plan->value(0.0);
                 starting_franka_q = robot_state.q; 
+                momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose()); 
                 momap::log()->warn("difference between where we are and where we think = {}", 
                                     ( du::v_to_e( ConvertToVector(starting_franka_q) ) - starting_conf ).norm() );
 
@@ -569,6 +570,8 @@ private:
                 Eigen::VectorXd current_conf_eigen = du::v_to_e( ConvertToVector(current_conf) );
                 // error = ( du::v_to_e( ConvertToVector(current_conf) ) -  plan_.plan->value(plan_.plan->end_time()) ).norm();
                 error = ( current_conf_eigen -  output_end ).norm();
+                momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose()); 
+                momap::log()->warn("starting_q_eigen = {}", starting_q_eigen.transpose()); 
                 momap::log()->info("error: {}", error);
                 momap::log()->info("current_conf_eigen: {}", current_conf_eigen.transpose());
                 momap::log()->info("output_end: {}", output_end.transpose());
