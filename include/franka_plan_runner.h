@@ -561,7 +561,9 @@ private:
                 }
                 Eigen::VectorXd delta = desired_next - starting_conf; 
                 Eigen::VectorXd output_eigen = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta; 
-                error = ( du::v_to_e( ConvertToVector(current_conf) ) - plan_.plan->value(plan_.plan->end_time()) ).norm();
+                auto delta_end = plan_.plan->value(plan_.plan->end_time()) - starting_conf; 
+                Eigen::VectorXd output_end = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta_end; 
+                error = ( du::v_to_e( ConvertToVector(current_conf) ) -  output_end ).norm();
                 // set desired position based on interpolated spline
                 // output = {{ desired_next[0], desired_next[1],
                 //             desired_next[2], desired_next[3],
