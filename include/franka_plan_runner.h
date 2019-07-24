@@ -388,7 +388,7 @@ private:
                     std::cout << "Running error recovery..." << std::endl;
                     if (plan_.mutex.try_lock() ) {
                         robot.automaticErrorRecovery();
-                        plan.mutex_.unlock(); 
+                        plan_.mutex_.unlock(); 
                     } else {
                         momap::log()->error("failed to get a mutex after an error. returning -99.");
                         return -99; 
