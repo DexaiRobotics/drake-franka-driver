@@ -240,6 +240,7 @@ public:
         sign_ = +1; 
 
         plan_.has_data = false; 
+        plan_.plan.release();
         plan_.utime = -1;
         plan_.end_time_us = 0;
         plan_.paused = false;
@@ -566,7 +567,7 @@ private:
                         franka::JointPositions ret_val = current_conf;
                         std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
                         plan_.plan.release();
-                        plan_.has_data = false; 
+                        plan_.has_data = false;
                         // plan_.utime = -1;
                         plan_.mutex.unlock();
                         
@@ -582,7 +583,7 @@ private:
                     }
                 }
             } else {
-                momap::log()->error("Inside JPC but plan_.plan != True");
+                // momap::log()->error("Inside JPC but plan_.plan != True");
             }
         
             plan_.mutex.unlock();
