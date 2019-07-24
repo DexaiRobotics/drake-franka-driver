@@ -472,9 +472,6 @@ private:
                 momap::log()->info("Starting new plan.");
                 start_time_us = cur_time_us; // implies that we should have call motion finished
                 cur_plan_number = plan_number_;
-                plan_.mutex.unlock();
-                output =  robot_state.q_d; // should this be robot_state.qd?
-                return franka::MotionFinished(output); 
             }
 
             if (plan_.paused) {
@@ -557,14 +554,12 @@ private:
                 if (error < 0.007) { // TODO: replace with non arbitrary number
                     franka::JointPositions ret_val = current_conf;
                     std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
-                
-                    std::unique_lock<std::mutex> lck(plan_.mutex);
                     plan_.plan.release();
                     plan_.has_data = false; 
                     PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
                     plan_.utime = -1;
-                    plan_.mutex.unlock();
-                    return franka::MotionFinished(output);
+                    // plan_.mutex.unlock();
+                    // return franka::MotionFinished(output);
                 }
                 else {
                     momap::log()->info("Plan running overtime and not converged, error: {}", error);
