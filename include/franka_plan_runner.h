@@ -531,7 +531,7 @@ private:
                 starting_conf = plan_.plan->value(0.0);
                 starting_franka_q = robot_state.q; 
                 momap::log()->warn("difference between where we are and where we think = {}", 
-                                    ( du::v_to_e( ConvertToVector(starting_franka_q) ) + starting_conf ).norm() );
+                                    ( du::v_to_e( ConvertToVector(starting_franka_q) ) - starting_conf ).norm() );
 
             }
 
@@ -565,7 +565,8 @@ private:
                 Eigen::VectorXd output_eigen = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta; 
                 auto delta_end = plan_.plan->value(plan_.plan->end_time()) - starting_conf; 
                 Eigen::VectorXd output_end = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta_end; 
-                error = ( du::v_to_e( ConvertToVector(current_conf) ) -  plan_.plan->value(plan_.plan->end_time()) ).norm();
+                // error = ( du::v_to_e( ConvertToVector(current_conf) ) -  plan_.plan->value(plan_.plan->end_time()) ).norm();
+                error = ( du::v_to_e( ConvertToVector(current_conf) ) -  output_end ).norm();
                 // set desired position based on interpolated spline
                 // output = {{ desired_next[0], desired_next[1],
                 //             desired_next[2], desired_next[3],
