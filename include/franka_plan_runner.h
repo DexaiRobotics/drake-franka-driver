@@ -368,8 +368,7 @@ private:
             };
 
             
-            bool stop_signal = false; 
-            while(!stop_signal){
+            while(true){
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
                     if (plan_.has_data) {
