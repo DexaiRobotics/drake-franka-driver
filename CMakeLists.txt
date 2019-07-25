@@ -73,6 +73,11 @@ list(APPEND CMAKE_PREFIX_PATH ${FRANKA_BUILD_DIR})
 
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
+
+message(STATUS "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
+message(STATUS "Franka_LIBRARIES: ${Franka_LIBRARIES}")
+
+
 find_package(lcm REQUIRED)
 find_package(gflags MODULE REQUIRED COMPONENTS shared)
 find_package(GTest REQUIRED)
