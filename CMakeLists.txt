@@ -78,45 +78,25 @@ find_package(gflags MODULE REQUIRED COMPONENTS shared)
 find_package(GTest REQUIRED)
 find_package(fcl REQUIRED)
 
-find_package( Python3 3.6 REQUIRED Interpreter Development)
-set(PYTHON_LIBRARIES ${Python3_LIBRARIES} )
-
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(PYTHON_LIBRARIES ${Python3_LIBRARIES} )
-else()
-    set(PYTHON_LIBRARIES "/usr/lib/x86_64-linux-gnu/libpython3.6m.so") #$ENV{LOCAL_PYTHON_PATH}/lib/libpython2.7.so )
-endif()
-
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        set(PYTHON_INCLUDE_DIRS
-                "${Python3_INCLUDE_DIRS}"       # kitchen sink
-                "${Python3_LIBRARY_DIRS}/python3.6/dist-packages/numpy/core/include"
-                "${Python3_LIBRARY_DIRS}/python3.6/site-packages/numpy/core/include"
-        )
-else()
-        set(PYTHON_INCLUDE_DIRS
-                "/usr/include/python3.6" #$ENV{LOCAL_PYTHON_PATH}/include/python3.6
-                "${Python3_INCLUDE_DIRS}"       # kitchen sink
-                "/usr/local/lib/python3.6/dist-packages/numpy/core/include"
-                "/usr/local/lib/python3.6/site-packages/numpy/core/include/"
-        )
-endif()
-
-message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
-message(STATUS "PYTHON_INCLUDE_DIRS: ${PYTHON_INCLUDE_DIRS}")
-
+find_package( Python3 3.6 REQUIRED Interpreter Development NumPy)
+message(STATUS "Python3_VERSION: ${Python3_VERSION}")
+message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
+message(STATUS "Python3_LIBRARY_DIRS: ${Python3_LIBRARY_DIRS}")
+message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
+message(STATUS "Python3_NumPy_FOUND: ${Python3_NumPy_FOUND}")
+message(STATUS "Python3_NumPy_INCLUDE_DIRS: ${Python3_NumPy_INCLUDE_DIRS}")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # add include dir for Franka headers
 include_directories(
     include
-    $ENV{DRACULA_INCLUDE_DIR}
-    $ENV{DRACULA_INCLUDE_DIR}/../tests
-    $ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
+    ${DRACULA_INCLUDE_DIR}
+    ${DRACULA_INCLUDE_DIR}/../tests
+    ${DRACULA_INCLUDE_DIR}/../../externals/json/include
     ${Franka_INCLUDE_DIRS}
-    ${PYTHON_INCLUDE_DIRS}
-    $ENV{CTPL_INCLUDE_DIR}
+    ${Python3_INCLUDE_DIRS}
+    ${CTPL_INCLUDE_DIR}
 )
 
 
@@ -144,8 +124,8 @@ target_link_libraries(${driver_name}
     gflags
     drake::drake
     Threads::Threads
-    $ENV{DRACULA_LIBRARIES}
-    ${PYTHON_LIBRARIES}
+    ${DRACULA_LIBRARIES}
+    ${Python3_LIBRARIES}
     fcl
 )
 

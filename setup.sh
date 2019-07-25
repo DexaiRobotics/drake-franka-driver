@@ -18,10 +18,12 @@ else
 fi
 echo "####### make will use $num_threads jobs to build target: $target #######"
 
-echo "build libfranka if not done yet:"
+echo "update libfranka and build if not done yet..."
+cd externals
 git submodule update --init --recursive
 cd libfranka
 if [ ! -d "build" ]; then
+    echo "build libfranka..."
     mkdir build && cd build
     if (( $build_debug > 0 )); then
         echo "Build libfranka in Debug mode!"
