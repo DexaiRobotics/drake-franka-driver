@@ -5,7 +5,7 @@ robots/
 
 # Ignore the build directory and compiled binaries
 build/
-externals/
+#externals/
 
 # Ignore backup files
 *.bak
