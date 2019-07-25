@@ -18,10 +18,26 @@ else
 fi
 echo "####### make will use $num_threads jobs to build target: $target #######"
 
-source scripts/setup_env.sh
+echo "build libfranka if not done yet:"
+git submodule update --init --recursive
+cd libfranka
+if [ ! -d "build" ]; then
+    mkdir build && cd build
+    if (( $build_debug > 0 )); then
+        echo "Build libfranka in Debug mode!"
+        cmake .. -DCMAKE_BUILD_TYPE=Debug
+    else
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+    fi
+    cmake --build . -j $num_threads --target franka
+    cd ..
+fi
+cd ../..
 
+echo "clean_build = $clean_build"
 if (( $clean_build > 0 )); then
     #if the CMakeCache.txt file exists, remove it.
+    echo "Performing a clean build!"
     if [ -f CMakeCache.txt ]; then
       rm -f CMakeCache.txt
     fi
@@ -33,7 +49,9 @@ fi
 
 # Now build the target from scratch:
 mkdir -p build; cd build
+echo "build_debug = $build_debug"
 if (( $build_debug > 0 )); then
+    echo "Build in Debug mode!"
     cmake .. -DCMAKE_BUILD_TYPE=Debug || exit 4   # Build for debugging
 else
     cmake ..                          || exit 5

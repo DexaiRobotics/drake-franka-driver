@@ -14,17 +14,62 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
 
+
+## Set up environment
+message(STATUS "setting up environment!")
+
+# Set Drake's path
+set(DRAKE_BUILD_DIR "/opt/drake")
+message(STATUS "DRAKE_BUILD_DIR: ${DRAKE_BUILD_DIR}")
+
+set(FRANKA_BUILD_DIR "${CMAKE_SOURCE_DIR}/externals/libfranka/build")
+message(STATUS "FRANKA_BUILD_DIR: ${FRANKA_BUILD_DIR}")
+
+
+# Figure out where dracula can be found
+if (($ENV{CIRCLECI} MATCHES "true") )
+    get_filename_component(DEXAI_SRC_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
+    set(ENV{DEXAI_SRC} ${DEXAI_SRC_DIR})
+elseif(NOT DEFINED ENV{DEXAI_SRC})
+    message(STATUS "NOTE: The environment variable DEXAI_SRC is not defined")
+    message(STATUS "NOTE: setting DEXAI_SRC to /src")
+    set(ENV{DEXAI_SRC} /src)
+endif()
+message(STATUS "DEXAI_SRC: $ENV{DEXAI_SRC}")
+set(DRACULA_SOURCE_PATH "$ENV{DEXAI_SRC}/dracula")
+message(STATUS "DRACULA_SOURCE_PATH: ${DRACULA_SOURCE_PATH}")
+set(DRACULA_BUILD_PATH "${DRACULA_SOURCE_PATH}/build")
+message(STATUS "DRACULA_BUILD_PATH: ${DRACULA_BUILD_PATH}")
+set(DRACULA_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/dracula/include")
+message(STATUS "DRACULA_INCLUDE_DIR: ${DRACULA_INCLUDE_DIR}")
+
+# Set Dracula Libraries
+if (UNIX AND NOT APPLE)
+    set(DRACULA_LIBRARIES "${DRACULA_BUILD_PATH}/dracula/libdracula.so")
+elseif (APPLE)
+    message ("MAC OS X")
+    set(DRACULA_LIBRARIES "${DRACULA_BUILD_PATH}/dracula/libdracula.dylib")
+endif ()
+
+set(CTPL_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/CTPL")
+
+#LOCAL_PYTHON=`which python`
+#export LOCAL_PYTHON_PATH=`dirname $LOCAL_PYTHON`
+
+## end of setting environment variables
+
+
 configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 configure_file(tests/data/franka_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 
 # Find LCM
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 
-list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR})
-list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake)
-list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake/drake)
+list(APPEND CMAKE_PREFIX_PATH ${DRAKE_BUILD_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${DRAKE_BUILD_DIR}/lib/cmake)
+list(APPEND CMAKE_PREFIX_PATH ${DRAKE_BUILD_DIR}/lib/cmake/drake)
 
-list(APPEND CMAKE_PREFIX_PATH $ENV{FRANKA_BUILD_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${FRANKA_BUILD_DIR})
 
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
