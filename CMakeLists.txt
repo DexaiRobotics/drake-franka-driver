@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.1)
+cmake_minimum_required(VERSION 3.14)
 project(drake-franka-driver)
 
 set(CMAKE_CXX_STANDARD 14)
@@ -14,65 +14,94 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
 
+
+## Set up environment
+message(STATUS "setting up environment!")
+
+# Set Drake's path
+set(DRAKE_BUILD_DIR "/opt/drake")
+message(STATUS "DRAKE_BUILD_DIR: ${DRAKE_BUILD_DIR}")
+
+set(FRANKA_BUILD_DIR "${CMAKE_SOURCE_DIR}/externals/libfranka/build")
+message(STATUS "FRANKA_BUILD_DIR: ${FRANKA_BUILD_DIR}")
+
+
+# Figure out where dracula can be found
+if (($ENV{CIRCLECI} MATCHES "true") )
+    get_filename_component(DEXAI_SRC_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
+    set(ENV{DEXAI_SRC} ${DEXAI_SRC_DIR})
+elseif(NOT DEFINED ENV{DEXAI_SRC})
+    message(STATUS "NOTE: The environment variable DEXAI_SRC is not defined")
+    message(STATUS "NOTE: setting DEXAI_SRC to /src")
+    set(ENV{DEXAI_SRC} /src)
+endif()
+message(STATUS "DEXAI_SRC: $ENV{DEXAI_SRC}")
+set(DRACULA_SOURCE_PATH "$ENV{DEXAI_SRC}/dracula")
+message(STATUS "DRACULA_SOURCE_PATH: ${DRACULA_SOURCE_PATH}")
+set(DRACULA_BUILD_PATH "${DRACULA_SOURCE_PATH}/build")
+message(STATUS "DRACULA_BUILD_PATH: ${DRACULA_BUILD_PATH}")
+set(DRACULA_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/dracula/include")
+message(STATUS "DRACULA_INCLUDE_DIR: ${DRACULA_INCLUDE_DIR}")
+
+# Set Dracula Libraries
+if (UNIX AND NOT APPLE)
+    set(DRACULA_LIBRARIES "${DRACULA_BUILD_PATH}/dracula/libdracula.so")
+elseif (APPLE)
+    message ("MAC OS X")
+    set(DRACULA_LIBRARIES "${DRACULA_BUILD_PATH}/dracula/libdracula.dylib")
+endif ()
+
+set(CTPL_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/CTPL")
+
+#LOCAL_PYTHON=`which python`
+#export LOCAL_PYTHON_PATH=`dirname $LOCAL_PYTHON`
+
+## end of setting environment variables
+
+
 configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 configure_file(tests/data/franka_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 
 # Find LCM
 list(APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/modules")
 
-list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR})
-list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake)
-list(APPEND CMAKE_PREFIX_PATH $ENV{DRAKE_BUILD_DIR}/lib/cmake/drake)
+list(APPEND CMAKE_PREFIX_PATH ${DRAKE_BUILD_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${DRAKE_BUILD_DIR}/lib/cmake)
+list(APPEND CMAKE_PREFIX_PATH ${DRAKE_BUILD_DIR}/lib/cmake/drake)
 
-list(APPEND CMAKE_PREFIX_PATH $ENV{FRANKA_BUILD_DIR})
+list(APPEND CMAKE_PREFIX_PATH ${FRANKA_BUILD_DIR})
 
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
+
+message(STATUS "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
+message(STATUS "Franka_LIBRARIES: ${Franka_LIBRARIES}")
+
+
 find_package(lcm REQUIRED)
 find_package(gflags MODULE REQUIRED COMPONENTS shared)
 find_package(GTest REQUIRED)
 find_package(fcl REQUIRED)
 
-find_package( Python3 3.6 REQUIRED Interpreter Development)
-set(PYTHON_LIBRARIES ${Python3_LIBRARIES} )
-
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(PYTHON_LIBRARIES ${Python3_LIBRARIES} )
-else()
-    set(PYTHON_LIBRARIES "/usr/lib/x86_64-linux-gnu/libpython3.6m.so") #$ENV{LOCAL_PYTHON_PATH}/lib/libpython2.7.so )
-endif()
-
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-        set(PYTHON_INCLUDE_DIRS
-                "${Python3_INCLUDE_DIRS}"       # kitchen sink
-                "${Python3_LIBRARY_DIRS}/python3.6/dist-packages/numpy/core/include"
-                "${Python3_LIBRARY_DIRS}/python3.6/site-packages/numpy/core/include"
-        )
-else()
-        set(PYTHON_INCLUDE_DIRS
-                "/usr/include/python3.6" #$ENV{LOCAL_PYTHON_PATH}/include/python3.6
-                "${Python3_INCLUDE_DIRS}"       # kitchen sink
-                "/usr/local/lib/python3.6/dist-packages/numpy/core/include"
-                "/usr/local/lib/python3.6/site-packages/numpy/core/include/"
-        )
-endif()
-
-message(STATUS "PYTHON_LIBRARIES: ${PYTHON_LIBRARIES}")
-message(STATUS "PYTHON_INCLUDE_DIRS: ${PYTHON_INCLUDE_DIRS}")
-
+find_package( Python3 3.6 REQUIRED Interpreter Development NumPy)
+message(STATUS "Python3_VERSION: ${Python3_VERSION}")
+message(STATUS "Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
+message(STATUS "Python3_LIBRARY_DIRS: ${Python3_LIBRARY_DIRS}")
+message(STATUS "Python3_LIBRARIES: ${Python3_LIBRARIES}")
+message(STATUS "Python3_NumPy_FOUND: ${Python3_NumPy_FOUND}")
+message(STATUS "Python3_NumPy_INCLUDE_DIRS: ${Python3_NumPy_INCLUDE_DIRS}")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # add include dir for Franka headers
 include_directories(
     include
-    $ENV{DRACULA_INCLUDE_DIR}
-    $ENV{DRACULA_INCLUDE_DIR}/../tests
-    $ENV{DRACULA_INCLUDE_DIR}/../../externals/json/include
+    ${DRACULA_INCLUDE_DIR}
+    ${DRACULA_INCLUDE_DIR}/../tests
+    ${DRACULA_INCLUDE_DIR}/../../externals/json/include
     ${Franka_INCLUDE_DIRS}
-    ${PYTHON_INCLUDE_DIRS}
-    $ENV{CTPL_INCLUDE_DIR}
-    externals/StopWatch
+    ${Python3_INCLUDE_DIRS}
+    ${CTPL_INCLUDE_DIR}
 )
 
 
@@ -100,23 +129,8 @@ target_link_libraries(${driver_name}
     gflags
     drake::drake
     Threads::Threads
-    $ENV{DRACULA_LIBRARIES}
-    ${PYTHON_LIBRARIES}
-    fcl
-)
-
-add_executable( ArrayToVectorPerformance
-    src/test_vector_performance.cc
-    externals/StopWatch/StopWatch.cpp
-)
-target_link_libraries( ArrayToVectorPerformance
-    ${Franka_LIBRARIES}
-    ${LCM_NAMESPACE}lcm
-    gflags
-    drake::drake
-    Threads::Threads
-    $ENV{DRACULA_LIBRARIES}
-    ${PYTHON_LIBRARIES}
+    ${DRACULA_LIBRARIES}
+    ${Python3_LIBRARIES}
     fcl
 )
 

@@ -5,7 +5,7 @@ robots/
 
 # Ignore the build directory and compiled binaries
 build/
-externals/
+#externals/
 
 # Ignore backup files
 *.bak
@@ -22,3 +22,5 @@ externals/
 *DS_Store
 *snopt.out
 *.ipynb_checkpoints
+/.idea/
+/cmake-build-debug/
