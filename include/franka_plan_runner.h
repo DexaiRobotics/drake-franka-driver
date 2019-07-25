@@ -534,7 +534,7 @@ private:
                 start_time_us = cur_time_us; // implies that we should have call motion finished
                 cur_plan_number = plan_number_;
                 starting_conf = plan_.plan->value(0.0);
-                starting_franka_q = robot_state.q; 
+                starting_franka_q = robot_state.q_d; 
                 momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose()); 
                 momap::log()->warn("difference between where we are and where we think = {}", 
                                     ( du::v_to_e( ConvertToVector(starting_franka_q) ) - starting_conf ).norm() );
@@ -551,7 +551,7 @@ private:
 
             Eigen::VectorXd desired_next = Eigen::VectorXd::Zero(kNumJoints);
             std::array<double, 7> current_cmd = robot_state.q_d; // set to actual, not desired
-            std::array<double, 7> current_conf = robot_state.q; // set to actual, not desired
+            std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
             desired_next = du::v_to_e( ConvertToVector(current_cmd) );
             
             double error = DBL_MAX; 
