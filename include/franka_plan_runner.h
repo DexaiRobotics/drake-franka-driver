@@ -373,11 +373,6 @@ private:
                 try {
                     if (plan_.has_data) {
                         robot.control(joint_position_callback); //impedance_control_callback
-                    
-                        std::this_thread::sleep_for(
-                                std::chrono::milliseconds(static_cast<int>( 1.0 )));
-                        momap::log()->info("in while loop...");
-
                     } else {
                         // publish robot_status
                         // TODO: add a timer to be closer to 200 Hz. 
