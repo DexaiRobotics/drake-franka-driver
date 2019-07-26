@@ -493,7 +493,7 @@ private:
                     }
                     this->target_stop_time = temp_target_stop_time;
                     this->stop_epsilon = period.toSec() / STOP_EPSILON;
-		    cout <<"TARGET: " << target_stop_time << endl;
+		            cout <<"TARGET: " << target_stop_time << endl;
                 }
 
                 double new_stop = StopPeriod(period.toSec());
@@ -501,6 +501,9 @@ private:
                 //cout.precision(17);
                 //cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
                 timestep++;
+
+                auto speed = du::v_to_e( ConvertToVector(starting_franka_q)).norm()
+                cout << "SPEED: " << speed << endl;
                 if(new_stop > this->stop_epsilon){
                     this->stop_duration++;
                 }
@@ -510,8 +513,8 @@ private:
                 }
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
-                cout.precision(17);
-                cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
+                //cout.precision(17);
+                //cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
                 timestep++;
                 
             }
@@ -736,7 +739,7 @@ private:
         else if(plan_.has_data && !msg->data && paused){
             momap::log()->info("Received continue command. Continuing plan.");
             this->timestep = -1 * this->stop_duration; //how long unpausing should take
-            // cout << "STOP DURATION: " << stop_duration << endl;
+            cout << "STOP DURATION: " << stop_duration << endl;
             paused = false;
             unpausing = true;
         }
