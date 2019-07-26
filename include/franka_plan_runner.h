@@ -212,7 +212,7 @@ private:
     std::atomic_bool pausing;
     std::atomic_bool paused;
     std::atomic_bool unpausing;
-    float STOP_MARGIN = 1000;
+    float STOP_MARGIN = 1;
     float stop_margin_counter = 0;
     Eigen::VectorXd starting_conf;
     std::array<double, 7> starting_franka_q; 
