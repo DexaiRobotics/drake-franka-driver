@@ -486,32 +486,32 @@ private:
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = vel[i] / this->max_accels[i];
+                        float stop_time = fabs(vel[i] / this->max_accels[i]);
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
                     }
                     this->target_stop_time = temp_target_stop_time;
                     this->stop_epsilon = period.toSec() / STOP_EPSILON;
+		    cout <<"TARGET: " << target_stop_time << endl;
                 }
 
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
-                // cout.precision(17);
-                // cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+                //cout.precision(17);
+                //cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
                 timestep++;
                 if(new_stop > this->stop_epsilon){
                     this->stop_duration++;
                 }
             } else if (!paused && unpausing) { //robot is unpausing
                 if (timestep >= 0) { //if robot has reached full speed again
-                    std::unique_lock<std::mutex> lck(plan_.mutex);
                     unpausing = false;
                 }
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
-                // cout.precision(17);
-                // cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
+                cout.precision(17);
+                cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
                 timestep++;
                 
             }
