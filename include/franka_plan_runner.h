@@ -505,9 +505,13 @@ private:
                 std::array<double,7> vel = robot_state.dq;
                 auto speed = du::v_to_e( ConvertToVector(vel)).norm();
                 cout << "SPEED: " << speed << endl;
-                if(new_stop > this->stop_epsilon){
+                // if(new_stop > this->stop_epsilon){
+                //     this->stop_duration++;
+                // }
+                if(speed > 0.01){
                     this->stop_duration++;
                 }
+                
             } else if (!paused && unpausing) { //robot is unpausing
                 if (timestep >= 0) { //if robot has reached full speed again
                     unpausing = false;
