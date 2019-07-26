@@ -508,11 +508,12 @@ private:
                 std::array<double,7> vel = robot_state.dq;
                 auto speed = du::v_to_e( ConvertToVector(vel)).norm();
                 //cout << "SPEED: " << speed << endl;
-                if(new_stop < period.toSec()/50){
+                if(new_stop >= period.toSec()/50){
                     this->stop_duration++;
                 }
                 else if(stop_margin_counter <= STOP_MARGIN){
                     stop_margin_counter += period.toSec();
+                    cout << stop_margin_counter << endl;
                 }
                 else{
                     paused = true;
