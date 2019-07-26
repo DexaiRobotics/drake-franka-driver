@@ -212,7 +212,7 @@ private:
     std::atomic_bool pausing;
     std::atomic_bool paused;
     std::atomic_bool unpausing;
-    float STOP_MARGIN = 1;
+    float STOP_MARGIN = 0.6;
     float stop_margin_counter = 0;
     Eigen::VectorXd starting_conf;
     std::array<double, 7> starting_franka_q; 
@@ -517,6 +517,7 @@ private:
                 }
                 else{
                     paused = true;
+                    cout << "PAUSED == TRUE";
                 }
                 
                 
@@ -740,7 +741,7 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(plan_.has_data && msg->data && !paused && !unpausing){
+        if(plan_.has_data && msg->data && !pausing && !unpausing){
             momap::log()->info("Received pause command. Pausing plan.");
             paused = false;
             pausing = true;
