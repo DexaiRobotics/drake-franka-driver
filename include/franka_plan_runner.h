@@ -209,6 +209,7 @@ private:
     float target_stop_time;
     const float STOP_EPSILON = 0.3;
     float stop_duration;
+    std:atomic_bool pausing;
     std::atomic_bool paused;
     std::atomic_bool unpausing;
     Eigen::VectorXd starting_conf;
@@ -241,6 +242,7 @@ public:
         start_time_us = -1;
         sign_ = +1; 
 
+        pausing = false;
         paused = false;
         unpausing = false;
 
@@ -480,12 +482,12 @@ private:
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
 
-            if (paused) {
+            if (pausing) {
                 if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = fabs(vel[i] / this->max_accels[i]);
+                        float stop_time = fabs(vel[i] / (this->max_accels[i]/2));
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
@@ -505,9 +507,10 @@ private:
                 //cout << "SPEED: " << speed << endl;
                 if(speed > STOP_EPSILON){
                     this->stop_duration++;
+                    paused = true;
                 }
                 
-            } else if (!paused && unpausing) { //robot is unpausing
+            } else if (unpausing) { //robot is unpausing
                 if (timestep >= 0) { //if robot has reached full speed again
                     unpausing = false;
                 }
@@ -715,8 +718,7 @@ private:
 
         plan_.plan.release();
         plan_.plan.reset(&piecewise_polynomial);
-        plan_.has_data = true;
-        paused = false; 
+        plan_.has_data = true; 
 
 
         ++plan_number_;
@@ -728,9 +730,11 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(plan_.has_data && msg->data && !paused){
+        if(plan_.has_data && msg->data && !paused && !unpausing){
             momap::log()->info("Received pause command. Pausing plan.");
-            paused = true;
+            paused = false;
+            pausing = true;
+            unpausing = false;
             this->target_stop_time = 0;
             this->timestep = 1;
             this->stop_duration = 0;
@@ -741,6 +745,7 @@ private:
             this->timestep = -1 * this->stop_duration; //how long unpausing should take
             cout << "STOP DURATION: " << stop_duration << endl;
             paused = false;
+            pausing = false;
             unpausing = true;
         }
         
