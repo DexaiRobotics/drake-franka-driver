@@ -490,7 +490,7 @@ private:
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = fabs(vel[i] / (this->max_accels[i]/1.5));
+                        float stop_time = fabs(vel[i] / (this->max_accels[i]));
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
@@ -508,7 +508,7 @@ private:
                 std::array<double,7> vel = robot_state.dq;
                 auto speed = du::v_to_e( ConvertToVector(vel)).norm();
                 //cout << "SPEED: " << speed << endl;
-                if(new_stop >= period.toSec()/50){
+                if(new_stop >= period.toSec()/30){ // TODO MAKE THIS NOT A CONSTANT
                     this->stop_duration++;
                 }
                 else if(stop_margin_counter <= STOP_MARGIN){
