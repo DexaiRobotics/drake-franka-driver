@@ -502,7 +502,8 @@ private:
                 //cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
                 timestep++;
 
-                auto speed = du::v_to_e( ConvertToVector(robot_state.dq)).norm();
+                std::array<double,7> vel = robot_state.dq;
+                auto speed = du::v_to_e(vel).norm();
                 cout << "SPEED: " << speed << endl;
                 if(new_stop > this->stop_epsilon){
                     this->stop_duration++;
