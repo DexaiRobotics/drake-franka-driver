@@ -502,7 +502,7 @@ private:
                 //cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
                 timestep++;
 
-                auto speed = du::v_to_e( ConvertToVector(starting_franka_q)).norm()
+                auto speed = du::v_to_e( ConvertToVector(robot_state.dq)).norm();
                 cout << "SPEED: " << speed << endl;
                 if(new_stop > this->stop_epsilon){
                     this->stop_duration++;
