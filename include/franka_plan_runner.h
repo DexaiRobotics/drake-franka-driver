@@ -207,8 +207,7 @@ private:
     Eigen::MatrixXd joint_limits;
     long timestep;
     float target_stop_time;
-    const float STOP_EPSILON = 20; //make this a yaml parameter
-    float stop_epsilon;
+    const float STOP_EPSILON = 0.3;
     float stop_duration;
     std::atomic_bool paused;
     std::atomic_bool unpausing;
@@ -492,8 +491,7 @@ private:
                         }
                     }
                     this->target_stop_time = temp_target_stop_time;
-                    this->stop_epsilon = period.toSec() / STOP_EPSILON;
-		            cout <<"TARGET: " << target_stop_time << endl;
+		           // cout <<"TARGET: " << target_stop_time << endl;
                 }
 
                 double new_stop = StopPeriod(period.toSec());
@@ -504,11 +502,8 @@ private:
 
                 std::array<double,7> vel = robot_state.dq;
                 auto speed = du::v_to_e( ConvertToVector(vel)).norm();
-                cout << "SPEED: " << speed << endl;
-                // if(new_stop > this->stop_epsilon){
-                //     this->stop_duration++;
-                // }
-                if(speed > 0.01){
+                //cout << "SPEED: " << speed << endl;
+                if(speed > STOP_EPSILON){
                     this->stop_duration++;
                 }
                 
