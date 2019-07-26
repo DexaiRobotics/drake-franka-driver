@@ -209,9 +209,11 @@ private:
     float target_stop_time;
     const float STOP_EPSILON = 0.3;
     float stop_duration;
-    std:atomic_bool pausing;
+    std::atomic_bool pausing;
     std::atomic_bool paused;
     std::atomic_bool unpausing;
+    float STOP_MARGIN = 1000;
+    float stop_margin_counter = 0;
     Eigen::VectorXd starting_conf;
     std::array<double, 7> starting_franka_q; 
     
@@ -245,6 +247,7 @@ public:
         pausing = false;
         paused = false;
         unpausing = false;
+
 
         starting_franka_q = {{0,0,0,0,0,0,0}}; 
         starting_conf = Eigen::VectorXd::Zero(kNumJoints);
@@ -487,7 +490,7 @@ private:
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = fabs(vel[i] / (this->max_accels[i]/2));
+                        float stop_time = fabs(vel[i] / (this->max_accels[i]/1.5));
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
@@ -505,10 +508,16 @@ private:
                 std::array<double,7> vel = robot_state.dq;
                 auto speed = du::v_to_e( ConvertToVector(vel)).norm();
                 //cout << "SPEED: " << speed << endl;
-                if(speed > STOP_EPSILON){
+                if(new_stop < period.toSec()/50){
                     this->stop_duration++;
+                }
+                else if(stop_margin_counter <= STOP_MARGIN){
+                    stop_margin_counter += period.toSec();
+                }
+                else{
                     paused = true;
                 }
+                
                 
             } else if (unpausing) { //robot is unpausing
                 if (timestep >= 0) { //if robot has reached full speed again
@@ -738,6 +747,7 @@ private:
             this->target_stop_time = 0;
             this->timestep = 1;
             this->stop_duration = 0;
+            stop_margin_counter = 0;
 
         }
         else if(plan_.has_data && !msg->data && paused){
@@ -747,6 +757,7 @@ private:
             paused = false;
             pausing = false;
             unpausing = true;
+
         }
         
 
