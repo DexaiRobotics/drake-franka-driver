@@ -503,7 +503,7 @@ private:
                 timestep++;
 
                 std::array<double,7> vel = robot_state.dq;
-                auto speed = du::v_to_e(vel).norm();
+                auto speed = du::v_to_e( ConvertToVector(vel)).norm();
                 cout << "SPEED: " << speed << endl;
                 if(new_stop > this->stop_epsilon){
                     this->stop_duration++;
