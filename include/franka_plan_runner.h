@@ -108,8 +108,6 @@ struct RobotPiecewisePolynomial {
     int64_t utime;
     std::unique_ptr<PiecewisePolynomial<double>> plan;
     int64_t end_time_us;
-    bool paused;
-    bool unpausing;
 };
 
 template <typename T, std::size_t SIZE>
@@ -212,6 +210,8 @@ private:
     const float STOP_EPSILON = 20; //make this a yaml parameter
     float stop_epsilon;
     float stop_duration;
+    std::atomic_bool paused;
+    std::atomic_bool unpausing;
     Eigen::VectorXd starting_conf;
     std::array<double, 7> starting_franka_q; 
     
@@ -242,6 +242,9 @@ public:
         start_time_us = -1;
         sign_ = +1; 
 
+        paused = false;
+        unpausing = false;
+
         starting_franka_q = {{0,0,0,0,0,0,0}}; 
         starting_conf = Eigen::VectorXd::Zero(kNumJoints);
 
@@ -249,8 +252,6 @@ public:
         plan_.plan.release();
         plan_.utime = -1;
         plan_.end_time_us = 0;
-        plan_.paused = false;
-        plan_.unpausing = false;
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
         momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
@@ -480,7 +481,7 @@ private:
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
 
-            if (plan_.paused) {
+            if (paused) {
                 if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
@@ -502,10 +503,10 @@ private:
                 if(new_stop > this->stop_epsilon){
                     this->stop_duration++;
                 }
-            } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
+            } else if (!paused && unpausing) { //robot is unpausing
                 if (timestep >= 0) { //if robot has reached full speed again
                     std::unique_lock<std::mutex> lck(plan_.mutex);
-                    plan_.unpausing = false;
+                    unpausing = false;
                 }
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
@@ -712,7 +713,7 @@ private:
         plan_.plan.release();
         plan_.plan.reset(&piecewise_polynomial);
         plan_.has_data = true;
-        plan_.paused = false; 
+        paused = false; 
 
 
         ++plan_number_;
@@ -724,25 +725,20 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(plan_.has_data && msg->data && !plan_.paused){
+        if(plan_.has_data && msg->data && !paused){
             momap::log()->info("Received pause command. Pausing plan.");
-            std::unique_lock<std::mutex> lck(plan_.mutex);
-            plan_.paused = true;
-            plan_.mutex.unlock();
-
+            paused = true;
             this->target_stop_time = 0;
             this->timestep = 1;
             this->stop_duration = 0;
 
         }
-        else if(plan_.has_data && !msg->data && plan_.paused){
+        else if(plan_.has_data && !msg->data && paused){
             momap::log()->info("Received continue command. Continuing plan.");
             this->timestep = -1 * this->stop_duration; //how long unpausing should take
             // cout << "STOP DURATION: " << stop_duration << endl;
-            std::unique_lock<std::mutex> lck(plan_.mutex);
-            plan_.paused = false;
-            plan_.unpausing = true;
-            plan_.mutex.unlock();
+            paused = false;
+            unpausing = true;
         }
         
 
