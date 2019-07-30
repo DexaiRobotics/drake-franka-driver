@@ -517,7 +517,6 @@ private:
                 }
                 else{
                     paused = true;
-                    cout << "PAUSED == TRUE";
                 }
                 
                 
