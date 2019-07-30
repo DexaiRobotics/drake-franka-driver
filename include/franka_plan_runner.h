@@ -490,7 +490,7 @@ private:
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = fabs(vel[i] / (this->max_accels[i]));
+                        float stop_time = fabs(vel[i] / (this->max_accels[i]))/2;
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
