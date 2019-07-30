@@ -5,6 +5,7 @@ import time
 from robot_msgs import bool_t
 import sys
 import lcm
+import subprocess
 
 
 def get_current_utime():
@@ -27,10 +28,15 @@ class FrankaDriverServer:
 
     def handle_start_driver_request(self, channel, req):
         print("Starting driver!")
+        cmd = 'cd /src/drake-franka-driver && ./franka_0.sh'
+        print(cmd)
+        subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
 
     def handle_stop_driver_request(self, channel, req):
         print("Stopping driver!")
-
+        cmd = 'pkill -f franka_plan_runner'
+        print(cmd)
+        subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
 
     def run_server(self):
         print("Starting Franka Driver Server")
