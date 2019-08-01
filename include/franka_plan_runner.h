@@ -488,6 +488,7 @@ private:
             case 2 : msg.data = false; break;
         }
         lcm_.publish(p.lcm_stop_channel, &msg);
+        queued_cmd = 0;
     }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
@@ -504,7 +505,7 @@ private:
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = fabs(vel[i] / (this->max_accels[i])) / 2;
+                        float stop_time = fabs(vel[i] / (this->max_accels[i])); //real world stop time ~2x stop_time in plan
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
