@@ -182,6 +182,7 @@ int64_t get_current_utime() {
     return current_utime;
 }
 
+
 class FrankaPlanRunner {
 private:
     Dracula *dracula = nullptr;
@@ -207,13 +208,15 @@ private:
     Eigen::MatrixXd joint_limits;
     long timestep;
     float target_stop_time;
-    const float STOP_EPSILON = 0.3;
+    const float STOP_EPSILON = 0.033;
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
     std::atomic_bool unpausing;
     float STOP_MARGIN = 0.6;
     float stop_margin_counter = 0;
+    int queued_cmd = 0; //0: None, 1: Pause, 2: Continue 
+
     Eigen::VectorXd starting_conf;
     std::array<double, 7> starting_franka_q; 
     
@@ -476,6 +479,17 @@ private:
         return (current_time - prev_time);
     }
 
+    void QueuedCmd(){
+        bool_t msg;
+        msg.utime = get_current_utime();
+        switch(queued_cmd){
+            case 0 : return;
+            case 1 : msg.data = true; break;
+            case 2 : msg.data = false; break;
+        }
+        lcm_.publish(p.lcm_stop_channel, &msg);
+    }
+
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
                                                 , franka::Duration period
     ) {
@@ -490,7 +504,7 @@ private:
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = fabs(vel[i] / (this->max_accels[i]))/2;
+                        float stop_time = fabs(vel[i] / (this->max_accels[i])) / 2;
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
@@ -508,15 +522,15 @@ private:
                 std::array<double,7> vel = robot_state.dq;
                 auto speed = du::v_to_e( ConvertToVector(vel)).norm();
                 //cout << "SPEED: " << speed << endl;
-                if(new_stop >= period.toSec()/30){ // TODO MAKE THIS NOT A CONSTANT
+                if(new_stop >= period.toSec() * STOP_EPSILON){ // TODO MAKE THIS NOT A CONSTANT
                     this->stop_duration++;
                 }
                 else if(stop_margin_counter <= STOP_MARGIN){
                     stop_margin_counter += period.toSec();
-                    cout << stop_margin_counter << endl;
                 }
                 else{
                     paused = true;
+                    QueuedCmd()
                 }
                 
                 
@@ -740,24 +754,34 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(plan_.has_data && msg->data && !pausing && !unpausing){
-            momap::log()->info("Received pause command. Pausing plan.");
-            paused = false;
-            pausing = true;
-            unpausing = false;
-            this->target_stop_time = 0;
-            this->timestep = 1;
-            this->stop_duration = 0;
-            stop_margin_counter = 0;
+        if(plan_.has_data && msg->data && !pausing){
+            if(!unpausing){
+                momap::log()->info("Received pause command. Pausing plan.");
+                paused = false;
+                pausing = true;
+                unpausing = false;
+                this->target_stop_time = 0;
+                this->timestep = 1;
+                this->stop_duration = 0;
+                stop_margin_counter = 0;
+            }
+            else { 
+                queued_cmd = 1;
+            }
 
         }
-        else if(plan_.has_data && !msg->data && paused){
-            momap::log()->info("Received continue command. Continuing plan.");
-            this->timestep = -1 * this->stop_duration; //how long unpausing should take
-            cout << "STOP DURATION: " << stop_duration << endl;
-            paused = false;
-            pausing = false;
-            unpausing = true;
+        else if(plan_.has_data && !msg->data){
+            if(paused){
+                momap::log()->info("Received continue command. Continuing plan.");
+                this->timestep = -1 * this->stop_duration; //how long unpausing should take
+                cout << "STOP DURATION: " << stop_duration << endl;
+                paused = false;
+                pausing = false;
+                unpausing = true;
+            }
+            else if(pausing){
+                queued_cmd = 2;
+            }
 
         }
         
