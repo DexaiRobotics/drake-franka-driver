@@ -480,7 +480,7 @@ private:
     }
 
     void QueuedCmd(){
-        bool_t msg;
+        robot_msgs::bool_t msg;
         msg.utime = get_current_utime();
         switch(queued_cmd){
             case 0 : return;
@@ -530,13 +530,14 @@ private:
                 }
                 else{
                     paused = true;
-                    QueuedCmd()
+                    QueuedCmd();
                 }
                 
                 
             } else if (unpausing) { //robot is unpausing
                 if (timestep >= 0) { //if robot has reached full speed again
                     unpausing = false;
+                    QueuedCmd();
                 }
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
