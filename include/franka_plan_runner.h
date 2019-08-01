@@ -209,6 +209,7 @@ private:
     long timestep;
     float target_stop_time;
     const float STOP_EPSILON = 0.033;
+    const float CONTINUE_SCALE = 2;
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
@@ -775,7 +776,7 @@ private:
         else if(plan_.has_data && !msg->data){
             if(paused){
                 momap::log()->info("Received continue command. Continuing plan.");
-                this->timestep = -1 * this->stop_duration; //how long unpausing should take
+                this->timestep = CONTINUE_SCALE * -1 * this->stop_duration; //how long unpausing should take
                 cout << "STOP DURATION: " << stop_duration << endl;
                 paused = false;
                 pausing = false;
