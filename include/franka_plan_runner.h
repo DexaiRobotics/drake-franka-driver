@@ -208,7 +208,7 @@ private:
     Eigen::MatrixXd joint_limits;
     long timestep;
     float target_stop_time;
-    const float STOP_EPSILON;
+    float stop_epsilon;
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
@@ -238,7 +238,7 @@ public:
         franka_time = 0.0; 
         max_accels = params.robot_max_accelerations;
 
-        STOP_EPSILON = params.stop_epsilon;
+        stop_epsilon = params.stop_epsilon;
         STOP_MARGIN = params.stop_margin;
 
         dracula = new Dracula(p);
@@ -526,7 +526,7 @@ private:
                 std::array<double,7> vel = robot_state.dq;
                 auto speed = du::v_to_e( ConvertToVector(vel)).norm();
                 //cout << "SPEED: " << speed << endl;
-                if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
+                if(new_stop >= period.toSec() * stop_epsilon){ // robot counts as "stopped" when new_stop is less than a fraction of period
                     this->stop_duration++;
                 }
                 else if(stop_margin_counter <= STOP_MARGIN){ // margin period after pause before robot is allowed to continue
