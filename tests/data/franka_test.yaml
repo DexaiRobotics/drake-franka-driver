@@ -91,6 +91,9 @@ parameters:
       - 7500
       - 10000
       - 10000
+  stop_epsilon: 0.015 # used to calculate when robot counts as "stopped"
+  stop_margin: 0.6    # how long robot sleeps before ready to recieve continue 
+  simulated: true
   robot_name: franka
   safe_z: 0.4
   splineType: FirstOrderHold
