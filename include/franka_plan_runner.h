@@ -508,7 +508,7 @@ private:
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = fabs(vel[i] / (this->max_accels[i])); //real world stop time ~2x stop_time in plan
+                        float stop_time = fabs(vel[i] / (this->max_accels[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
@@ -526,10 +526,10 @@ private:
                 std::array<double,7> vel = robot_state.dq;
                 auto speed = du::v_to_e( ConvertToVector(vel)).norm();
                 //cout << "SPEED: " << speed << endl;
-                if(new_stop >= period.toSec() * STOP_EPSILON){ // TODO MAKE THIS NOT A CONSTANT
+                if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
                     this->stop_duration++;
                 }
-                else if(stop_margin_counter <= STOP_MARGIN){
+                else if(stop_margin_counter <= STOP_MARGIN){ // margin period after pause before robot is allowed to continue
                     stop_margin_counter += period.toSec();
                 }
                 else{
@@ -759,8 +759,8 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(plan_.has_data && msg->data && !pausing){
-            if(!unpausing){
+        if(plan_.has_data && msg->data && !pausing){ //if pause command recieved
+            if(!unpausing){ //if robot isn't currently unpausing
                 momap::log()->info("Received pause command. Pausing plan.");
                 paused = false;
                 pausing = true;
@@ -770,13 +770,13 @@ private:
                 this->stop_duration = 0;
                 stop_margin_counter = 0;
             }
-            else { 
+            else { //if robot is currently unpausing, queue pause cmd
                 queued_cmd = 1;
             }
 
         }
-        else if(plan_.has_data && !msg->data){
-            if(paused){
+        else if(plan_.has_data && !msg->data){ //if unpause command recieved
+            if(paused){ //if robot is currently paused, run continue
                 momap::log()->info("Received continue command. Continuing plan.");
                 this->timestep = -1 * this->stop_duration; //how long unpausing should take
                 cout << "STOP DURATION: " << stop_duration << endl;
@@ -784,7 +784,7 @@ private:
                 pausing = false;
                 unpausing = true;
             }
-            else if(pausing){
+            else if(pausing){ //if robot is currently pausing, queue unpause cmd
                 queued_cmd = 2;
             }
 
