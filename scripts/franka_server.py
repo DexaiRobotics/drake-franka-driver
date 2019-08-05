@@ -64,7 +64,7 @@ if __name__ == '__main__':
     try:
         while True:
             rps.run()
-            rps.publish_state()
+#            rps.publish_state()
             time.sleep(1.0 / 30.0)
     except KeyboardInterrupt:
         print('interrupted!')
