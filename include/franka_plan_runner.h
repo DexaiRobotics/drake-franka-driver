@@ -514,18 +514,14 @@ private:
                         }
                     }
                     this->target_stop_time = temp_target_stop_time;
-		           // cout <<"TARGET: " << target_stop_time << endl;
+                    momap::log()->debug("TARGET: {}", target_stop_time);
                 }
 
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
-                //cout.precision(17);
-                //cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+                momap::log()->debug("STOP PERIOD: {}", new_stop);
                 timestep++;
 
-                std::array<double,7> vel = robot_state.dq;
-                auto speed = du::v_to_e( ConvertToVector(vel)).norm();
-                //cout << "SPEED: " << speed << endl;
                 if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
                     this->stop_duration++;
                 }
@@ -545,8 +541,7 @@ private:
                 }
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
-                //cout.precision(17);
-                //cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
+                momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
                 timestep++;
                 
             }
@@ -779,7 +774,7 @@ private:
             if(paused){ //if robot is currently paused, run continue
                 momap::log()->info("Received continue command. Continuing plan.");
                 this->timestep = -1 * this->stop_duration; //how long unpausing should take
-                cout << "STOP DURATION: " << stop_duration << endl;
+                momap::log()->debug("STOP DURATION: {}",stop_duration);
                 paused = false;
                 pausing = false;
                 unpausing = true;
