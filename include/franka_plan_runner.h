@@ -208,7 +208,7 @@ private:
     Eigen::MatrixXd joint_limits;
     long timestep;
     float target_stop_time;
-    const float STOP_EPSILON;
+    float STOP_EPSILON;
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
