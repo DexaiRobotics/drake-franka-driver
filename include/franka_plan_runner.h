@@ -217,7 +217,7 @@ private:
     std::atomic_bool unpausing;
     float STOP_MARGIN; 
     float stop_margin_counter = 0;
-    std::atomic<int> queued_cmd = 0; //0: None, 1: Pause, 2: Continue
+    int queued_cmd = 0; //0: None, 1: Pause, 2: Continue
     std::set <std::string> stop_set;  
 
 
@@ -487,21 +487,21 @@ private:
     }
 
     void QueuedCmd(){
-        // robot_msgs::pause_cmd msg;
-        // msg.utime = get_current_utime();
-        // switch(queued_cmd){
-        //     case 0 : return;
-        //     case 1 : msg.data = true; break;
-        //     case 2 : msg.data = false; break;
-        // }
-        // lcm_.publish(p.lcm_stop_channel, &msg);
-        // queued_cmd = 0;
+        robot_msgs::pause_cmd msg;
+        msg.utime = get_current_utime();
         switch(queued_cmd){
             case 0 : return;
-            case 1 : Pause(); break;
-            case 2 : Continue(); break;
+            case 1 : msg.data = true; break;
+            case 2 : msg.data = false; break;
         }
+        lcm_.publish(p.lcm_stop_channel, &msg);
         queued_cmd = 0;
+        // switch(queued_cmd){
+        //     case 0 : return;
+        //     case 1 : Pause(); break;
+        //     case 2 : Continue(); break;
+        // }
+        // queued_cmd = 0;
     }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
