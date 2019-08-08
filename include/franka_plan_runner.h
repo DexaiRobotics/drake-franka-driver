@@ -761,7 +761,7 @@ private:
         if(msg->data){ //if pause command recieved
             stop_set.insert(msg->source);
             momap::log()->info("Received pause from {}", msg->source);
-            if(stop_set.size() == 0 && !pausing){
+            if(!pausing){ //if this is first stop received
                 if(!unpausing){ //if robot isn't currently unpausing
                     momap::log()->info("Pausing plan.");
                     paused = false;
