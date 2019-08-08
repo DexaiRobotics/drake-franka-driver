@@ -798,7 +798,7 @@ private:
                 }
             }
             else {
-                momap::log()->info("Command rejected: No matching pause command", msg->source);
+                momap::log()->info("Continue command rejected: No matching pause command '{}'", msg->source);
             }
         }
     };
