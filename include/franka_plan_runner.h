@@ -487,21 +487,21 @@ private:
     }
 
     void QueuedCmd(){
-        // robot_msgs::pause_cmd msg;
-        // msg.utime = get_current_utime();
-        // switch(queued_cmd){
-        //     case 0 : return;
-        //     case 1 : msg.data = true; break;
-        //     case 2 : msg.data = false; break;
-        // }
-        // lcm_.publish(p.lcm_stop_channel, &msg);
-        // queued_cmd = 0;
+        robot_msgs::pause_cmd msg;
+        msg.utime = get_current_utime();
         switch(queued_cmd){
             case 0 : return;
-            case 1 : Pause(); break;
-            case 2 : Continue(); break;
+            case 1 : msg.data = true; break;
+            case 2 : msg.data = false; break;
         }
+        lcm_.publish(p.lcm_stop_channel, &msg);
         queued_cmd = 0;
+        // switch(queued_cmd){
+        //     case 0 : return;
+        //     case 1 : Pause(); break;
+        //     case 2 : Continue(); break;
+        // }
+        // queued_cmd = 0;
     }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
