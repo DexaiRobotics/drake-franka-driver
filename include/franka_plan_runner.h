@@ -758,9 +758,10 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::pause_cmd* msg) {
-        if(msg->data && !pausing){ //if pause command recieved
+        if(msg->data){ //if pause command recieved
+            stop_set.insert(msg->source);
             momap::log()->info("Received pause from {}", msg->source);
-            if(stop_set.size() == 0){
+            if(stop_set.size() == 0 && !pausing){
                 if(!unpausing){ //if robot isn't currently unpausing
                     momap::log()->info("Pausing plan.");
                     paused = false;
@@ -775,7 +776,7 @@ private:
                     queued_cmd = 1;
                 }
             }
-            stop_set.insert(msg->source);
+            
         }
         else if(!msg->data){ //if unpause command recieved
             momap::log()->info("Received continue from {}", msg->source);

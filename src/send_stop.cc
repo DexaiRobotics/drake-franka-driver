@@ -14,8 +14,17 @@ int64_t get_current_utime() {
 }
 
 
-int main()
-{
+int main(int argc, char** argv)
+{	
+	std::string channel_name;
+	if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <robot letter>" << std::endl;
+        return -1;
+    }
+    else {
+        channel_name.append("FRANKA_").append(argv[1]).append("_STOP");
+    }
+
 	lcm::LCM lcm("udpm://239.255.76.67:7667?ttl=2");
 	if(!lcm.good()) return 1;
 	while(1){
@@ -38,7 +47,7 @@ int main()
 		else{
 			continue;
 		}
-		lcm.publish("FRANKA_K_STOP", &cmd);
+		lcm.publish(channel_name, &cmd);
 		
 	}
 	return 0;
