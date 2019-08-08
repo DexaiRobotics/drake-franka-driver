@@ -42,6 +42,7 @@ void FrankaPlanRunner::MultibodySetUp(drake::multibody::MultibodyPlant<double> &
 
 franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::RobotState& robot_state, franka::Duration period){
     std::array<double, 7> output = robot_state.tau_J; // TODO: initialize to something else
+    std::cout<< "enter invdyn callback";
     if ( plan_.mutex.try_lock() ) {
         // we got the lock, so try and do stuff.
         // momap::log()->info("got the lock!");
