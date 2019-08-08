@@ -487,7 +487,7 @@ private:
     }
 
     void QueuedCmd(){
-        robot_msgs::bool_t msg;
+        robot_msgs::pause_cmd msg;
         msg.utime = get_current_utime();
         switch(queued_cmd){
             case 0 : return;
@@ -759,7 +759,9 @@ private:
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::pause_cmd* msg) {
         if(msg->data){ //if pause command recieved
-            stop_set.insert(msg->source);
+            if(msg->source != ""){
+                stop_set.insert(msg->source);
+            }
             momap::log()->info("Received pause from {}", msg->source);
             if(!pausing){ //if this is first stop received
                 if(!unpausing){ //if robot isn't currently unpausing
@@ -780,8 +782,11 @@ private:
         }
         else if(!msg->data){ //if unpause command recieved
             momap::log()->info("Received continue from {}", msg->source);
-            if(stop_set.find(msg->source) != stop_set.end()) {
-                stop_set.erase(msg->source);
+            if(stop_set.find(msg->source) != stop_set.end() || msg->source == "") { //force continue if msg->source is empty, in order for queue to work
+                if(stop_set.find(msg->source) != stop_set.end()){
+                   stop_set.erase(msg->source); 
+                }
+                
 
                 if(stop_set.size() == 0){
                     if(paused){ //if robot is currently paused, run continue
@@ -802,7 +807,7 @@ private:
             }
         }
     };
-
+    
         
 };
 } // robot_plan_runner
