@@ -17,6 +17,7 @@
 #include <math.h>
 #include <array>
 #include <atomic>
+#include <set>
 
 #include <cassert>
 #include <cmath>
@@ -67,6 +68,7 @@
 // #include <momap/momap_robot_plan_v1.h>
 #include <lcmtypes/robot_spline_t.hpp>
 #include <robot_msgs/bool_t.hpp>
+#include <robot_msgs/pause_cmd.hpp>
 
 #include "trajectory_solver.h"
 #include "momap/momap_log.h"
@@ -215,7 +217,9 @@ private:
     std::atomic_bool unpausing;
     float STOP_MARGIN; 
     float stop_margin_counter = 0;
-    int queued_cmd = 0; //0: None, 1: Pause, 2: Continue 
+    int queued_cmd = 0; //0: None, 1: Pause, 2: Continue
+    set<string> stop_set;  
+
 
     Eigen::VectorXd starting_conf;
     std::array<double, 7> starting_franka_q; 
@@ -753,39 +757,48 @@ private:
     };
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
-        const robot_msgs::bool_t* msg) {
+        const robot_msgs::pause_cmd* msg) {
         if(msg->data && !pausing){ //if pause command recieved
-            if(!unpausing){ //if robot isn't currently unpausing
-                momap::log()->info("Received pause command. Pausing plan.");
-                paused = false;
-                pausing = true;
-                unpausing = false;
-                this->target_stop_time = 0;
-                this->timestep = 1;
-                this->stop_duration = 0;
-                stop_margin_counter = 0;
+            momap::log()->info("Received pause from {}", msg->source);
+            if(stop_set.size() == 0){
+                if(!unpausing){ //if robot isn't currently unpausing
+                    momap::log()->info("Pausing plan.");
+                    paused = false;
+                    pausing = true;
+                    unpausing = false;
+                    this->target_stop_time = 0;
+                    this->timestep = 1;
+                    this->stop_duration = 0;
+                    stop_margin_counter = 0;
+                }
+                else { //if robot is currently unpausing, queue pause cmd
+                    queued_cmd = 1;
+                }
             }
-            else { //if robot is currently unpausing, queue pause cmd
-                queued_cmd = 1;
-            }
-
+            stop_set.insert(msg->source);
         }
         else if(!msg->data){ //if unpause command recieved
-            if(paused){ //if robot is currently paused, run continue
-                momap::log()->info("Received continue command. Continuing plan.");
-                this->timestep = -1 * this->stop_duration; //how long unpausing should take
-                momap::log()->debug("STOP DURATION: {}",stop_duration);
-                paused = false;
-                pausing = false;
-                unpausing = true;
+            momap::log()->info("Received continue from {}", msg->source);
+            try {
+                stop_set.erase(msg->source);
             }
-            else if(pausing){ //if robot is currently pausing, queue unpause cmd
-                queued_cmd = 2;
+            catch { 
+                return
             }
-
+            if(stop_set.size() == 0){
+                if(paused){ //if robot is currently paused, run continue
+                    momap::log()->info("Continuing plan.");
+                    this->timestep = -1 * this->stop_duration; //how long unpausing should take
+                    momap::log()->debug("STOP DURATION: {}",stop_duration);
+                    paused = false;
+                    pausing = false;
+                    unpausing = true;
+                }
+                else if(pausing){ //if robot is currently pausing, queue unpause cmd
+                    queued_cmd = 2;
+                }
+            }
         }
-        
-
     };
 
         

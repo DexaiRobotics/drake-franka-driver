@@ -1,0 +1,10 @@
+package robot_msgs;
+
+
+struct pause_cmd
+{
+    // microseconds since the epoch
+    int64_t  utime;
+    boolean  data;
+    string source;
+}
