@@ -45,44 +45,12 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
     if ( plan_.mutex.try_lock() ) {
         // we got the lock, so try and do stuff.
         // momap::log()->info("got the lock!");
-
-        if (plan_.paused) {
-            if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
-                std::array<double,7> vel = robot_state.dq;
-                float temp_target_stop_time = 0;
-                for (int i = 0; i < 7; i++) {
-                    float stop_time = vel[i] / this->max_accels[i];
-                    if(stop_time > temp_target_stop_time){
-                        temp_target_stop_time = stop_time;
-                    }
-                }
-                this->target_stop_time = temp_target_stop_time;
-                this->stop_epsilon = period.toSec() / STOP_EPSILON;
-            }
-
-            double new_stop = StopPeriod(period.toSec());
-            franka_time += new_stop;
-            // cout.precision(17);
-            // cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
-            timestep++;
-            if(new_stop > this->stop_epsilon){
-                this->stop_duration++;
-            }
-        } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
-            if (timestep >= 0) { //if robot has reached full speed again
-                std::unique_lock<std::mutex> lck(plan_.mutex);
-                plan_.unpausing = false;
-            }
-            double new_stop = StopPeriod(period.toSec());
-            franka_time += new_stop;
-            // cout.precision(17);
-            // cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
-            timestep++;
-
-        } else {
-            franka_time += period.toSec();
+        FrankaPlanRunner::check_franka_pause();
+        if (robot_data_.mutex.try_lock()) {
+            robot_data_.has_data = true;
+            robot_data_.robot_state = robot_state;
+            robot_data_.mutex.unlock();
         }
-
 
         //below is inverseDynamics code
         const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints);
@@ -138,7 +106,6 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
     momap::log()->debug("returning at end of callback");
     return output;
 }
-
 }  // namespace robot_plan_runner
 }  // namespace drake
 

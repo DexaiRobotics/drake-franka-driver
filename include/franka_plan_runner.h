@@ -58,14 +58,11 @@
 #include <franka/robot.h>
 #include <franka/duration.h>
 #include <franka/rate_limiting.h>
-#include <franka/model.h>
 
 #include "examples_common.h"
 
 #include <iostream>
 #include <memory>
-#include <chrono>
-#include <ctime>
 
 // #include <momap/momap_robot_plan_v1.h>
 #include <lcmtypes/robot_spline_t.hpp>
@@ -111,8 +108,6 @@ struct RobotPiecewisePolynomial {
     int64_t utime;
     std::unique_ptr<PiecewisePolynomial<double>> plan;
     int64_t end_time_us;
-    bool paused;
-    bool unpausing;
 };
 
 template <typename T, std::size_t SIZE>
@@ -186,6 +181,7 @@ int64_t get_current_utime() {
     int64_t current_utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
     return current_utime;
 }
+
 
 class FrankaPlanRunner {
 private:
@@ -494,6 +490,69 @@ private:
         return (current_time - prev_time);
     }
 
+    void QueuedCmd(){
+        robot_msgs::bool_t msg;
+        msg.utime = get_current_utime();
+        switch(queued_cmd){
+            case 0 : return;
+            case 1 : msg.data = true; break;
+            case 2 : msg.data = false; break;
+        }
+        lcm_.publish(p.lcm_stop_channel, &msg);
+        queued_cmd = 0;
+    }
+
+    ///
+    /// function that is part of callbacks. purpose : to check time and pausing status
+    ///
+    void check_franka_pause(){
+        if (pausing) {
+            if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
+                std::array<double,7> vel = robot_state.dq;
+                float temp_target_stop_time = 0;
+                for (int i = 0; i < 7; i++) {
+                    float stop_time = fabs(vel[i] / (this->max_accels[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
+                    if(stop_time > temp_target_stop_time){
+                        temp_target_stop_time = stop_time;
+                    }
+                }
+                this->target_stop_time = temp_target_stop_time;
+                momap::log()->debug("TARGET: {}", target_stop_time);
+            }
+
+            double new_stop = StopPeriod(period.toSec());
+            franka_time += new_stop;
+            momap::log()->debug("STOP PERIOD: {}", new_stop);
+            timestep++;
+
+            if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
+                this->stop_duration++;
+            }
+            else if(stop_margin_counter <= STOP_MARGIN){ // margin period after pause before robot is allowed to continue
+                stop_margin_counter += period.toSec();
+            }
+            else{
+                paused = true;
+                QueuedCmd();
+            }
+
+
+        } else if (unpausing) { //robot is unpausing
+            if (timestep >= 0) { //if robot has reached full speed again
+                unpausing = false;
+                QueuedCmd();
+            }
+            double new_stop = StopPeriod(period.toSec());
+            franka_time += new_stop;
+            momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
+            timestep++;
+
+        }
+        else {
+            franka_time += period.toSec();
+        }
+    }
+
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
                                                 , franka::Duration period
     ) {
@@ -747,25 +806,35 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(plan_.has_data && msg->data && !plan_.paused){
-            momap::log()->info("Received pause command. Pausing plan.");
-            std::unique_lock<std::mutex> lck(plan_.mutex);
-            plan_.paused = true;
-            plan_.mutex.unlock();
-
-            this->target_stop_time = 0;
-            this->timestep = 1;
-            this->stop_duration = 0;
+        if(plan_.has_data && msg->data && !pausing){ //if pause command recieved
+            if(!unpausing){ //if robot isn't currently unpausing
+                momap::log()->info("Received pause command. Pausing plan.");
+                paused = false;
+                pausing = true;
+                unpausing = false;
+                this->target_stop_time = 0;
+                this->timestep = 1;
+                this->stop_duration = 0;
+                stop_margin_counter = 0;
+            }
+            else { //if robot is currently unpausing, queue pause cmd
+                queued_cmd = 1;
+            }
 
         }
-        else if(plan_.has_data && !msg->data && plan_.paused){
-            momap::log()->info("Received continue command. Continuing plan.");
-            this->timestep = -1 * this->stop_duration; //how long unpausing should take
-            // cout << "STOP DURATION: " << stop_duration << endl;
-            std::unique_lock<std::mutex> lck(plan_.mutex);
-            plan_.paused = false;
-            plan_.unpausing = true;
-            plan_.mutex.unlock();
+        else if(plan_.has_data && !msg->data){ //if unpause command recieved
+            if(paused){ //if robot is currently paused, run continue
+                momap::log()->info("Received continue command. Continuing plan.");
+                this->timestep = -1 * this->stop_duration; //how long unpausing should take
+                momap::log()->debug("STOP DURATION: {}",stop_duration);
+                paused = false;
+                pausing = false;
+                unpausing = true;
+            }
+            else if(pausing){ //if robot is currently pausing, queue unpause cmd
+                queued_cmd = 2;
+            }
+
         }
 
 
