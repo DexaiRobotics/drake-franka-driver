@@ -208,18 +208,23 @@ private:
     Eigen::MatrixXd joint_limits;
     long timestep;
     float target_stop_time;
-    const float STOP_EPSILON = 20; //make this a yaml parameter
-    float stop_epsilon;
+    float STOP_EPSILON;
     float stop_duration;
+    std::atomic_bool pausing;
+    std::atomic_bool paused;
+    std::atomic_bool unpausing;
+    float STOP_MARGIN;
+    float stop_margin_counter = 0;
+    int queued_cmd = 0; //0: None, 1: Pause, 2: Continue
+
     Eigen::VectorXd starting_conf;
     std::array<double, 7> starting_franka_q;
-    Eigen::VectorXd integral_error; //make sure this doesn't get destroyed after each call of callback - ask sprax
 
     // for inv dynamics :
     bool run_inverse_dynamics_;
     std::unique_ptr<drake::systems::Context<double>> mb_plant_context_; // for multibody plants
     drake::multibody::MultibodyPlant<double> mb_plant_ ;
-
+    Eigen::VectorXd integral_error;
     // PiecewisePolynomial<double> ref_vd_;// = plan_.plan->derivative(2); // might move this into setup
 
     // Set print rate for comparing commanded vs. measured torques.
@@ -237,6 +242,9 @@ public:
         franka_time = 0.0;
         max_accels = params.robot_max_accelerations;
 
+        STOP_EPSILON = params.stop_epsilon;
+        STOP_MARGIN = params.stop_margin;
+
         dracula = new Dracula(p);
         joint_limits = dracula->GetCS()->GetJointLimits();
         momap::log()->info("Joint limits: {}", joint_limits.transpose());
@@ -246,6 +254,11 @@ public:
         start_time_us = -1;
         sign_ = +1;
 
+        pausing = false;
+        paused = false;
+        unpausing = false;
+
+
         starting_franka_q = {{0,0,0,0,0,0,0}};
         starting_conf = Eigen::VectorXd::Zero(kNumJoints);
 
@@ -253,8 +266,6 @@ public:
         plan_.plan.release();
         plan_.utime = -1;
         plan_.end_time_us = 0;
-        plan_.paused = false;
-        plan_.unpausing = false;
         momap::log()->info("Plan channel: {}", p.lcm_plan_channel);
         momap::log()->info("Stop channel: {}", p.lcm_stop_channel);
         momap::log()->info("Plan received channel: {}", p.lcm_plan_received_channel);
@@ -262,6 +273,7 @@ public:
         momap::log()->info("Status channel: {}", p.lcm_status_channel);
 
     };
+
 
     ~FrankaPlanRunner() {
         // if (lcm_publish_status_thread.joinable()) {
@@ -505,53 +517,53 @@ private:
     ///
     /// function that is part of callbacks. purpose : to check time and pausing status
     ///
-    void check_franka_pause(){
-        if (pausing) {
-            if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
-                std::array<double,7> vel = robot_state.dq;
-                float temp_target_stop_time = 0;
-                for (int i = 0; i < 7; i++) {
-                    float stop_time = fabs(vel[i] / (this->max_accels[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
-                    if(stop_time > temp_target_stop_time){
-                        temp_target_stop_time = stop_time;
-                    }
-                }
-                this->target_stop_time = temp_target_stop_time;
-                momap::log()->debug("TARGET: {}", target_stop_time);
-            }
+    // void check_franka_pause(){
+        // if (pausing) {
+        //     if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
+        //         std::array<double,7> vel = robot_state.dq;
+        //         float temp_target_stop_time = 0;
+        //         for (int i = 0; i < 7; i++) {
+        //             float stop_time = fabs(vel[i] / (this->max_accels[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
+        //             if(stop_time > temp_target_stop_time){
+        //                 temp_target_stop_time = stop_time;
+        //             }
+        //         }
+        //         this->target_stop_time = temp_target_stop_time;
+        //         momap::log()->debug("TARGET: {}", target_stop_time);
+        //     }
 
-            double new_stop = StopPeriod(period.toSec());
-            franka_time += new_stop;
-            momap::log()->debug("STOP PERIOD: {}", new_stop);
-            timestep++;
+        //     double new_stop = StopPeriod(period.toSec());
+        //     franka_time += new_stop;
+        //     momap::log()->debug("STOP PERIOD: {}", new_stop);
+        //     timestep++;
 
-            if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
-                this->stop_duration++;
-            }
-            else if(stop_margin_counter <= STOP_MARGIN){ // margin period after pause before robot is allowed to continue
-                stop_margin_counter += period.toSec();
-            }
-            else{
-                paused = true;
-                QueuedCmd();
-            }
+        //     if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
+        //         this->stop_duration++;
+        //     }
+        //     else if(stop_margin_counter <= STOP_MARGIN){ // margin period after pause before robot is allowed to continue
+        //         stop_margin_counter += period.toSec();
+        //     }
+        //     else{
+        //         paused = true;
+        //         QueuedCmd();
+        //     }
 
 
-        } else if (unpausing) { //robot is unpausing
-            if (timestep >= 0) { //if robot has reached full speed again
-                unpausing = false;
-                QueuedCmd();
-            }
-            double new_stop = StopPeriod(period.toSec());
-            franka_time += new_stop;
-            momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
-            timestep++;
+        // } else if (unpausing) { //robot is unpausing
+        //     if (timestep >= 0) { //if robot has reached full speed again
+        //         unpausing = false;
+        //         QueuedCmd();
+        //     }
+        //     double new_stop = StopPeriod(period.toSec());
+        //     franka_time += new_stop;
+        //     momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
+        //     timestep++;
 
-        }
-        else {
-            franka_time += period.toSec();
-        }
-    }
+        // }
+        // else {
+        //     franka_time += period.toSec();
+        // }
+    // }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
                                                 , franka::Duration period
@@ -562,37 +574,45 @@ private:
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
 
-            if (plan_.paused) {
+            if (pausing) {
                 if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
                     std::array<double,7> vel = robot_state.dq;
                     float temp_target_stop_time = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = vel[i] / this->max_accels[i];
+                        float stop_time = fabs(vel[i] / (this->max_accels[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
                         if(stop_time > temp_target_stop_time){
                             temp_target_stop_time = stop_time;
                         }
                     }
                     this->target_stop_time = temp_target_stop_time;
-                    this->stop_epsilon = period.toSec() / STOP_EPSILON;
+                    momap::log()->debug("TARGET: {}", target_stop_time);
                 }
 
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
-                // cout.precision(17);
-                // cout << "S - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << endl;
+                momap::log()->debug("STOP PERIOD: {}", new_stop);
                 timestep++;
-                if(new_stop > this->stop_epsilon){
+
+                if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
                     this->stop_duration++;
                 }
-            } else if (!plan_.paused && plan_.unpausing) { //robot is unpausing
+                else if(stop_margin_counter <= STOP_MARGIN){ // margin period after pause before robot is allowed to continue
+                    stop_margin_counter += period.toSec();
+                }
+                else{
+                    paused = true;
+                    QueuedCmd();
+                }
+
+
+            } else if (unpausing) { //robot is unpausing
                 if (timestep >= 0) { //if robot has reached full speed again
-                    std::unique_lock<std::mutex> lck(plan_.mutex);
-                    plan_.unpausing = false;
+                    unpausing = false;
+                    QueuedCmd();
                 }
                 double new_stop = StopPeriod(period.toSec());
                 franka_time += new_stop;
-                // cout.precision(17);
-                // cout << "C - OG PERIOD: " << period.toSec() << "  PERIOD: " << fixed << new_stop << " " << this->target_stop_time << " " << this->timestep << endl;
+                momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
                 timestep++;
 
             }
@@ -794,7 +814,6 @@ private:
         plan_.plan.release();
         plan_.plan.reset(&piecewise_polynomial);
         plan_.has_data = true;
-        plan_.paused = false;
 
 
         ++plan_number_;
@@ -839,6 +858,7 @@ private:
 
 
     };
+
     ///
     /// creates multibody plant and its context
     /// param : mb_plant_ : is member of franka_plan_runner class, multibodyplant for calcinvdyn

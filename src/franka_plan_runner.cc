@@ -45,7 +45,54 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
     if ( plan_.mutex.try_lock() ) {
         // we got the lock, so try and do stuff.
         // momap::log()->info("got the lock!");
-        FrankaPlanRunner::check_franka_pause();
+        // FrankaPlanRunner::check_franka_pause();
+
+        if (pausing) {
+            if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
+                std::array<double,7> vel = robot_state.dq;
+                float temp_target_stop_time = 0;
+                for (int i = 0; i < 7; i++) {
+                    float stop_time = fabs(vel[i] / (this->max_accels[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
+                    if(stop_time > temp_target_stop_time){
+                        temp_target_stop_time = stop_time;
+                    }
+                }
+                this->target_stop_time = temp_target_stop_time;
+                momap::log()->debug("TARGET: {}", target_stop_time);
+            }
+
+            double new_stop = StopPeriod(period.toSec());
+            franka_time += new_stop;
+            momap::log()->debug("STOP PERIOD: {}", new_stop);
+            timestep++;
+
+            if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
+                this->stop_duration++;
+            }
+            else if(stop_margin_counter <= STOP_MARGIN){ // margin period after pause before robot is allowed to continue
+                stop_margin_counter += period.toSec();
+            }
+            else{
+                paused = true;
+                QueuedCmd();
+            }
+
+
+        } else if (unpausing) { //robot is unpausing
+            if (timestep >= 0) { //if robot has reached full speed again
+                unpausing = false;
+                QueuedCmd();
+            }
+            double new_stop = StopPeriod(period.toSec());
+            franka_time += new_stop;
+            momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
+            timestep++;
+
+        }
+        else {
+            franka_time += period.toSec();
+        }
+
         if (robot_data_.mutex.try_lock()) {
             robot_data_.has_data = true;
             robot_data_.robot_state = robot_state;
