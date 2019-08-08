@@ -382,7 +382,7 @@ private:
             while(true){
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
-                    if (plan_.has_data) {
+                    if (plan_.has_data && !paused) {
                         robot.control(joint_position_callback); //impedance_control_callback
                     } else {
                         // publish robot_status
@@ -754,7 +754,7 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::bool_t* msg) {
-        if(plan_.has_data && msg->data && !pausing){ //if pause command recieved
+        if(msg->data && !pausing){ //if pause command recieved
             if(!unpausing){ //if robot isn't currently unpausing
                 momap::log()->info("Received pause command. Pausing plan.");
                 paused = false;
@@ -770,7 +770,7 @@ private:
             }
 
         }
-        else if(plan_.has_data && !msg->data){ //if unpause command recieved
+        else if(!msg->data){ //if unpause command recieved
             if(paused){ //if robot is currently paused, run continue
                 momap::log()->info("Received continue command. Continuing plan.");
                 this->timestep = -1 * this->stop_duration; //how long unpausing should take
