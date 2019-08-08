@@ -217,7 +217,7 @@ private:
     std::atomic_bool unpausing;
     float STOP_MARGIN; 
     float stop_margin_counter = 0;
-    std::atomic_int queued_cmd = 0; //0: None, 1: Pause, 2: Continue
+    std::atomic<int> queued_cmd = 0; //0: None, 1: Pause, 2: Continue
     std::set <std::string> stop_set;  
 
 
