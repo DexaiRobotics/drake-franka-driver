@@ -501,6 +501,7 @@ private:
             case 1 : Pause(); break;
             case 2 : Continue(); break;
         }
+        queued_cmd = 0;
     }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
