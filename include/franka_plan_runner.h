@@ -218,7 +218,7 @@ private:
     float STOP_MARGIN; 
     float stop_margin_counter = 0;
     int queued_cmd = 0; //0: None, 1: Pause, 2: Continue
-    set<string> stop_set;  
+    std::set <std::string> stop_set;  
 
 
     Eigen::VectorXd starting_conf;
@@ -779,23 +779,21 @@ private:
         }
         else if(!msg->data){ //if unpause command recieved
             momap::log()->info("Received continue from {}", msg->source);
-            try {
+            if(stop_set.find(msg->source) != stop_set.end()) {
                 stop_set.erase(msg->source);
-            }
-            catch { 
-                return
-            }
-            if(stop_set.size() == 0){
-                if(paused){ //if robot is currently paused, run continue
-                    momap::log()->info("Continuing plan.");
-                    this->timestep = -1 * this->stop_duration; //how long unpausing should take
-                    momap::log()->debug("STOP DURATION: {}",stop_duration);
-                    paused = false;
-                    pausing = false;
-                    unpausing = true;
-                }
-                else if(pausing){ //if robot is currently pausing, queue unpause cmd
-                    queued_cmd = 2;
+
+                if(stop_set.size() == 0){
+                    if(paused){ //if robot is currently paused, run continue
+                        momap::log()->info("Continuing plan.");
+                        this->timestep = -1 * this->stop_duration; //how long unpausing should take
+                        momap::log()->debug("STOP DURATION: {}",stop_duration);
+                        paused = false;
+                        pausing = false;
+                        unpausing = true;
+                    }
+                    else if(pausing){ //if robot is currently pausing, queue unpause cmd
+                        queued_cmd = 2;
+                    }
                 }
             }
         }

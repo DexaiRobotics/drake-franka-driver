@@ -1,6 +1,7 @@
 #include <iostream>
 #include "lcm/lcm-cpp.hpp"
 #include <robot_msgs/bool_t.hpp>
+#include <robot_msgs/pause_cmd.hpp>
 #include <sys/time.h>
 
 using namespace std;
@@ -18,22 +19,26 @@ int main()
 	lcm::LCM lcm("udpm://239.255.76.67:7667?ttl=2");
 	if(!lcm.good()) return 1;
 	while(1){
-		robot_msgs::bool_t cmd;
+		robot_msgs::pause_cmd cmd;
 		string a;
+		string b;
 		cout << "Enter cmd: ";
 		cin >> a;
+		cin >> b;
 		cmd.utime = get_current_utime();
 		if(a == "s"){
 			cmd.data = true;
+			cmd.source = b;
 			cout << "published STOP\n";
 		} else if(a == "c"){
 			cmd.data = false;
+			cmd.source = b;
 			cout << "published CONTINUE\n";
 		}
 		else{
 			continue;
 		}
-		lcm.publish("FRANKA_G_STOP", &cmd);
+		lcm.publish("FRANKA_K_STOP", &cmd);
 		
 	}
 	return 0;
