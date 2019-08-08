@@ -487,15 +487,20 @@ private:
     }
 
     void QueuedCmd(){
-        robot_msgs::pause_cmd msg;
-        msg.utime = get_current_utime();
+        // robot_msgs::pause_cmd msg;
+        // msg.utime = get_current_utime();
+        // switch(queued_cmd){
+        //     case 0 : return;
+        //     case 1 : msg.data = true; break;
+        //     case 2 : msg.data = false; break;
+        // }
+        // lcm_.publish(p.lcm_stop_channel, &msg);
+        // queued_cmd = 0;
         switch(queued_cmd){
             case 0 : return;
-            case 1 : msg.data = true; break;
-            case 2 : msg.data = false; break;
+            case 1 : Pause(); break;
+            case 2 : Continue(); break;
         }
-        lcm_.publish(p.lcm_stop_channel, &msg);
-        queued_cmd = 0;
     }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
@@ -765,14 +770,7 @@ private:
             momap::log()->info("Received pause from {}", msg->source);
             if(!pausing){ //if this is first stop received
                 if(!unpausing){ //if robot isn't currently unpausing
-                    momap::log()->info("Pausing plan.");
-                    paused = false;
-                    pausing = true;
-                    unpausing = false;
-                    this->target_stop_time = 0;
-                    this->timestep = 1;
-                    this->stop_duration = 0;
-                    stop_margin_counter = 0;
+                    Pause();
                 }
                 else { //if robot is currently unpausing, queue pause cmd
                     queued_cmd = 1;
@@ -790,12 +788,7 @@ private:
 
                 if(stop_set.size() == 0){
                     if(paused){ //if robot is currently paused, run continue
-                        momap::log()->info("Continuing plan.");
-                        this->timestep = -1 * this->stop_duration; //how long unpausing should take
-                        momap::log()->debug("STOP DURATION: {}",stop_duration);
-                        paused = false;
-                        pausing = false;
-                        unpausing = true;
+                        Continue();
                     }
                     else if(pausing){ //if robot is currently pausing, queue unpause cmd
                         queued_cmd = 2;
@@ -807,8 +800,26 @@ private:
             }
         }
     };
-    
-        
+
+    void Pause(){
+        momap::log()->info("Pausing plan.");
+        paused = false;
+        pausing = true;
+        unpausing = false;
+        this->target_stop_time = 0;
+        this->timestep = 1;
+        this->stop_duration = 0;
+        stop_margin_counter = 0;
+    }
+
+    void Continue(){
+        momap::log()->info("Continuing plan.");
+        this->timestep = -1 * this->stop_duration; //how long unpausing should take
+        momap::log()->debug("STOP DURATION: {}",stop_duration);
+        paused = false;
+        pausing = false;
+        unpausing = true;
+    }
 };
 } // robot_plan_runner
 } // drake
