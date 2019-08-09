@@ -160,14 +160,26 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
                         tau[4], tau[5],
                         tau[6] }};
             // throw std::exception(); // stops robot before actually sending output
-            if (franka_time > 100*plan_.plan->end_time()) {
-                plan_.plan.release();
-                plan_.has_data = false;
-                // plan_.utime = -1;
-                plan_.mutex.unlock();
+            // where we are now
+            Eigen::VectorXd current_conf = du::v_to_e( ConvertToVector(robot_state.q));
+            // where we want to go
+            Eigen::VectorXd desired_end_conf = plan_.plan->value(plan_.plan->end_time());
+            // norm distance from desired_end_conf
+            double dist_from_end = (current_conf - desired_end_conf).norm();
+            if (franka_time > plan_.plan->end_time()) {
+                if (dist_from_end < 0.007) {
+                    plan_.plan.release();
+                    plan_.has_data = false;
+                    // plan_.utime = -1;
+                    plan_.mutex.unlock();
 
-                PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-                return franka::MotionFinished(output);
+                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                    return franka::MotionFinished(output);
+                } else {
+                    momap::log()->info("Plan running overtime and not converged, dist: {}",
+                                       dist_from_end);
+                }
+
             }
         }
         plan_.mutex.unlock();
