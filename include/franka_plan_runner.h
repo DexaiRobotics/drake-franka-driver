@@ -232,6 +232,9 @@ private:
     double franka_time;
     Eigen::VectorXd max_accels;
 
+    Eigen::Matrix<double, 7, 1> pos_start;
+    bool runonce = true;
+
 public:
     FrankaPlanRunner(const parameters::Parameters params)
     : p(params), ip_addr_(params.robot_ip), plan_number_(0),
