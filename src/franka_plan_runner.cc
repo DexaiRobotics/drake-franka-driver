@@ -121,6 +121,8 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             Eigen::VectorXd desired_vd = Eigen::VectorXd::Zero(kNumJoints);
             // Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_desired(robot_state.q_d.data());
             Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_actual(robot_state.q.data());
+
+            //Robert : for testing can maintain one position
             if(runonce){
                 pos_start = pos_actual;
                 momap::log()->info("set pos_start to = {}", pos_start);
@@ -133,6 +135,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             Eigen::Map<const Eigen::Matrix<double, 7, 1> > vel_actual(robot_state.dq.data());
             // auto t1 = std::chrono::system_clock::now(); // for timing purposes
             // TODO : FIX SEGFAULT FOR REF_VD INITIALIZE/INSTANTIATE
+            // TODO : need ref_vd because doing the derivative of polynomial in realtime to get ref acceleration is too slow and takes 2.3 ms
             // desired_vd = ref_vd_.value(franka_time) +
             desired_vd = kp.cwiseProduct(pos_desired - pos_actual)+ kd.cwiseProduct(vel_desired - vel_actual) + ki.cwiseProduct(integral_error) ;
             // for gravity compensation, desired_vd should be zero

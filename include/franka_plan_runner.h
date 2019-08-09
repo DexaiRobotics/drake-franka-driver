@@ -875,6 +875,8 @@ private:
 
     ///
     /// callback for inverse dynamics control
+    /// TODO :make kp,ki,kd part of the yaml
+    /// TO NOTE: when testing, it seemed that joint 0 was much more reactive than all the other joints
     ///
     franka::Torques InverseDynamicsControlCallback(const franka::RobotState& robot_state, franka::Duration period);
 
