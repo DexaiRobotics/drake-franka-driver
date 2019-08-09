@@ -803,7 +803,8 @@ private:
         {
             if (!du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
             {
-                momap::log()->info("Discarding plan, mismatched start position.");
+                momap::log()->info("Discarding plan, mismatched start position {} vs robot_q {}.",
+                                    commanded_start(joint), robot_data_.robot_state.q[joint] );
                 plan_.has_data = false;
                 plan_.plan.release();
                 plan_.mutex.unlock();
