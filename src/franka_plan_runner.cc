@@ -41,7 +41,7 @@ void FrankaPlanRunner::MultibodySetUp(drake::multibody::MultibodyPlant<double> &
 }
 
 franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::RobotState& robot_state, franka::Duration period){
-    std::array<double, 7> output = robot_state.tau_J; // TODO: initialize to something else
+    franka::Torques output = robot_state.tau_J; // TODO: initialize to something else
     momap::log()->debug("entering callback");
     if ( plan_.mutex.try_lock() ) {
         // we got the lock, so try and do stuff.
@@ -149,24 +149,18 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
                         tau[6] }};
             // throw std::exception(); // stops robot before actually sending output
             if (franka_time > plan_.plan->end_time()) {
-                if (error < 0.007) { // TODO: replace with non arbitrary number
-                    franka::JointPositions ret_val = current_conf;
-                    std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
-                    plan_.plan.release();
-                    plan_.has_data = false;
-                    // plan_.utime = -1;
-                    plan_.mutex.unlock();
+                plan_.plan.release();
+                plan_.has_data = false;
+                // plan_.utime = -1;
+                plan_.mutex.unlock();
 
-                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-                    // return output;
-                    // plan_.mutex.unlock();
-                    return franka::MotionFinished(output);
-                }
-                else {
-                    momap::log()->info("Plan running overtime and not converged, error: {}", error);
-                    // momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
-                    // momap::log()->info("q_d: {}", desired_next.transpose());
-                }
+                PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                // return output;
+                // plan_.mutex.unlock();
+                return franka::MotionFinished(output);
+                momap::log()->info("Plan running overtime and not converged, error: {}", error);
+                // momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
+                // momap::log()->info("q_d: {}", desired_next.transpose());
             }
         }
         plan_.mutex.unlock();
