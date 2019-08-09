@@ -119,14 +119,13 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             if(franka_time == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
 
             Eigen::VectorXd desired_vd = Eigen::VectorXd::Zero(kNumJoints);
-            Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_desired(robot_state.q_d.data());
-
+            // Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_desired(robot_state.q_d.data());
             Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_actual(robot_state.q.data());
             if(runonce){
                 pos_start = pos_actual;
                 runonce = false;
             }
-            pos_desired = pos_start;
+            Eigen::Matrix<double, 7, 1> pos_desired = pos_start;
 
             integral_error += pos_desired - pos_actual;
             Eigen::Map<const Eigen::Matrix<double, 7, 1> > vel_desired(robot_state.dq_d.data());
