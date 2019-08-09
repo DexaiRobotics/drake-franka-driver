@@ -93,6 +93,18 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             franka_time += period.toSec();
         }
 
+        if (plan_.plan && plan_number_ != cur_plan_number) {
+            momap::log()->info("Starting new plan at {} s.", franka_time);
+            start_time_us = cur_time_us; // implies that we should have call motion finished
+            cur_plan_number = plan_number_;
+            starting_conf = plan_.plan->value(0.0);
+            starting_franka_q = robot_state.q_d;
+            momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose());
+            momap::log()->warn("difference between where we are and where we think = {}",
+                                ( du::v_to_e( ConvertToVector(starting_franka_q) ) - starting_conf ).norm() );
+
+        }
+
         if (robot_data_.mutex.try_lock()) {
             robot_data_.has_data = true;
             robot_data_.robot_state = robot_state;

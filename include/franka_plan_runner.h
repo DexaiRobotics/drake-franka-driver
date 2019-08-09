@@ -402,8 +402,8 @@ private:
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
                     if (plan_.has_data) {
-                        robot.control(joint_position_callback); //impedance_control_callback
-                        // robot.control(inverse_dynamics_control_callback);
+                        // robot.control(joint_position_callback); //impedance_control_callback
+                        robot.control(inverse_dynamics_control_callback);
                     } else {
                         // publish robot_status
                         // TODO: add a timer to be closer to 200 Hz.
