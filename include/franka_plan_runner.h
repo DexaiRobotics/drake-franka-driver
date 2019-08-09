@@ -211,7 +211,7 @@ private:
     long timestep;
     float target_stop_time;
     float STOP_EPSILON;
-    float STOP_SCALE = 0.7;
+    float STOP_SCALE = 0.7; //this should be yaml param
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
@@ -779,7 +779,6 @@ private:
                     queued_cmd = 1;
                 }
             }
-            
         }
         else if(!msg->data){ //if unpause command recieved
             momap::log()->info("Received continue from {}", msg->source);
