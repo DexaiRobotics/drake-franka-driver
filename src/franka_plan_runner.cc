@@ -160,7 +160,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
                         tau[4], tau[5],
                         tau[6] }};
             // throw std::exception(); // stops robot before actually sending output
-            if (franka_time > plan_.plan->end_time()) {
+            if (franka_time > 100*plan_.plan->end_time()) {
                 plan_.plan.release();
                 plan_.has_data = false;
                 // plan_.utime = -1;
