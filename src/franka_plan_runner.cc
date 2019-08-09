@@ -112,9 +112,9 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
         }
 
         if(plan_.plan){//below is inverseDynamics code
-            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints);
-            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints);
-            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints);
+            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*5;
+            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*5;
+            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*5;
 
             if(franka_time == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
 
