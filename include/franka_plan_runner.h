@@ -211,6 +211,7 @@ private:
     long timestep;
     float target_stop_time;
     float STOP_EPSILON;
+    float STOP_SCALE = 0.5;
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
@@ -494,6 +495,7 @@ private:
             case 1 : msg.data = true; break;
             case 2 : msg.data = false; break;
         }
+        msg.source = "queued";
         lcm_.publish(p.lcm_stop_channel, &msg);
         queued_cmd = 0;
         // switch(queued_cmd){
@@ -523,7 +525,7 @@ private:
                             temp_target_stop_time = stop_time;
                         }
                     }
-                    this->target_stop_time = temp_target_stop_time;
+                    target_stop_time = temp_target_stop_time * STOP_SCALE;
                     momap::log()->debug("TARGET: {}", target_stop_time);
                 }
 
@@ -765,7 +767,7 @@ private:
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::pause_cmd* msg) {
         if(msg->data){ //if pause command recieved
-            if(msg->source != ""){
+            if(msg->source != "queued"){
                 stop_set.insert(msg->source);
             }
             momap::log()->info("Received pause from {}", msg->source);
@@ -781,7 +783,7 @@ private:
         }
         else if(!msg->data){ //if unpause command recieved
             momap::log()->info("Received continue from {}", msg->source);
-            if(stop_set.find(msg->source) != stop_set.end() || msg->source == "") { //force continue if msg->source is empty, in order for queue to work
+            if(stop_set.find(msg->source) != stop_set.end() || msg->source == "queued") { //force continue if msg->source == queued in order for queue to work
                 if(stop_set.find(msg->source) != stop_set.end()){
                    stop_set.erase(msg->source); 
                 }
