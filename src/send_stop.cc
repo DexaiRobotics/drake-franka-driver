@@ -33,7 +33,7 @@ int main()
 		else{
 			continue;
 		}
-		lcm.publish("FRANKA_0_STOP", &cmd);
+		lcm.publish("FRANKA_G_STOP", &cmd);
 		
 	}
 	return 0;

@@ -649,8 +649,8 @@ private:
             std::array<double, 7> current_cmd = robot_state.q_d; // set to actual, not desired
             std::array<double, 7> current_conf = robot_state.q_d; // set to actual, not desired
             desired_next = du::v_to_e( ConvertToVector(current_cmd) );
-
-            double error = DBL_MAX;
+            
+            double error = DBL_MAX; 
 
             // const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
             if (plan_.plan) {
@@ -775,7 +775,7 @@ private:
         }
 
         editing_plan = true;
-
+    
         momap::log()->info("utime: {}", rst->utime);
         plan_.utime = rst->utime;
         //$ publish confirmation that plan was received with same utime
