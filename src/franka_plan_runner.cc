@@ -161,7 +161,8 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
                         tau[6] }};
             // throw std::exception(); // stops robot before actually sending output
             // where we are now
-            Eigen::VectorXd current_conf = du::v_to_e( ConvertToVector(robot_state.q));
+            std::array<double, 7> current_q = robot_state.q;
+            Eigen::VectorXd current_conf = du::v_to_e( ConvertToVector(current_q));
             // where we want to go
             Eigen::VectorXd desired_end_conf = plan_.plan->value(plan_.plan->end_time());
             // norm distance from desired_end_conf
