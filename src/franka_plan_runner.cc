@@ -112,7 +112,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
         }
 
         if(plan_.plan){//below is inverseDynamics code
-            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*50;
+            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*500;
             const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*0;
             const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*0;
 
@@ -123,6 +123,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_actual(robot_state.q.data());
             if(runonce){
                 pos_start = pos_actual;
+                momap::log()->info("set pos_start to = {}", pos_start);
                 runonce = false;
             }
             Eigen::Matrix<double, 7, 1> pos_desired = pos_start;
