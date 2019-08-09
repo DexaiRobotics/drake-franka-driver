@@ -525,7 +525,7 @@ private:
                             temp_target_stop_time = stop_time;
                         }
                     }
-                    target_stop_time = temp_target_stop_time * STOP_SCALE;
+                    target_stop_time = temp_target_stop_time / STOP_SCALE;
                     momap::log()->debug("TARGET: {}", target_stop_time);
                 }
 
