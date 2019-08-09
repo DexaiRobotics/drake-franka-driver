@@ -155,12 +155,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
                 plan_.mutex.unlock();
 
                 PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-                // return output;
-                // plan_.mutex.unlock();
-                return franka::MotionFinished(output);
-                momap::log()->info("Plan running overtime and not converged, error: {}", error);
-                // momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
-                // momap::log()->info("q_d: {}", desired_next.transpose());
+                return franka::MotionFinished(robot_state.q);
             }
         }
         plan_.mutex.unlock();
