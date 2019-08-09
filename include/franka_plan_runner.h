@@ -211,7 +211,7 @@ private:
     long timestep;
     float target_stop_time;
     float STOP_EPSILON;
-    float STOP_SCALE = 0.5;
+    float STOP_SCALE = 0.7;
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
