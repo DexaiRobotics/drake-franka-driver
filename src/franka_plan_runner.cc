@@ -42,7 +42,7 @@ void FrankaPlanRunner::MultibodySetUp(drake::multibody::MultibodyPlant<double> &
 
 franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::RobotState& robot_state, franka::Duration period){
     std::array<double, 7> output = robot_state.tau_J; // TODO: initialize to something else
-    std::cout<< "enter invdyn callback";
+    momap::log()->debug("entering callback");
     if ( plan_.mutex.try_lock() ) {
         // we got the lock, so try and do stuff.
         // momap::log()->info("got the lock!");
@@ -89,8 +89,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
             timestep++;
 
-        }
-        else {
+        } else {
             franka_time += period.toSec();
         }
 
@@ -100,59 +99,81 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             robot_data_.mutex.unlock();
         }
 
-        //below is inverseDynamics code
-        const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints);
-        const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints);
-        const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints);
+        if(plan_.plan){//below is inverseDynamics code
+            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints);
+            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints);
+            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints);
 
-        if(franka_time == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
+            if(franka_time == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
 
-        Eigen::VectorXd desired_vd = Eigen::VectorXd::Zero(kNumJoints);
-        Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_desired(robot_state.q_d.data());
-        Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_actual(robot_state.q.data());
-        integral_error += pos_desired - pos_actual;
-        Eigen::Map<const Eigen::Matrix<double, 7, 1> > vel_desired(robot_state.dq_d.data());
-        Eigen::Map<const Eigen::Matrix<double, 7, 1> > vel_actual(robot_state.dq.data());
-        // auto t1 = std::chrono::system_clock::now(); // for timing purposes
-        // TODO : FIX SEGFAULT FOR REF_VD INITIALIZE/INSTANTIATE
-        // desired_vd = ref_vd_.value(franka_time) + kp.cwiseProduct(pos_desired - pos_actual) + kd.cwiseProduct(vel_desired - vel_actual) + ki.cwiseProduct(integral_error) ;
-        // for gravity compensation, desired_vd should be zero
+            Eigen::VectorXd desired_vd = Eigen::VectorXd::Zero(kNumJoints);
+            Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_desired(robot_state.q_d.data());
+            Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_actual(robot_state.q.data());
+            integral_error += pos_desired - pos_actual;
+            Eigen::Map<const Eigen::Matrix<double, 7, 1> > vel_desired(robot_state.dq_d.data());
+            Eigen::Map<const Eigen::Matrix<double, 7, 1> > vel_actual(robot_state.dq.data());
+            // auto t1 = std::chrono::system_clock::now(); // for timing purposes
+            // TODO : FIX SEGFAULT FOR REF_VD INITIALIZE/INSTANTIATE
+            // desired_vd = ref_vd_.value(franka_time) + kp.cwiseProduct(pos_desired - pos_actual) + kd.cwiseProduct(vel_desired - vel_actual) + ki.cwiseProduct(integral_error) ;
+            // for gravity compensation, desired_vd should be zero
 
-        Eigen::VectorXd tau = Eigen::VectorXd::Zero(kNumJoints);
-        Eigen::VectorXd current_state(14);
-        current_state << pos_actual, vel_actual;
-        mb_plant_.SetPositionsAndVelocities(mb_plant_context_.get(), current_state);
+            Eigen::VectorXd tau = Eigen::VectorXd::Zero(kNumJoints);
+            Eigen::VectorXd current_state(14);
+            current_state << pos_actual, vel_actual;
+            mb_plant_.SetPositionsAndVelocities(mb_plant_context_.get(), current_state);
 
-        multibody::MultibodyForces<double> external_forces(mb_plant_);
-        // Isabelle's old version : account for all external forces ( including gravity )
-        // Eigen::Map<const Eigen::Matrix<double, 7, 1> > tau_cmd(robot_state.tau_J_d.data());          // convert std::array to eigen vector
-        // Eigen::Map<const Eigen::Matrix<double, 7, 1> > tau_measured(robot_state.tau_J.data());      // the signs are flipped on these because the link side is negative sign of motor side
-        // external_forces.mutable_generalized_forces() = tau_cmd - tau_measured; // external_forces = external torques we sense on the robot
+            multibody::MultibodyForces<double> external_forces(mb_plant_);
+            // Isabelle's old version : account for all external forces ( including gravity )
+            // Eigen::Map<const Eigen::Matrix<double, 7, 1> > tau_cmd(robot_state.tau_J_d.data());          // convert std::array to eigen vector
+            // Eigen::Map<const Eigen::Matrix<double, 7, 1> > tau_measured(robot_state.tau_J.data());      // the signs are flipped on these because the link side is negative sign of motor side
+            // external_forces.mutable_generalized_forces() = tau_cmd - tau_measured; // external_forces = external torques we sense on the robot
 
 
-        // Robert;s version : only account for gravity
-        mb_plant_.CalcForceElementsContribution( *mb_plant_context_, &external_forces); //takes care of reading gravity
-        momap::log()->debug("gravity = {}", external_forces.generalized_forces().transpose());
+            // Robert;s version : only account for gravity
+            mb_plant_.CalcForceElementsContribution( *mb_plant_context_, &external_forces); //takes care of reading gravity
+            momap::log()->debug("gravity = {}", external_forces.generalized_forces().transpose());
 
-        // potentially useful methods : get external force (not including gravity) from robot sensors
-        // Eigen::Map<const Eigen::Matrix<double, 7, 1> > tau_ext(robot_state.tau_ext_hat_filtered.data());
-        // external_forces.mutable_generalized_forces() = tau_ext;
-        tau = mb_plant_.CalcInverseDynamics(*mb_plant_context_, desired_vd, external_forces); //calculates the M(q) + C(q) - tau_ap
-        // auto t4 = std::chrono::system_clock::now();
-        // momap::log()->info("gravity calc v2= {}",  mb_plant_.CalcGravityGeneralizedForces(*mb_plant_context_));
-        // momap::log()->info("tau = {}", tau.transpose());
+            // potentially useful methods : get external force (not including gravity) from robot sensors
+            // Eigen::Map<const Eigen::Matrix<double, 7, 1> > tau_ext(robot_state.tau_ext_hat_filtered.data());
+            // external_forces.mutable_generalized_forces() = tau_ext;
+            tau = mb_plant_.CalcInverseDynamics(*mb_plant_context_, desired_vd, external_forces); //calculates the M(q) + C(q) - tau_ap
+            // auto t4 = std::chrono::system_clock::now();
+            // momap::log()->info("gravity calc v2= {}",  mb_plant_.CalcGravityGeneralizedForces(*mb_plant_context_));
+            // momap::log()->info("tau = {}", tau.transpose());
 
-        //calling franka::limitrate is unnecessary because robot.control has limit_rate= default true?
+            //calling franka::limitrate is unnecessary because robot.control has limit_rate= default true?
 
-        output = {{ tau[0], tau[1],
-                    tau[2], tau[3],
-                    tau[4], tau[5],
-                    tau[6] }};
-        // throw std::exception(); // stops robot before actually sending output
+            output = {{ tau[0], tau[1],
+                        tau[2], tau[3],
+                        tau[4], tau[5],
+                        tau[6] }};
+            // throw std::exception(); // stops robot before actually sending output
+            if (franka_time > plan_.plan->end_time()) {
+                if (error < 0.007) { // TODO: replace with non arbitrary number
+                    franka::JointPositions ret_val = current_conf;
+                    std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
+                    plan_.plan.release();
+                    plan_.has_data = false;
+                    // plan_.utime = -1;
+                    plan_.mutex.unlock();
+
+                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                    // return output;
+                    // plan_.mutex.unlock();
+                    return franka::MotionFinished(output);
+                }
+                else {
+                    momap::log()->info("Plan running overtime and not converged, error: {}", error);
+                    // momap::log()->info("q:   {}", du::v_to_e( ConvertToVector(current_conf)).transpose());
+                    // momap::log()->info("q_d: {}", desired_next.transpose());
+                }
+            }
+        }
+        plan_.mutex.unlock();
+        momap::log()->debug("returning at end of callback");
+        return output;
     }
-    plan_.mutex.unlock();
-    momap::log()->debug("returning at end of callback");
-    return output;
+    return franka::MotionFinished(output);
 }
 }  // namespace robot_plan_runner
 }  // namespace drake
