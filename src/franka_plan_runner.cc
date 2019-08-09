@@ -155,7 +155,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
                 plan_.mutex.unlock();
 
                 PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
-                return franka::MotionFinished(robot_state.q);
+                return franka::MotionFinished(output);
             }
         }
         plan_.mutex.unlock();
