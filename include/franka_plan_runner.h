@@ -394,7 +394,7 @@ private:
             };
 
             //for inverse dynamics
-            run_inverse_dynamics_ = true; // TODO : move this somewhere else in the class?
+            run_inverse_dynamics_ = false; // TODO : move this somewhere else in the class?
             if(run_inverse_dynamics_){
                 MultibodySetUp(mb_plant_, mb_plant_context_, "/src/drake-franka-driver/tests/data/franka_test_with_mass_no_joint_limits.urdf" );
                 // std::cout << "done multibody setup" << '\n';
@@ -405,8 +405,12 @@ private:
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
                     if (plan_.has_data) {
-                        // robot.control(joint_position_callback); //impedance_control_callback
-                        robot.control(inverse_dynamics_control_callback);
+                        if(run_inverse_dynamics_) {
+                            robot.control(inverse_dynamics_control_callback);
+                        }
+                        else{
+                            robot.control(joint_position_callback);
+                        }
                     } else {
                         // publish robot_status
                         // TODO: add a timer to be closer to 200 Hz.
