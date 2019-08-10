@@ -31,8 +31,9 @@ int main(int argc, char** argv)
 		robot_msgs::pause_cmd cmd;
 		string a;
 		string b;
-		cout << "Enter cmd: ";
+		cout << "Enter cmd (s=STOP, c=CONTINUE): ";
 		cin >> a;
+		cout << "Enter source: ";
 		cin >> b;
 		cmd.utime = get_current_utime();
 		if(a == "s"){

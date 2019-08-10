@@ -211,7 +211,7 @@ private:
     long timestep;
     float target_stop_time;
     float STOP_EPSILON;
-    float STOP_SCALE = 0.7; //this should be yaml param
+    float STOP_SCALE = 0.8; //this should be yaml param
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
@@ -498,12 +498,6 @@ private:
         msg.source = "queued";
         lcm_.publish(p.lcm_stop_channel, &msg);
         queued_cmd = 0;
-        // switch(queued_cmd){
-        //     case 0 : return;
-        //     case 1 : Pause(); break;
-        //     case 2 : Continue(); break;
-        // }
-        // queued_cmd = 0;
     }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
@@ -766,7 +760,7 @@ private:
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
         const robot_msgs::pause_cmd* msg) {
-        if(msg->data){ //if pause command recieved
+        if(msg->data){ //if pause command received
             if(msg->source != "queued"){
                 stop_set.insert(msg->source);
             }
@@ -780,7 +774,7 @@ private:
                 }
             }
         }
-        else if(!msg->data){ //if unpause command recieved
+        else if(!msg->data){ //if unpause command received
             momap::log()->info("Received continue from {}", msg->source);
             if(stop_set.find(msg->source) != stop_set.end() || msg->source == "queued") { //force continue if msg->source == queued in order for queue to work
                 if(stop_set.find(msg->source) != stop_set.end()){
