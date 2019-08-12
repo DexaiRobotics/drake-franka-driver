@@ -177,13 +177,13 @@ void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
 std::string RobotModeToString(franka::RobotMode mode) {
     std::string mode_string;
     switch(mode){
-        case franka::RobotMode::kOther                  : mode_string = "kOther"; break;
-        case franka::RobotMode::kIdle                   : mode_string = "kIdle"; break;
-        case franka::RobotMode::kMove                   : mode_string = "kMove"; break;
-        case franka::RobotMode::kGuiding                : mode_string = "kGuiding"; break;
-        case franka::RobotMode::kReflex                 : mode_string = "kReflex"; break;
-        case franka::RobotMode::kUserStopped            : mode_string = "kUserStopped"; break;
-        case franka::RobotMode::kAutomaticErrorRecovery : mode_string = "kAutomaticErrorRecovery"; break;
+        case franka::RobotMode::kOther                  : mode_string = "Other"; break;
+        case franka::RobotMode::kIdle                   : mode_string = "Idle"; break;
+        case franka::RobotMode::kMove                   : mode_string = "Move"; break;
+        case franka::RobotMode::kGuiding                : mode_string = "Guiding"; break;
+        case franka::RobotMode::kReflex                 : mode_string = "Reflex"; break;
+        case franka::RobotMode::kUserStopped            : mode_string = "User Stopped"; break;
+        case franka::RobotMode::kAutomaticErrorRecovery : mode_string = "Automatic Error Recovery"; break;
     }
     return mode_string;
 }
@@ -713,27 +713,17 @@ private:
 
         } 
 
-        franka::RobotMode current_mode;
-
-        if (robot_data_.has_data) {
-            current_mode = robot_data_.robot_state.robot_mode;
-            robot_data_.mutex.unlock();
-        }
-        else {
-            robot_data_.mutex.unlock();
-            momap::log()->error("CanReceiveCommands: No robot data available.");
-            return false;
-        }
+        franka::RobotMode current_mode = robot_data_.robot_state.robot_mode;
+        robot_data_.mutex.unlock();
 
         momap::log()->info("Current mode: {}", RobotModeToString(current_mode));
         
-
-        if (current_mode == franka::RobotMode::kIdle ||
-            current_mode == franka::RobotMode::kMove ||
-            current_mode == franka::RobotMode::kOther) 
-        {
+        //$ TODO: in the future, we may want to send commands to overwrite the current command
+        //$ currently, can only accept a plan if not already running one
+        if (current_mode == franka::RobotMode::kIdle) {
             return true;
         }
+        
         momap::log()->error("CanReceiveCommands: Wrong mode!");
         return false;
     }
@@ -748,7 +738,7 @@ private:
 
         //$ check if in proper mode to receive commands
         if ( ! CanReceiveCommands()) {
-            momap::log()->error("HandlePlan: Discarding plan, in wrong mode!");
+            momap::log()->error("Discarding plan, in wrong mode!");
             return;
         }
         
