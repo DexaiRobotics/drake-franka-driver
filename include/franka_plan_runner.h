@@ -689,6 +689,41 @@ private:
         lcm_.publish(lcm_channel, &dummy_status);
     }
     
+    //$ check if robot is in a mode that can receive commands, i.e. not user stopped or error recovery
+    bool CanReceiveCommands() {
+
+        while ( ! robot_data_.mutex.try_lock()) {
+            momap::log()->warn("trying to get a lock on the robot_data_.mutex. Sleeping 1 ms and trying again.");
+            std::this_thread::sleep_for(
+                    std::chrono::milliseconds(static_cast<int>( 1.0 )));
+
+        } 
+
+        RobotMode current_mode;
+
+        if (robot_data_.has_data) {
+            current_mode = robot_data_.robot_state.robot_mode;
+            robot_data_.mutex.unlock();
+        }
+        else {
+            robot_data_.mutex.unlock();
+            momap::log()->error("CanReceiveCommands: No robot data available.");
+            return false;
+        }
+
+        momap::log()->info("Current mode:");
+        std::cout << current_mode << std::endl;
+
+        if (current_mode == RobotMode::kIdle ||
+            current_mode == RobotMode::kMove ||
+            current_mode == RobotMode::kOther) 
+        {
+            return true;
+        }
+        momap::log()->error("CanReceiveCommands: Wrong mode!");
+        return false;
+    }
+
     void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&, const robot_spline_t* rst)
     {
         momap::log()->info("New plan received.");
@@ -696,13 +731,19 @@ private:
             momap::log()->info("Discarding plan, no status message received yet from the robot");
             return;
         }
+
+        //$ check if in proper mode to receive commands
+        if ( ! CanReceiveCommands()) {
+            return false;
+        }
+        
         // plan_.mutex.lock();
         while( ! plan_.mutex.try_lock()) {
             momap::log()->warn("trying to get a lock on the plan_.mutex. Sleeping 1 ms and trying again.");
             std::this_thread::sleep_for(
                     std::chrono::milliseconds(static_cast<int>( 1.0 )));
         }
-        
+
         editing_plan = true;
     
         momap::log()->info("utime: {}", rst->utime);
