@@ -101,6 +101,7 @@ include_directories(
     ${DRACULA_INCLUDE_DIR}/../../externals/json/include
     ${Franka_INCLUDE_DIRS}
     ${Python3_INCLUDE_DIRS}
+    ${Python3_NumPy_INCLUDE_DIRS} 
     ${CTPL_INCLUDE_DIR}
 )
 
