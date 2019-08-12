@@ -117,7 +117,7 @@ std::vector<T> ConvertToVector(std::array<T, SIZE> &a) {
 }
 template <typename T, std::size_t SIZE>
 void ConvertToArray(std::vector<T> &v, std::array<T, SIZE> &a) {
-    for(int i=0; i<SIZE; i++) {
+    for(int i = 0; i < SIZE; i++) {
         a[i] = v[i];
     }
 }
@@ -473,7 +473,7 @@ private:
             next_conf_vec = du::e_to_v(next_conf);
             std::vector<double> prev_conf_vec =  du::e_to_v(prev_conf);
 
-            for(int i=0; i<7; i++) {
+            for(int i = 0; i < 7; i++) {
                 vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double) period.toSec();                
             }
 
@@ -706,15 +706,9 @@ private:
     //$ check if robot is in a mode that can receive commands, i.e. not user stopped or error recovery
     bool CanReceiveCommands() {
 
-        while ( ! robot_data_.mutex.try_lock()) {
-            momap::log()->warn("trying to get a lock on the robot_data_.mutex. Sleeping 1 ms and trying again.");
-            std::this_thread::sleep_for(
-                    std::chrono::milliseconds(static_cast<int>( 1.0 )));
-
-        } 
+        std::lock_guard<std::mutex> lock(robot_data_.mutex); //$ unlocks when lock_guard goes out of scope
 
         franka::RobotMode current_mode = robot_data_.robot_state.robot_mode;
-        robot_data_.mutex.unlock();
 
         momap::log()->info("Current mode: {}", RobotModeToString(current_mode));
         
