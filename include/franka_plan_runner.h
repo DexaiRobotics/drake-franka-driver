@@ -174,6 +174,20 @@ void ResizeStatusMessage(lcmt_iiwa_status &lcm_status_){
   lcm_status_.joint_torque_external.resize(kNumJoints, 0);
 }
 
+std::string RobotModeToString(franka::RobotMode mode) {
+    std::string mode_string;
+    switch(mode){
+        case franka::RobotMode::kOther                  : mode_string = "kOther"; break;
+        case franka::RobotMode::kIdle                   : mode_string = "kIdle"; break;
+        case franka::RobotMode::kMove                   : mode_string = "kMove"; break;
+        case franka::RobotMode::kGuiding                : mode_string = "kGuiding"; break;
+        case franka::RobotMode::kReflex                 : mode_string = "kReflex"; break;
+        case franka::RobotMode::kUserStopped            : mode_string = "kUserStopped"; break;
+        case franka::RobotMode::kAutomaticErrorRecovery : mode_string = "kAutomaticErrorRecovery"; break;
+    }
+    return mode_string;
+}
+
 // TODO: use this
 int64_t get_current_utime() {
     struct timeval  tv;
@@ -699,7 +713,7 @@ private:
 
         } 
 
-        RobotMode current_mode;
+        franka::RobotMode current_mode;
 
         if (robot_data_.has_data) {
             current_mode = robot_data_.robot_state.robot_mode;
@@ -711,12 +725,12 @@ private:
             return false;
         }
 
-        momap::log()->info("Current mode:");
-        std::cout << current_mode << std::endl;
+        momap::log()->info("Current mode: {}", RobotModeToString(current_mode));
+        
 
-        if (current_mode == RobotMode::kIdle ||
-            current_mode == RobotMode::kMove ||
-            current_mode == RobotMode::kOther) 
+        if (current_mode == franka::RobotMode::kIdle ||
+            current_mode == franka::RobotMode::kMove ||
+            current_mode == franka::RobotMode::kOther) 
         {
             return true;
         }
@@ -734,7 +748,8 @@ private:
 
         //$ check if in proper mode to receive commands
         if ( ! CanReceiveCommands()) {
-            return false;
+            momap::log()->error("HandlePlan: Discarding plan, in wrong mode!");
+            return;
         }
         
         // plan_.mutex.lock();
