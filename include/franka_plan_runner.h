@@ -17,6 +17,7 @@
 #include <math.h>
 #include <array>
 #include <atomic>
+#include <set>
 
 #include <cassert>
 #include <cmath>
@@ -67,6 +68,7 @@
 // #include <momap/momap_robot_plan_v1.h>
 #include <lcmtypes/robot_spline_t.hpp>
 #include <robot_msgs/bool_t.hpp>
+#include <robot_msgs/pause_cmd.hpp>
 
 #include "trajectory_solver.h"
 #include "momap/momap_log.h"
@@ -110,6 +112,12 @@ struct RobotPiecewisePolynomial {
     int64_t end_time_us;
 };
 
+enum class QueuedCommand {
+    NONE,
+    PAUSE,
+    CONTINUE
+};
+
 template <typename T, std::size_t SIZE>
 std::vector<T> ConvertToVector(std::array<T, SIZE> &a) {
     std::vector<T> v(a.begin(), a.end());
@@ -128,7 +136,7 @@ static void AssignToLcmStatus(franka::RobotState &robot_state, lcmt_iiwa_status 
     int num_joints_ = kNumJoints;
     struct timeval  tv;
     gettimeofday(&tv, NULL);
-    // TODO: @dmsj store both timeofday and franka_time
+    // TODO: @dmsj store both timeofday and franka_time_
     robot_status.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec); //int64_t(1000.0 * robot_state.time.toMSec());
     robot_status.num_joints = num_joints_;
     // q
@@ -196,7 +204,6 @@ int64_t get_current_utime() {
     return current_utime;
 }
 
-
 class FrankaPlanRunner {
 private:
     Dracula *dracula = nullptr;
@@ -209,38 +216,37 @@ private:
     int plan_number_{};
     int cur_plan_number{};
     int64_t cur_plan_utime_{};
-    int64_t cur_time_us{};
-    int64_t start_time_us{};
+    int64_t cur_time_us_{};
+    int64_t start_time_us_{};
     RobotPiecewisePolynomial plan_;
     RobotData robot_data_{}; 
-    PPType piecewise_polynomial;
+    PPType piecewise_polynomial_;
+
+    int sign_{};
+    std::atomic_bool editing_plan_{false};
+    std::array<double, 16> initial_pose_;
+    Eigen::MatrixXd joint_limits_;
+    long timestep_;
+    float target_stop_time_;
+    float STOP_SCALE = 0.8; //this should be yaml param
+    float stop_duration_;
+    std::atomic_bool pausing_;
+    std::atomic_bool paused_;
+    std::atomic_bool unpausing_;
+    float stop_margin_counter_ = 0;
+    QueuedCommand queued_cmd_ = QueuedCommand::NONE;
+    std::set <std::string> stop_set_;  
+
+
+    Eigen::VectorXd starting_conf_;
+    std::array<double, 7> starting_franka_q_; 
+
+    const double lcm_publish_rate_ = 200.0; //Hz
+    double franka_time_;
+    Eigen::VectorXd max_accels_;
+
     std::thread lcm_publish_status_thread;
     std::thread lcm_handle_thread;
-    int sign_{};
-    std::atomic_bool editing_plan{false};
-    std::array<double, 16> initial_pose;
-    Eigen::MatrixXd joint_limits;
-    long timestep;
-    float target_stop_time;
-    float STOP_EPSILON;
-    float stop_duration;
-    std::atomic_bool pausing;
-    std::atomic_bool paused;
-    std::atomic_bool unpausing;
-    float STOP_MARGIN; 
-    float stop_margin_counter = 0;
-    int queued_cmd = 0; //0: None, 1: Pause, 2: Continue 
-
-    Eigen::VectorXd starting_conf;
-    std::array<double, 7> starting_franka_q; 
-    
-
-
-
-    // Set print rate for comparing commanded vs. measured torques.
-    const double lcm_publish_rate = 200.0; //Hz
-    double franka_time;
-    Eigen::VectorXd max_accels;
 
 public:
     FrankaPlanRunner(const parameters::Parameters params)
@@ -249,28 +255,25 @@ public:
         lcm_.subscribe(p.lcm_plan_channel, &FrankaPlanRunner::HandlePlan, this);
         lcm_.subscribe(p.lcm_stop_channel, &FrankaPlanRunner::HandleStop, this);
         running_ = true;
-        franka_time = 0.0; 
-        max_accels = params.robot_max_accelerations;
-
-        STOP_EPSILON = params.stop_epsilon;
-        STOP_MARGIN = params.stop_margin;
+        franka_time_ = 0.0; 
+        max_accels_ = params.robot_max_accelerations;
 
         dracula = new Dracula(p);
-        joint_limits = dracula->GetCS()->GetJointLimits();
-        momap::log()->info("Joint limits: {}", joint_limits.transpose());
+        joint_limits_ = dracula->GetCS()->GetJointLimits();
+        momap::log()->info("Joint limits: {}", joint_limits_.transpose());
 
         cur_plan_number = plan_number_;
-        cur_time_us = -1;
-        start_time_us = -1;
+        cur_time_us_ = -1;
+        start_time_us_ = -1;
         sign_ = +1; 
 
-        pausing = false;
-        paused = false;
-        unpausing = false;
+        pausing_ = false;
+        paused_ = false;
+        unpausing_ = false;
 
 
-        starting_franka_q = {{0,0,0,0,0,0,0}}; 
-        starting_conf = Eigen::VectorXd::Zero(kNumJoints);
+        starting_franka_q_ = {{0,0,0,0,0,0,0}}; 
+        starting_conf_ = Eigen::VectorXd::Zero(kNumJoints);
 
         plan_.has_data = false; 
         plan_.plan.release();
@@ -357,15 +360,7 @@ private:
             franka::Robot robot(ip_addr_);
             setDefaultBehavior(robot);
             robot_alive_ = true; 
-            // First move the robot to a suitabcurrent_desiredle joint configuration
-            // std::array<double, 7> q_goal = {current_desired{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
-            // MotionGenerator motion_generator(0.5, q_goal);
-            // std::cout << "WARNING: This example will move the robot! "
-            //         << "Please make sure to have the user stop button at hand!" << std::endl
-            //         << "Press Enter to continue..." << std::endl;
-            // std::cin.ignore();
-            // robot.control(motion_generator);
-            // std::cout << "Finished moving to initial joint configuration." << std::endl;
+
             std::cout << "Ready." << std::endl;
 
             // Set additional parameters always before the control loop, NEVER in the control loop!
@@ -396,7 +391,7 @@ private:
             while(true) {
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
-                    if (plan_.has_data) {
+                    if (plan_.has_data && !paused_) { //$ prevent the plan from being started if robot is paused_
                         robot.control(joint_position_callback); //impedance_control_callback
                     } else {
                         // publish robot_status
@@ -409,7 +404,7 @@ private:
                                 this->robot_data_.mutex.unlock();
                             }
                             std::this_thread::sleep_for(
-                                    std::chrono::milliseconds(static_cast<int>( 1000.0 / lcm_publish_rate )));
+                                    std::chrono::milliseconds(static_cast<int>( 1000.0 / lcm_publish_rate_ )));
                             return false;
                         });
                     }
@@ -455,7 +450,7 @@ private:
 
         while(1) {
             std::this_thread::sleep_for(
-                std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate )));
+                std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate_ )));
 
             std::vector<double> next_conf_vec = du::e_to_v(next_conf);
             ConvertToArray(next_conf_vec, robot_state.q);
@@ -490,22 +485,23 @@ private:
         /*Logistic growth function: t' = f - 4 / [a(e^{at}+1] where
         f = target_stop time, t' = franka time, t = real time
         Returns delta t', the period that should be incremented to franka time*/
-        double a = 2 / target_stop_time;
-        double current_time = (this->target_stop_time-4/(a*(exp(a*period*this->timestep)+1)));
-        double prev_time = (this->target_stop_time-4/(a*(exp(a*period*(this->timestep-1))+1)));
+        double a = 2 / target_stop_time_;
+        double current_time = (this->target_stop_time_-4/(a*(exp(a*period*this->timestep_)+1)));
+        double prev_time = (this->target_stop_time_-4/(a*(exp(a*period*(this->timestep_-1))+1)));
         return (current_time - prev_time);
     }
 
     void QueuedCmd() {
-        robot_msgs::bool_t msg;
+        robot_msgs::pause_cmd msg;
         msg.utime = get_current_utime();
-        switch(queued_cmd) {
-            case 0 : return;
-            case 1 : msg.data = true; break;
-            case 2 : msg.data = false; break;
+        switch(queued_cmd_) {
+            case QueuedCommand::NONE     : return;
+            case QueuedCommand::PAUSE    : msg.data = true; break;
+            case QueuedCommand::CONTINUE : msg.data = false; break;
         }
+        msg.source = "queued";
         lcm_.publish(p.lcm_stop_channel, &msg);
-        queued_cmd = 0;
+        queued_cmd_ = QueuedCommand::NONE;
     }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
@@ -517,66 +513,66 @@ private:
             // we got the lock, so try and do stuff.
             // momap::log()->info("got the lock!");
 
-            if (pausing) {
-                if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
+            if (pausing_) {
+                if (target_stop_time_ == 0) { //if target_stop_time_ not set, set target_stop_time_
                     std::array<double,7> vel = robot_state.dq;
-                    float temp_target_stop_time = 0;
+                    float temp_target_stop_time_ = 0;
                     for (int i = 0; i < 7; i++) {
-                        float stop_time = fabs(vel[i] / (this->max_accels[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
-                        if (stop_time > temp_target_stop_time) {
-                            temp_target_stop_time = stop_time;
+                        float stop_time = fabs(vel[i] / (this->max_accels_[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
+                        if (stop_time > temp_target_stop_time_) {
+                            temp_target_stop_time_ = stop_time;
                         }
                     }
-                    this->target_stop_time = temp_target_stop_time;
-                    momap::log()->debug("TARGET: {}", target_stop_time);
+                    target_stop_time_ = temp_target_stop_time_ / STOP_SCALE;
+                    momap::log()->debug("TARGET: {}", target_stop_time_);
                 }
 
                 double new_stop = StopPeriod(period.toSec());
-                franka_time += new_stop;
+                franka_time_ += new_stop;
                 momap::log()->debug("STOP PERIOD: {}", new_stop);
-                timestep++;
+                timestep_++;
 
-                if (new_stop >= period.toSec() * STOP_EPSILON) { // robot counts as "stopped" when new_stop is less than a fraction of period
-                    this->stop_duration++;
+                if (new_stop >= period.toSec() * p.stop_epsilon) { // robot counts as "stopped" when new_stop is less than a fraction of period
+                    this->stop_duration_++;
                 }
-                else if (stop_margin_counter <= STOP_MARGIN) { // margin period after pause before robot is allowed to continue
-                    stop_margin_counter += period.toSec();
+                else if (stop_margin_counter_ <= p.stop_margin) { // margin period after pause before robot is allowed to continue
+                    stop_margin_counter_ += period.toSec();
                 }
                 else{
-                    paused = true;
+                    paused_ = true;
                     QueuedCmd();
                 }
                 
                 
-            } else if (unpausing) { //robot is unpausing
-                if (timestep >= 0) { //if robot has reached full speed again
-                    unpausing = false;
+            } else if (unpausing_) { //robot is unpausing_
+                if (timestep_ >= 0) { //if robot has reached full speed again
+                    unpausing_ = false;
                     QueuedCmd();
                 }
                 double new_stop = StopPeriod(period.toSec());
-                franka_time += new_stop;
+                franka_time_ += new_stop;
                 momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
-                timestep++;
+                timestep_++;
                 
             }
             else {
-                franka_time += period.toSec();
+                franka_time_ += period.toSec();
             }
 
-            cur_time_us = int64_t(franka_time * 1.0e6); 
+            cur_time_us_ = int64_t(franka_time_ * 1.0e6); 
 
             // TODO: remove the need for this check. who cares if it is a new plan?
             // TODO: make sure we've called motion finished and reset the timer?
 
             if (plan_.plan && plan_number_ != cur_plan_number) {
-                momap::log()->info("Starting new plan at {} s.", franka_time);
-                start_time_us = cur_time_us; // implies that we should have call motion finished
+                momap::log()->info("Starting new plan at {} s.", franka_time_);
+                start_time_us_ = cur_time_us_; // implies that we should have call motion finished
                 cur_plan_number = plan_number_;
-                starting_conf = plan_.plan->value(0.0);
-                starting_franka_q = robot_state.q_d; 
-                momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose()); 
+                starting_conf_ = plan_.plan->value(0.0);
+                starting_franka_q_ = robot_state.q_d; 
+                momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q_) ).transpose()); 
                 momap::log()->warn("difference between where we are and where we think = {}", 
-                                    ( du::v_to_e( ConvertToVector(starting_franka_q) ) - starting_conf ).norm() );
+                                    ( du::v_to_e( ConvertToVector(starting_franka_q_) ) - starting_conf_ ).norm() );
 
             }
 
@@ -595,27 +591,27 @@ private:
             
             double error = DBL_MAX; 
 
-            // const double cur_traj_time_s = static_cast<double>(cur_time_us - start_time_us) / 1e6;
+            // const double cur_traj_time_s = static_cast<double>(cur_time_us_ - start_time_us_) / 1e6;
             if (plan_.plan) {
-                desired_next = plan_.plan->value(franka_time); //cur_traj_time_s
+                desired_next = plan_.plan->value(franka_time_); //cur_traj_time_s
                 // TODO: remove - not DRY
                 for (int j = 0; j < desired_next.size(); j++) {
-                    if (desired_next(j) > joint_limits(j, 1) ) {
-                        desired_next(j) = joint_limits(j,1);
-                    } else if ( desired_next(j) < joint_limits(j, 0)) {
-                        desired_next(j) = joint_limits(j,0);
+                    if (desired_next(j) > joint_limits_(j, 1) ) {
+                        desired_next(j) = joint_limits_(j,1);
+                    } else if ( desired_next(j) < joint_limits_(j, 0)) {
+                        desired_next(j) = joint_limits_(j,0);
                     }
                 }
-                Eigen::VectorXd delta = desired_next - starting_conf; 
-                Eigen::VectorXd output_eigen = du::v_to_e( ConvertToVector(starting_franka_q) ) + delta; 
-                Eigen::VectorXd delta_end = plan_.plan->value(plan_.plan->end_time()) - starting_conf; 
-                Eigen::VectorXd starting_q_eigen = du::v_to_e( ConvertToVector(starting_franka_q) );
+                Eigen::VectorXd delta = desired_next - starting_conf_; 
+                Eigen::VectorXd output_eigen = du::v_to_e( ConvertToVector(starting_franka_q_) ) + delta; 
+                Eigen::VectorXd delta_end = plan_.plan->value(plan_.plan->end_time()) - starting_conf_; 
+                Eigen::VectorXd starting_q_eigen = du::v_to_e( ConvertToVector(starting_franka_q_) );
                 Eigen::VectorXd output_end = starting_q_eigen + delta_end; 
                 Eigen::VectorXd current_conf_eigen = du::v_to_e( ConvertToVector(current_conf) );
                 // error = ( du::v_to_e( ConvertToVector(current_conf) ) -  plan_.plan->value(plan_.plan->end_time()) ).norm();
                 error = ( current_conf_eigen -  output_end ).norm();
 
-                // momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose()); 
+                // momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q_) ).transpose()); 
                 // momap::log()->warn("starting_q_eigen = {}", starting_q_eigen.transpose()); 
                 // momap::log()->info("error: {}", error);
                 // momap::log()->info("current_conf_eigen: {}", current_conf_eigen.transpose());
@@ -635,7 +631,7 @@ private:
                 // std::array<double, 7> q_goal = {{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
                 // output = q_goal; 
         
-                if (franka_time > plan_.plan->end_time()) {
+                if (franka_time_ > plan_.plan->end_time()) {
                     if (error < 0.007) { // TODO: replace with non arbitrary number
                         franka::JointPositions ret_val = current_conf;
                         std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
@@ -680,7 +676,7 @@ private:
         while (running_) {
             // Sleep to achieve the desired print rate.
             std::this_thread::sleep_for(
-                std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate )));
+                std::chrono::milliseconds(static_cast<int>( 1000.0/lcm_publish_rate_ )));
             
             // Try to lock data to avoid read write collisions.
             if (robot_data_.mutex.try_lock()) {
@@ -743,7 +739,7 @@ private:
                     std::chrono::milliseconds(static_cast<int>( 1.0 )));
         }
 
-        editing_plan = true;
+        editing_plan_ = true;
     
         momap::log()->info("utime: {}", rst->utime);
         plan_.utime = rst->utime;
@@ -751,23 +747,23 @@ private:
         PublishUtimeToChannel(plan_.utime, p.lcm_plan_received_channel);
         momap::log()->info("Published confirmation of received plan");
 
-        franka_time = 0.0;
-        piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
+        franka_time_ = 0.0;
+        piecewise_polynomial_ = TrajectorySolver::RobotSplineTToPPType(*rst);
 
-        if (piecewise_polynomial.get_number_of_segments()<1)
+        if (piecewise_polynomial_.get_number_of_segments()<1)
         {
             momap::log()->info("Discarding plan, invalid piecewise polynomial.");
             plan_.mutex.unlock();
             return;
         }
 
-        momap::log()->info("start time: {}", piecewise_polynomial.start_time());
-        momap::log()->info("end time: {}", piecewise_polynomial.end_time());
+        momap::log()->info("start time: {}", piecewise_polynomial_.start_time());
+        momap::log()->info("end time: {}", piecewise_polynomial_.end_time());
 
         // Start position == goal position check
         // TODO: add end position==goal position check (upstream)
         // TODO: change to append initial position and respline here
-        VectorXd commanded_start = piecewise_polynomial.value(piecewise_polynomial.start_time());
+        VectorXd commanded_start = piecewise_polynomial_.value(piecewise_polynomial_.start_time());
         for (int joint = 0; joint < rst->dof; joint++)
         {
             if ( ! du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
@@ -781,54 +777,74 @@ private:
         }
 
         plan_.plan.release();
-        plan_.plan.reset(&piecewise_polynomial);
+        plan_.plan.reset(&piecewise_polynomial_);
         plan_.has_data = true; 
 
 
         ++plan_number_;
         momap::log()->warn("Finished Handle Plan!"); 
-        editing_plan = false;
+        editing_plan_ = false;
         plan_.mutex.unlock();
         
     };
 
     void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
-        const robot_msgs::bool_t* msg) {
-        if (plan_.has_data && msg->data && !pausing) { //if pause command recieved
-            if ( ! unpausing) { //if robot isn't currently unpausing
-                momap::log()->info("Received pause command. Pausing plan.");
-                paused = false;
-                pausing = true;
-                unpausing = false;
-                this->target_stop_time = 0;
-                this->timestep = 1;
-                this->stop_duration = 0;
-                stop_margin_counter = 0;
+        const robot_msgs::pause_cmd* msg) {
+        if (msg->data) { //if pause command received
+            if (msg->source != "queued") {
+                stop_set_.insert(msg->source);
             }
-            else { //if robot is currently unpausing, queue pause cmd
-                queued_cmd = 1;
+            momap::log()->info("Received pause from {}", msg->source);
+            if ( ! pausing_) { //if this is first stop received
+                if ( ! unpausing_) { //if robot isn't currently unpausing_
+                    Pause();
+                }
+                else { //if robot is currently unpausing_, queue pause cmd
+                    queued_cmd_ = QueuedCommand::PAUSE;
+                }
             }
-
         }
-        else if (plan_.has_data && !msg->data) { //if unpause command recieved
-            if (paused) { //if robot is currently paused, run continue
-                momap::log()->info("Received continue command. Continuing plan.");
-                this->timestep = -1 * this->stop_duration; //how long unpausing should take
-                momap::log()->debug("STOP DURATION: {}",stop_duration);
-                paused = false;
-                pausing = false;
-                unpausing = true;
-            }
-            else if (pausing) { //if robot is currently pausing, queue unpause cmd
-                queued_cmd = 2;
-            }
+        else if ( ! msg->data) { //if unpause command received
+            momap::log()->info("Received continue from {}", msg->source);
+            if (stop_set_.find(msg->source) != stop_set_.end() || msg->source == "queued") { //force continue if msg->source == queued in order for queue to work
+                if (stop_set_.find(msg->source) != stop_set_.end()) {
+                   stop_set_.erase(msg->source); 
+                }
 
+                if (stop_set_.size() == 0) {
+                    if (paused_) { //if robot is currently paused_, run continue
+                        Continue();
+                    }
+                    else if (pausing_) { //if robot is currently pausing_, queue unpause cmd
+                        queued_cmd_ = QueuedCommand::CONTINUE;
+                    }
+                }
+            }
+            else {
+                momap::log()->info("Continue command rejected: No matching pause command '{}'", msg->source);
+            }
         }
-        
-
     };
 
-        
+    void Pause() {
+        momap::log()->info("Pausing plan.");
+        paused_ = false;
+        pausing_ = true;
+        unpausing_ = false;
+        this->target_stop_time_ = 0;
+        this->timestep_ = 1;
+        this->stop_duration_ = 0;
+        stop_margin_counter_ = 0;
+    }
+
+    void Continue() {
+        momap::log()->info("Continuing plan.");
+        this->timestep_ = -1 * this->stop_duration_; //how long unpausing_ should take
+        momap::log()->debug("STOP DURATION: {}", stop_duration_);
+        paused_ = false;
+        pausing_ = false;
+        unpausing_ = true;
+    }
 };
 } // robot_plan_runner
 } // drake
