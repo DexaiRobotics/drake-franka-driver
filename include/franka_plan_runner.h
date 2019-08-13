@@ -229,13 +229,11 @@ private:
     Eigen::MatrixXd joint_limits;
     long timestep;
     float target_stop_time;
-    float STOP_EPSILON;
     float STOP_SCALE = 0.8; //this should be yaml param
     float stop_duration;
     std::atomic_bool pausing;
     std::atomic_bool paused;
     std::atomic_bool unpausing;
-    float STOP_MARGIN; 
     float stop_margin_counter = 0;
     QueuedCommand queued_cmd = QueuedCommand::NONE;
     std::set <std::string> stop_set;  
@@ -261,9 +259,6 @@ public:
         running_ = true;
         franka_time = 0.0; 
         max_accels = params.robot_max_accelerations;
-
-        STOP_EPSILON = params.stop_epsilon;
-        STOP_MARGIN = params.stop_margin;
 
         dracula = new Dracula(p);
         joint_limits = dracula->GetCS()->GetJointLimits();
@@ -539,10 +534,10 @@ private:
                 momap::log()->debug("STOP PERIOD: {}", new_stop);
                 timestep++;
 
-                if (new_stop >= period.toSec() * STOP_EPSILON) { // robot counts as "stopped" when new_stop is less than a fraction of period
+                if (new_stop >= period.toSec() * p.stop_epsilon) { // robot counts as "stopped" when new_stop is less than a fraction of period
                     this->stop_duration++;
                 }
-                else if (stop_margin_counter <= STOP_MARGIN) { // margin period after pause before robot is allowed to continue
+                else if (stop_margin_counter <= p.stop_margin) { // margin period after pause before robot is allowed to continue
                     stop_margin_counter += period.toSec();
                 }
                 else{
