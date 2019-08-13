@@ -766,7 +766,7 @@ private:
         VectorXd commanded_start = piecewise_polynomial_.value(piecewise_polynomial_.start_time());
         for (int joint = 0; joint < rst->dof; joint++)
         {
-            if ( ! du::EpsEq(commanded_start(joint),robot_data_.robot_state.q[joint], 0.05))//FIXME: non-arbitrary tolerance
+            if ( ! du::EpsEq(commanded_start(joint), robot_data_.robot_state.q[joint], p.kMediumJointDistance))
             {
                 momap::log()->info("Discarding plan, mismatched start position.");
                 plan_.has_data = false;
