@@ -112,6 +112,12 @@ struct RobotPiecewisePolynomial {
     int64_t end_time_us;
 };
 
+enum class QueuedCommand {
+    NONE,
+    PAUSE,
+    CONTINUE
+};
+
 template <typename T, std::size_t SIZE>
 std::vector<T> ConvertToVector(std::array<T, SIZE> &a) {
     std::vector<T> v(a.begin(), a.end());
@@ -198,7 +204,6 @@ int64_t get_current_utime() {
     return current_utime;
 }
 
-
 class FrankaPlanRunner {
 private:
     Dracula *dracula = nullptr;
@@ -232,7 +237,7 @@ private:
     std::atomic_bool unpausing;
     float STOP_MARGIN; 
     float stop_margin_counter = 0;
-    int queued_cmd = 0; //0: None, 1: Pause, 2: Continue
+    QueuedCommand queued_cmd = QueuedCommand::NONE;
     std::set <std::string> stop_set;  
 
 
@@ -362,15 +367,7 @@ private:
             franka::Robot robot(ip_addr_);
             setDefaultBehavior(robot);
             robot_alive_ = true; 
-            // First move the robot to a suitabcurrent_desiredle joint configuration
-            // std::array<double, 7> q_goal = {current_desired{0, -M_PI_4, 0, -3 * M_PI_4, 0, M_PI_2, M_PI_4}};
-            // MotionGenerator motion_generator(0.5, q_goal);
-            // std::cout << "WARNING: This example will move the robot! "
-            //         << "Please make sure to have the user stop button at hand!" << std::endl
-            //         << "Press Enter to continue..." << std::endl;
-            // std::cin.ignore();
-            // robot.control(motion_generator);
-            // std::cout << "Finished moving to initial joint configuration." << std::endl;
+
             std::cout << "Ready." << std::endl;
 
             // Set additional parameters always before the control loop, NEVER in the control loop!
@@ -401,7 +398,7 @@ private:
             while(true) {
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
-                    if (plan_.has_data && !paused) {
+                    if (plan_.has_data && !paused) { //$ prevent the plan from being started if robot is paused
                         robot.control(joint_position_callback); //impedance_control_callback
                     } else {
                         // publish robot_status
@@ -501,22 +498,17 @@ private:
         return (current_time - prev_time);
     }
 
-<<<<<<< HEAD
     void QueuedCmd() {
         robot_msgs::pause_cmd msg;
-=======
-    void QueuedCmd() {
-        robot_msgs::bool_t msg;
->>>>>>> ddfdf142f6ea1d8f437493393c95215160a07c54
         msg.utime = get_current_utime();
         switch(queued_cmd) {
-            case 0 : return;
-            case 1 : msg.data = true; break;
-            case 2 : msg.data = false; break;
+            case QueuedCommand::NONE     : return;
+            case QueuedCommand::PAUSE    : msg.data = true; break;
+            case QueuedCommand::CONTINUE : msg.data = false; break;
         }
         msg.source = "queued";
         lcm_.publish(p.lcm_stop_channel, &msg);
-        queued_cmd = 0;
+        queued_cmd = QueuedCommand::NONE;
     }
 
     franka::JointPositions JointPositionCallback( const franka::RobotState& robot_state
@@ -815,7 +807,7 @@ private:
                     Pause();
                 }
                 else { //if robot is currently unpausing, queue pause cmd
-                    queued_cmd = 1;
+                    queued_cmd = QueuedCommand::PAUSE;
                 }
             }
         }
@@ -825,14 +817,13 @@ private:
                 if (stop_set.find(msg->source) != stop_set.end()) {
                    stop_set.erase(msg->source); 
                 }
-                
 
                 if (stop_set.size() == 0) {
                     if (paused) { //if robot is currently paused, run continue
                         Continue();
                     }
                     else if (pausing) { //if robot is currently pausing, queue unpause cmd
-                        queued_cmd = 2;
+                        queued_cmd = QueuedCommand::CONTINUE;
                     }
                 }
             }
@@ -856,7 +847,7 @@ private:
     void Continue() {
         momap::log()->info("Continuing plan.");
         this->timestep = -1 * this->stop_duration; //how long unpausing should take
-        momap::log()->debug("STOP DURATION: {}",stop_duration);
+        momap::log()->debug("STOP DURATION: {}", stop_duration);
         paused = false;
         pausing = false;
         unpausing = true;
