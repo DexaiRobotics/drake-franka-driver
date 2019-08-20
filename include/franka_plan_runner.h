@@ -271,7 +271,6 @@ public:
         paused_ = false;
         unpausing_ = false;
 
-
         starting_franka_q_ = {{0,0,0,0,0,0,0}}; 
         starting_conf_ = Eigen::VectorXd::Zero(kNumJoints);
 
@@ -304,13 +303,18 @@ public:
         }
         momap::log()->info("Before LCM thread join");
 
+        running_ = false;
+
         // clean-up threads if they're still alive.
-        if (lcm_publish_status_thread.joinable()) {
-            lcm_publish_status_thread.join();
+        while ( ! lcm_handle_thread.joinable() ||
+                ! lcm_publish_status_thread.joinable()) {
+            usleep(1e5 * 1);
+            momap::log()->info("Waiting for LCM threads to be joinable...");
         }
-        if (lcm_handle_thread.joinable()) {
-            lcm_handle_thread.join();
-        }
+
+        lcm_publish_status_thread.join();
+        lcm_handle_thread.join();
+
         momap::log()->info("After LCM thread join");
         return return_value;
     }
@@ -694,7 +698,7 @@ private:
     };
 
     void HandleLcm() {
-        while (true) {
+        while (running_) {
             lcm_.handleTimeout(0);
             usleep(1e3 * 1); //$ sleep 1ms
         }
