@@ -302,6 +302,8 @@ public:
         } else {
             return_value = RunFranka();
         }
+        momap::log()->info("Before LCM thread join");
+
         // clean-up threads if they're still alive.
         if (lcm_publish_status_thread.joinable()) {
             lcm_publish_status_thread.join();
@@ -309,6 +311,7 @@ public:
         if (lcm_handle_thread.joinable()) {
             lcm_handle_thread.join();
         }
+        momap::log()->info("After LCM thread join");
         return return_value;
     }
 private: 
