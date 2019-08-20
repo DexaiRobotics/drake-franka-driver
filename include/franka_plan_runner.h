@@ -363,7 +363,6 @@ private:
         //     }
         // });
 
-        // while (true) {
         try {
             franka::Robot robot(ip_addr_);
 
@@ -375,8 +374,6 @@ private:
             });
             momap::log()->info("Current mode: {}", RobotModeToString(current_mode));
             
-            //$ TODO: in the future, we may want to send commands to overwrite the current command
-            //$ currently, can only accept a plan if not already running one
             if (current_mode != franka::RobotMode::kIdle) {
                 momap::log()->info("Robot cannot receive commands in mode: {}", RobotModeToString(current_mode));
                 PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, RobotModeToString(current_mode));
@@ -388,7 +385,6 @@ private:
             PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, e.what());
             return -1;
         }
-        // }
 
         try {
             // Connect to robot.
