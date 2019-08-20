@@ -69,6 +69,7 @@
 #include <lcmtypes/robot_spline_t.hpp>
 #include <robot_msgs/bool_t.hpp>
 #include <robot_msgs/pause_cmd.hpp>
+#include <robot_msgs/trigger_t.hpp>
 
 #include "trajectory_solver.h"
 #include "momap/momap_log.h"
@@ -248,6 +249,8 @@ private:
     std::thread lcm_publish_status_thread;
     std::thread lcm_handle_thread;
 
+    std::string lcm_driver_status_channel_;
+
 public:
     FrankaPlanRunner(const parameters::Parameters params)
     : p(params), ip_addr_(params.robot_ip), plan_number_(0),
@@ -259,6 +262,7 @@ public:
         max_accels_ = params.robot_max_accelerations;
 
         dracula = new Dracula(p);
+        lcm_driver_status_channel_ = p.robot_name + "_DRIVER_STATUS";
         joint_limits_ = dracula->GetCS()->GetJointLimits();
         momap::log()->info("Joint limits: {}", joint_limits_.transpose());
 
@@ -286,11 +290,8 @@ public:
     
     };
 
-    ~FrankaPlanRunner() {
-        // if (lcm_publish_status_thread.joinable()) {
-        //     lcm_publish_status_thread.join();
-        // }
-    };
+    ~FrankaPlanRunner() {};
+
     int Run() {
         // start LCM threads; independent of sim vs. real robot
         lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
@@ -301,7 +302,7 @@ public:
         } else {
             return_value = RunFranka();
         }
-        momap::log()->info("Before LCM thread join");
+        momap::log()->debug("Before LCM thread join");
 
         running_ = false;
 
@@ -315,7 +316,7 @@ public:
         lcm_publish_status_thread.join();
         lcm_handle_thread.join();
 
-        momap::log()->info("After LCM thread join");
+        momap::log()->debug("After LCM thread join");
         return return_value;
     }
 private: 
@@ -378,11 +379,13 @@ private:
             //$ currently, can only accept a plan if not already running one
             if (current_mode != franka::RobotMode::kIdle) {
                 momap::log()->info("Robot cannot receive commands in mode: {}", RobotModeToString(current_mode));
+                PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, RobotModeToString(current_mode));
                 return 1;
             }
 
         } catch (franka::Exception const& e) {
             std::cout << e.what() << std::endl; 
+            PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, e.what());
             return -1;
         }
         // }
@@ -394,6 +397,7 @@ private:
             robot_alive_ = true; 
 
             std::cout << "Ready." << std::endl;
+            PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, true);
 
             // Set additional parameters always before the control loop, NEVER in the control loop!
             // Set collision behavior.
@@ -449,6 +453,7 @@ private:
                         plan_.mutex.unlock(); 
                     } else {
                         momap::log()->error("failed to get a mutex after an error. returning -99.");
+                        PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, e.what());
                         return -99; 
                     }
                     
@@ -458,11 +463,9 @@ private:
         } catch (const franka::Exception& ex) {
             running_ = false;
             momap::log()->error("drake::franka_driver::RunFranka Caught expection: {}", ex.what() );
-            // return -99; // bad things happened. 
+            PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, ex.what());
+            return -99; // bad things happened. 
         }
-        // if (print_thread.joinable()) {
-        //     print_thread.join();
-        // }
         return 0; 
         
     };
@@ -672,7 +675,7 @@ private:
                         // plan_.utime = -1;
                         plan_.mutex.unlock();
                         
-                        PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                        PublishTriggerToChannel(plan_.utime, p.lcm_plan_complete_channel);
                         // return output;
                         // plan_.mutex.unlock();
                         return franka::MotionFinished(output);
@@ -723,12 +726,12 @@ private:
         }
     };
 
-    //$ TODO: use a different, simpler LCM type for this?
-    void PublishUtimeToChannel(int64_t utime, std::string lcm_channel) {
-        lcmt_iiwa_status dummy_status;
-        ResizeStatusMessage(dummy_status);
-        dummy_status.utime = utime;
-        lcm_.publish(lcm_channel, &dummy_status);
+    void PublishTriggerToChannel(int64_t utime, std::string lcm_channel, bool success=true, std::string message="") {
+        robot_msgs::trigger_t msg;
+        msg.utime = utime;
+        msg.success = success;
+        msg.message = message;
+        lcm_.publish(lcm_channel, &msg);
     }
     
     //$ check if robot is in a mode that can receive commands, i.e. not user stopped or error recovery
@@ -776,7 +779,7 @@ private:
         momap::log()->info("utime: {}", rst->utime);
         plan_.utime = rst->utime;
         //$ publish confirmation that plan was received with same utime
-        PublishUtimeToChannel(plan_.utime, p.lcm_plan_received_channel);
+        PublishTriggerToChannel(plan_.utime, p.lcm_plan_received_channel);
         momap::log()->info("Published confirmation of received plan");
 
         franka_time_ = 0.0;

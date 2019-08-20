@@ -1,0 +1,10 @@
+package robot_msgs;
+
+// LCM version of std_srvs::TriggerResponse
+struct trigger_t
+{
+    // microseconds since the epoch
+    int64_t  utime;
+    boolean  success;
+    string   message;
+}
