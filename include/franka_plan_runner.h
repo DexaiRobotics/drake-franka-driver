@@ -355,6 +355,31 @@ private:
         //     }
         // });
 
+        // while (true) {
+        try {
+            franka::Robot robot(ip_addr_);
+
+            size_t count = 0;
+            franka::RobotMode current_mode;
+            robot.read([&count, &current_mode](const franka::RobotState& robot_state) {
+                current_mode = robot_state.robot_mode;
+                return count++ < 100;
+            });
+            momap::log()->info("Current mode: {}", RobotModeToString(current_mode));
+            
+            //$ TODO: in the future, we may want to send commands to overwrite the current command
+            //$ currently, can only accept a plan if not already running one
+            if (current_mode != franka::RobotMode::kIdle) {
+                momap::log()->info("Robot cannot receive commands in mode: {}", RobotModeToString(current_mode));
+                return 1;
+            }
+
+        } catch (franka::Exception const& e) {
+            std::cout << e.what() << std::endl; 
+            return -1;
+        }
+        // }
+
         try {
             // Connect to robot.
             franka::Robot robot(ip_addr_);
