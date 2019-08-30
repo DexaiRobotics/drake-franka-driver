@@ -321,48 +321,9 @@ public:
     }
 private: 
     int RunFranka() {
-        // const double print_rate = 10.0;
-        // struct {
-        //     std::mutex mutex;
-        //     bool has_data;
-        //     std::array<double, 7> tau_d_last;
-        //     franka::RobotState robot_state;
-        //     std::array<double, 7> gravity;
-        // } print_data{};
 
-        // Start print thread.
-        // std::thread print_thread([print_rate, &print_data, this]() {
-        //     while (this->running_) {
-        //     // Sleep to achieve the desired print rate.
-        //     std::this_thread::sleep_for(
-        //         std::chrono::milliseconds(static_cast<int>((1.0 / print_rate * 1000.0))));
-
-        //     // Try to lock data to avoid read write collisions.
-        //     if (print_data.mutex.try_lock()) {
-        //         if (print_data.has_data) {
-        //         std::array<double, 7> tau_error{};
-        //         double error_rms(0.0);
-        //         std::array<double, 7> tau_d_actual{};
-        //         for (size_t i = 0; i < 7; ++i) {
-        //             tau_d_actual[i] = print_data.tau_d_last[i] + print_data.gravity[i];
-        //             tau_error[i] = tau_d_actual[i] - print_data.robot_state.tau_J[i];
-        //             error_rms += std::pow(tau_error[i], 2.0) / tau_error.size();
-        //         }
-        //         error_rms = std::sqrt(error_rms);
-
-        //         // Print data to console
-        //         std::cout << "tau_error [Nm]: " << du::v_to_e(ConvertToVector(tau_error)).transpose() << std::endl
-        //                     << "tau_commanded [Nm]: " << du::v_to_e(ConvertToVector(tau_d_actual)).transpose() << std::endl
-        //                     << "tau_measured [Nm]: " << du::v_to_e(ConvertToVector(print_data.robot_state.tau_J)).transpose() << std::endl
-        //                     // << "root mean square of tau_error [Nm]: " << error_rms << std::endl
-        //                     << "-----------------------" << std::endl;
-        //         print_data.has_data = false;
-        //         }
-        //         print_data.mutex.unlock();
-        //     }
-        //     }
-        // });
-
+        //$ attempt connection to robot and read current mode
+        //$ return if connection fails, or robot is in a mode that cannot receive commands
         try {
             franka::Robot robot(ip_addr_);
 
@@ -398,7 +359,7 @@ private:
             // Set additional parameters always before the control loop, NEVER in the control loop!
             // Set collision behavior.
 
-            bool we_care_about_safety = false;
+            bool we_care_about_safety = true;
             if (we_care_about_safety) {
                 robot.setCollisionBehavior(
                     {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}}, {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
@@ -419,7 +380,8 @@ private:
                 return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
             };
 
-            
+
+            //$ main control loop
             while(true) {
                 // std::cout << "top of loop: Executing motion." << std::endl;
                 try {
@@ -444,15 +406,19 @@ private:
                 } catch (const franka::ControlException& e) {
                     std::cout << e.what() << std::endl;
                     std::cout << "Running error recovery..." << std::endl;
-                    if (plan_.mutex.try_lock() ) {
-                        robot.automaticErrorRecovery();
-                        plan_.mutex.unlock(); 
-                    } else {
-                        momap::log()->error("failed to get a mutex after an error. returning -99.");
-                        PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, e.what());
-                        return -99; 
-                    }
-                    
+                    momap::log()->error("FRANKA ERROR. returning -99.");
+                    PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, e.what());
+                    return -99; 
+
+                    //$ UNCOMMENT BELOW TO PERFORM AUTOMATIC ERROR RECOVERY
+                    // if (plan_.mutex.try_lock() ) {
+                    //     robot.automaticErrorRecovery();    
+                    //     plan_.mutex.unlock(); 
+                    // } else {
+                    //     momap::log()->error("failed to get a mutex after an error. returning -99.");
+                    //     PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, e.what());
+                    //     return -99; 
+                    // }
                 }
             }
 
