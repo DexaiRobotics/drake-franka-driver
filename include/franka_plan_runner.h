@@ -398,7 +398,7 @@ private:
             // Set additional parameters always before the control loop, NEVER in the control loop!
             // Set collision behavior.
 
-            bool we_care_about_safety = false;
+            bool we_care_about_safety = true;
             if (we_care_about_safety) {
                 robot.setCollisionBehavior(
                     {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}}, {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
@@ -444,8 +444,13 @@ private:
                 } catch (const franka::ControlException& e) {
                     std::cout << e.what() << std::endl;
                     std::cout << "Running error recovery..." << std::endl;
+                    momap::log()->error("FRANKA ERROR. returning -99.");
+                    PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, false, e.what());
+                    return -99; 
                     if (plan_.mutex.try_lock() ) {
-                        robot.automaticErrorRecovery();
+                        // robot.automaticErrorRecovery();
+                        
+                        return -9999;
                         plan_.mutex.unlock(); 
                     } else {
                         momap::log()->error("failed to get a mutex after an error. returning -99.");
