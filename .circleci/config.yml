@@ -5,7 +5,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: dmsj/drake-torch:latest #sprax/drax-momap:0.2.9
+      - image: dexai2/drake-torch:bionic_latest
 
     steps:
       - run:
