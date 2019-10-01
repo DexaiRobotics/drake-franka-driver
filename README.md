@@ -28,7 +28,7 @@ The `drake-franka-driver` reports the robot status on the `<robot_name>_status` 
 
 ## Starting driver on NUC remotely
 In our implementation, the NUC runs this driver to talk to the Franka Controller.
-There are 3 ways to start the driver: either using `di start core:franka` command on the beast computer, using `franka` command directly on the beast computer, or manually starting the driver on the NUC.
+There are 3 ways to start the driver: either using `di start core:franka` command on the beast computer, using `franka` command directly on the beast computer, or manually starting the driver on the NUC. See also here: https://github.com/DexaiRobotics/wiki/wiki/Running-Candy-Demo#starting-drake-franka-driver-manually-to-debug
 ### franka command
 There is a command called `franka` which is run on the Beast Computer (this is what `di start core:franka` callsunder the hood): https://github.com/DexaiRobotics/deploy/blob/master/franka
 On the NUC, there is a crontab which runs on startup: https://github.com/DexaiRobotics/deploy/blob/master/robot_cron/run_franka_server_out_docker.sh
