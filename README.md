@@ -26,3 +26,14 @@ The `drake-franka-driver` listens for commands on the `<robot_name>_cmd` lcm cha
 ### listening to the robot response
 The `drake-franka-driver` reports the robot status on the `<robot_name>_status` lcm channel. By default this is set to `franka_0_status`. Status is reported in a `franka_status` struct.
 
+## Starting driver on NUC remotely
+In our implementation, the NUC runs this driver to talk to the Franka Controller.
+There are 3 ways to start the driver: either using `di start core:franka` command on the beast computer, using `franka` command directly on the beast computer, or manually starting the driver on the NUC.
+### franka command
+There is a command called `franka` which is run on the Beast Computer (this is what `di start core:franka` callsunder the hood): https://github.com/DexaiRobotics/deploy/blob/master/franka
+On the NUC, there is a crontab which runs on startup: https://github.com/DexaiRobotics/deploy/blob/master/robot_cron/run_franka_server_out_docker.sh
+This will:
+1) make sure a docker is running
+2) run the following script to build the franka driver and start up the LCM server https://github.com/DexaiRobotics/fullstack/blob/master/src/run_franka_server.sh
+
+The LCM server https://github.com/DexaiRobotics/drake-franka-driver/blob/master/scripts/franka_server.py will listen to LCM commands from the franka command on the beast computer, and start up the actual driver when requested.
