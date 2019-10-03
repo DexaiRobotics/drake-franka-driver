@@ -1,5 +1,5 @@
-#! /bin/sh -
-set -euxo pipefail
+#! /bin/bash
+#set -euxo
 
 if [[ "$#" == "0" ]]; then
   echo "Default behavior, using hostname: $HOSTNAME"
@@ -36,5 +36,9 @@ echo "choose config file: $config"
 
 # if another driver instance is still somehow running, kill it silently
 pkill -f franka_plan_runner > /dev/null 2>&1
-
-./build/franka_plan_runner $config
+echo "start franka_plan_runner"
+if ./build/franka_plan_runner $config ; then
+    echo "franka_plan_runner started successfully"
+else
+    echo "franka_plan_runner failed to start"
+fi
