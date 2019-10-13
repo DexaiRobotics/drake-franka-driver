@@ -422,7 +422,7 @@ private:
                 std::array<double, 7> tau_d_calculated;
                 for (size_t i = 0; i < 7; i++) {
                     tau_d_calculated[i] =
-                        k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + 0*i_gains[i] * error_accumulator[i] + coriolis[i];
+                        k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + i_gains[i] * error_accumulator[i] + coriolis[i];
                     error_accumulator[i] += (state.q_d[i] - state.q[i]);
                 }
 
