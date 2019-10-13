@@ -400,7 +400,7 @@ private:
 
             // Set gains for the joint impedance control.
             // Stiffness
-            const std::array<double, 7> k_gains = {{600.0, 600.0, 600.0, 600.0, 250.0, 150.0, 50.0}};
+            const std::array<double, 7> k_gains = {{700.0, 700.0, 700.0, 700.0, 290.0, 180.0, 70.0}};
             // Damping
             const std::array<double, 7> d_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
             // integral
@@ -422,7 +422,7 @@ private:
                 std::array<double, 7> tau_d_calculated;
                 for (size_t i = 0; i < 7; i++) {
                     tau_d_calculated[i] =
-                        k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + i_gains[i] * error_accumulator[i] + coriolis[i];
+                        k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + 0*i_gains[i] * error_accumulator[i] + coriolis[i];
                     error_accumulator[i] += (state.q_d[i] - state.q[i]);
                 }
 
