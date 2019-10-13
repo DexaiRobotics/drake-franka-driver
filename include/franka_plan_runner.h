@@ -429,6 +429,15 @@ private:
                 Eigen::Vector3d position(transform.translation());
                 Eigen::Quaterniond orientation(transform.linear());
 
+                // get desired position:
+                Eigen::Vector3d position_d; // (initial_transform.translation());
+                Eigen::Quaterniond orientation_d; //(initial_transform.linear());
+                Eigen::VectorXd desired_conf;
+                std::vector<double> desired_conf_vec;
+                desired_conf_vec.assign(std::begin(robot_state.q_d), std::end(robot_state.q_d)) ;
+                desired_conf = du::v_to_e( desired_conf_vec ); 
+                dracula->GetCS()->GetFK("franka_feh", desired_conf, position_d, orientation_d);
+
                 // compute error to desired equilibrium pose
                 // position error
                 Eigen::Matrix<double, 6, 1> error;
@@ -459,8 +468,8 @@ private:
                 std::vector<double> tau_cmd_vec{0,0,0,0,0,0,0};
                 // std::vector<double> tau_J_franka{0,0,0,0,0,0,0};
                 // std::vector<double> err_accum_vec{0,0,0,0,0,0,0};
-                tau_m_vec.assign(std::begin(state.tau_J), std::end(state.tau_J)) ;
-                tau_cmd_vec.assign(std::begin(state.tau_J_d), std::end(state.tau_J_d)) ;
+                tau_m_vec.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ;
+                tau_cmd_vec.assign(std::begin(robot_state.tau_J_d), std::end(robot_state.tau_J_d)) ;
                 // tau_J_franka.assign(std::begin(tau_d_rate_limited), std::end(tau_d_rate_limited)) ;
                 // err_accum_vec.assign(std::begin(error_accumulator), std::end(error_accumulator)) ;
                 momap::log()->info("tau_meas: {}", dru::v_to_e(tau_m_vec).transpose());
