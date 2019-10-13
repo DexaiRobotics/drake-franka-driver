@@ -112,9 +112,9 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
         }
 
         if(plan_.plan){//below is inverseDynamics code
-            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*0;
-            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*0;
-            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*0;
+            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*10;
+            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*10;
+            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*10;
 
             if(franka_time_ == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
 
@@ -188,7 +188,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
                     PublishTriggerToChannel(plan_.utime, p.lcm_plan_complete_channel);
                     return franka::MotionFinished(output);
                 } else {
-                    momap::log()->info("Plan running overtime and not converged, dist: {}",
+                    momap::log()->debug("Plan running overtime and not converged, dist: {}",
                                        dist_from_end);
                 }
 
