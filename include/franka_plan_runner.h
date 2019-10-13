@@ -404,7 +404,7 @@ private:
             // Damping
             const std::array<double, 7> d_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
             // integral
-            const std::array<double, 7> i_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
+            const std::array<double, 7> i_gains = {{5.0, 5.0, 5.0, 5.0, 3.0, 2.5, 1.5}};
             std::array<double, 7> error_accumulator = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
             // Define callback for the joint torque control loop.
             
