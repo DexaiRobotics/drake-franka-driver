@@ -367,6 +367,9 @@ private:
             setDefaultBehavior(robot);
             robot_alive_ = true; 
 
+            // Load the kinematics and dynamics model.
+            franka::Model model = robot.loadModel();
+
             std::cout << "Ready." << std::endl;
             PublishTriggerToChannel(get_current_utime(), lcm_driver_status_channel_, true);
 
@@ -394,6 +397,50 @@ private:
                 return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
             };
 
+            // Set gains for the joint impedance control.
+            // Stiffness
+            const std::array<double, 7> k_gains = {{600.0, 600.0, 600.0, 600.0, 250.0, 150.0, 50.0}};
+            // Damping
+            const std::array<double, 7> d_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
+
+            // Define callback for the joint torque control loop.
+            std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
+                impedance_control_callback =
+                    [&print_data, &model, k_gains, d_gains](
+                        const franka::RobotState& state, franka::Duration /*period*/) -> franka::Torques {
+                
+                // Read current coriolis terms from model.
+                std::array<double, 7> coriolis = model.coriolis(state);
+
+                // Compute torque command from joint impedance control law.
+                // Note: The answer to our Cartesian pose inverse kinematics is always in state.q_d with one
+                // time step delay.
+                std::array<double, 7> tau_d_calculated;
+                for (size_t i = 0; i < 7; i++) {
+                    tau_d_calculated[i] =
+                        k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + coriolis[i];
+                }
+
+                // The following line is only necessary for printing the rate limited torque. As we activated
+                // rate limiting for the control loop (activated by default), the torque would anyway be
+                // adjusted!
+                std::array<double, 7> tau_d_rate_limited =
+                    franka::limitRate(franka::kMaxTorqueRate, tau_d_calculated, state.tau_J_d);
+
+                std::vector<double> tau_m_vec{0,0,0,0,0,0,0};
+                std::vector<double> tau_cmd_vec{0,0,0,0,0,0,0};
+                std::vector<double> tau_J_franka{0,0,0,0,0,0,0};
+                tau_m_vec.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ;
+                tau_cmd_vec.assign(std::begin(robot_state.tau_J_d), std::end(robot_state.tau_J_d)) ;
+                tau_J_franka.assign(std::begin(tau_d_rate_limited), std::end(tau_d_rate_limited)) ;
+                momap::log()->info("tau_meas: {}", dru::v_to_e(tau_m_vec).transpose());
+                momap::log()->info("tau_cmd: {}", dru::v_to_e(tau_cmd_vec).transpose());
+                momap::log()->info("tau_cmd: {}", dru::v_to_e(tau_cmd_vec).transpose());
+
+                // Send torque command.
+                return tau_d_rate_limited;
+            };
+
             //callback for inverseDynamics - i think all this code should be refactored at some point...
             std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
                 inverse_dynamics_control_callback = [&, this](
@@ -402,7 +449,7 @@ private:
             };
 
             //for inverse dynamics
-            run_inverse_dynamics_ = true; // TODO : move this somewhere else in the class?
+            run_inverse_dynamics_ = false; // TODO : move this somewhere else in the class?
             if(run_inverse_dynamics_){
                 MultibodySetUp(mb_plant_, mb_plant_context_, "/src/drake-franka-driver/tests/data/franka_test_with_mass.urdf" );
                 // std::cout << "done multibody setup" << '\n';
@@ -418,7 +465,8 @@ private:
                             robot.control(inverse_dynamics_control_callback);
                         }
                         else{
-                            robot.control(joint_position_callback);
+                            robot.control(impedance_control_callback, joint_position_callback);
+                            // robot.control(joint_position_callback);
                         }
                     } else {
                         // publish robot_status
