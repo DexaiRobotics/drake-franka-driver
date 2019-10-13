@@ -402,7 +402,7 @@ private:
             };
 
             //for inverse dynamics
-            run_inverse_dynamics_ = false; // TODO : move this somewhere else in the class?
+            run_inverse_dynamics_ = true; // TODO : move this somewhere else in the class?
             if(run_inverse_dynamics_){
                 MultibodySetUp(mb_plant_, mb_plant_context_, "/src/drake-franka-driver/tests/data/franka_test_with_mass_no_joint_limits.urdf" );
                 // std::cout << "done multibody setup" << '\n';
