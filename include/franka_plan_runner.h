@@ -695,7 +695,7 @@ private:
                 Eigen::VectorXd output_end = starting_q_eigen + delta_end; 
                 Eigen::VectorXd current_conf_eigen = du::v_to_e( ConvertToVector(current_conf) );
                 // error = ( du::v_to_e( ConvertToVector(current_conf) ) -  plan_.plan->value(plan_.plan->end_time()) ).norm();
-                error = ( current_conf_eigen -  output_end ).norm();
+                error = ( current_conf_eigen -  output_end ).maxCoeff();
 
                 // momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q_) ).transpose()); 
                 // momap::log()->warn("starting_q_eigen = {}", starting_q_eigen.transpose()); 
@@ -718,7 +718,7 @@ private:
                 // output = q_goal; 
         
                 if (franka_time_ > plan_.plan->end_time()) {
-                    if (error < 0.007) { // TODO: replace with non arbitrary number
+                    if (error < 0.005) { // TODO: replace with non arbitrary number
                         franka::JointPositions ret_val = current_conf;
                         std::cout << std::endl << "Finished motion, exiting controller" << std::endl;
                         plan_.plan.release();
