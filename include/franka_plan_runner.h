@@ -435,12 +435,14 @@ private:
                 std::vector<double> tau_m_vec{0,0,0,0,0,0,0};
                 std::vector<double> tau_cmd_vec{0,0,0,0,0,0,0};
                 std::vector<double> tau_J_franka{0,0,0,0,0,0,0};
+                std::vector<double> err_accum_vec{0,0,0,0,0,0,0};
                 tau_m_vec.assign(std::begin(state.tau_J), std::end(state.tau_J)) ;
                 tau_cmd_vec.assign(std::begin(state.tau_J_d), std::end(state.tau_J_d)) ;
                 tau_J_franka.assign(std::begin(tau_d_rate_limited), std::end(tau_d_rate_limited)) ;
+                err_accum_vec.assign(std::begin(error_accumulator), std::end(error_accumulator)) ;
                 momap::log()->info("tau_meas: {}", dru::v_to_e(tau_m_vec).transpose());
                 momap::log()->info("tau_cmd: {}", dru::v_to_e(tau_cmd_vec).transpose());
-                momap::log()->info("tau_cmd: {}", dru::v_to_e(tau_cmd_vec).transpose());
+                momap::log()->info("error_accumulator: {}", dru::v_to_e(err_accum_vec).transpose());
 
                 // Send torque command.
                 return tau_d_rate_limited;
