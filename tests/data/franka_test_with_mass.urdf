@@ -4,293 +4,23 @@
 <!-- |    EDITING THIS FILE BY HAND IS NOT RECOMMENDED                                 | -->
 <!-- =================================================================================== -->
 <robot name="franka" xmlns:xacro="http://www.ros.org/wiki/xacro">
-  <!-- Rviz colors -->
-  <!-- These define standard color names are that can be used elsewhere for
-       improved visualization -->
-  <link name="franka_feh">
-    <inertial>
-      <!--treating the FEH parts as a half-kilogram cylinder that's 4 inches across,
-      4 inches tall, and centered on the link. -->
-      <mass value="0.67" />
-      <origin xyz="0 0 0" rpy="0 0 0" />
-      <inertia ixx="0.000729" ixy="0" ixz="0" iyy="0.000729" iyz="0" izz="0.000625" />
-    </inertial>
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/franka_feh.obj"/>
-      </geometry>
-    </visual>
-    <!-- feh cover -->
-    <collision>
-      <origin rpy="0 0 0.785398" xyz="0.0424 0.0424 0.032"/>
-      <geometry>
-        <box size="0.09 0.075 0.08"/>
-      </geometry>
-    </collision>
-    <!-- tc tip -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.0942"/>
-      <geometry>
-        <cylinder length="0.013" radius="0.01125"/>
-      </geometry>
-    </collision>
-    <!-- tc -->
-    <!-- <collision>
-      <origin
-        xyz="0 0 0.0821"
-        rpy="0 0 0" />
-      <geometry>
-          <cylinder length="0.0162" radius="0.0275" />
-      </geometry>
-    </collision> -->
-    <!-- tc mount -->
-    <!-- <collision>
-      <origin
-        xyz="0 0 0.063"
-        rpy="0 0 0" />
-      <geometry>
-          <cylinder length="0.022" radius="0.034" />
-      </geometry>
-    </collision> -->
-    <!-- ft mount and ft -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.0388"/>
-      <geometry>
-        <cylinder length="0.0957" radius="0.04"/>
-      </geometry>
-    </collision>
-    <!-- camera and valve bank -->
-    <collision>
-      <origin rpy="0 0 -0.7854" xyz="0.0265 0.0265 0.0377"/>
-      <geometry>
-        <box size="0.09 0.075 0.096"/>
-      </geometry>
-    </collision>
-  </link>
-  <joint name="franka_0_link8_to_franka_feh" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-    <parent link="franka_0_link8"/>
-    <child link="franka_feh"/>
-  </joint>
-  <link name="feh_mate"/>
-  <joint name="franka_feh_to_feh_mate" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.0842"/>
-    <parent link="franka_feh"/>
-    <child link="feh_mate"/>
-  </joint>
-  <link name="realsense_base_link"/>
-  <joint name="franka_feh_to_realsense_base_link" type="fixed">
-    <origin rpy="1.5708 -1.5708 -0.7854" xyz="0.0481 0.0481 0.07165"/>
-    <parent link="franka_feh"/>
-    <child link="realsense_base_link"/>
-  </joint>
-  <!-- <link name="wrist_target_seg"/>
-  <joint
-    name="franka_feh_to_wrist_target_seg"
-    type="fixed">
-    <origin
-      xyz="0.069876 0 -0.04815"
-      rpy="0 ${3.14159/2} 0" />
-    <parent
-      link="franka_feh" />
-    <child
-      link="wrist_target_seg" />
-    <axis
-      xyz="0 0 0" />
-  </joint>
-  <link
-    name="wrist_target">
-    <inertial>
-      <origin
-        xyz="0.000240537999999998 -6.93889390390723E-18 8.56111620330315E-17"
-        rpy="0 0 0" />
-      <origin
-        xyz="0 0 0"
-        rpy="0 0 0" />
-      <geometry>
-        <mesh
-          filename="meshes/visual/wrist_target.obj" />
-      </geometry>
-    </visual>
-  </link>
-  <joint
-    name="franka_feh_to_wrist_target"
-    type="fixed">
-    <origin
-      xyz="0.069876 0 -0.04815"
-      rpy="3.14159 0 0" />
-    <parent
-      link="franka_feh" />
-    <child
-      link="wrist_target" />
-    <axis
-      xyz="0 0 0" />
-  </joint> -->
-  <!-- racked utensils -->
-  <joint name="base_link_to_spoon_1oz_skittles_tc_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="spoon_1oz_skittles_tc"/>
-    <origin rpy="0.000 -0.000 1.571" xyz="-0.090 0.342 -0.152"/>
-  </joint>
-  <link name="spoon_1oz_skittles_tc">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/spoon_1oz.obj"/>
-      </geometry>
-    </visual>
-    <!-- simpler, box collision geo when the utensil is in a bin -->
-    <!-- spoon tc mating feature -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.012"/>
-      <geometry>
-        <cylinder length="0.03" radius="0.0275"/>
-      </geometry>
-    </collision>
-    <!-- spoon tag paddle feature -->
-    <collision>
-      <origin rpy="0 0 0.785398" xyz="0.0266 0.0266 0.0365"/>
-      <geometry>
-        <box size="0.085 0.065 0.065"/>
-      </geometry>
-    </collision>
-    <!-- accurate collision geo for utensil -->
-  </link>
-  <link name="spoon_1oz_skittles_tag">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/april_tag_50mm.obj"/>
-      </geometry>
-    </visual>
-  </link>
-  <joint name="spoon_1oz_skittles_tc_to_spoon_1oz_skittles_tag" type="fixed">
-    <parent link="spoon_1oz_skittles_tc"/>
-    <child link="spoon_1oz_skittles_tag"/>
-    <origin rpy="3.14159 0 2.35619" xyz="0.0344 0.0344 0.0045"/>
-  </joint>
-  <link name="spoon_1oz_skittles_face"/>
-  <joint name="spoon_1oz_skittles_tc_to_spoon_1oz_skittles_face" type="fixed">
-    <parent link="spoon_1oz_skittles_tc"/>
-    <child link="spoon_1oz_skittles_face"/>
-    <origin rpy="0 -2.0944 -2.35619" xyz="0.0506 0.0506 0.1442"/>
-  </joint>
-  <link name="spoon_1oz_skittles_tip"/>
-  <joint name="spoon_1oz_skittles_face_to_spoon_1oz_skittles_tip" type="fixed">
-    <parent link="spoon_1oz_skittles_face"/>
-    <child link="spoon_1oz_skittles_tip"/>
-    <origin rpy="0 0 0" xyz="0.0254 0 0"/>
-  </joint>
-  <joint name="base_link_to_spoon_1oz_mnms_tc_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="spoon_1oz_mnms_tc"/>
-    <origin rpy="0.000 -0.000 1.571" xyz="-0.090 0.504 -0.152"/>
-  </joint>
-  <link name="spoon_1oz_mnms_tc">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/spoon_1oz.obj"/>
-      </geometry>
-    </visual>
-    <!-- simpler, box collision geo when the utensil is in a bin -->
-    <!-- spoon tc mating feature -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.012"/>
-      <geometry>
-        <cylinder length="0.03" radius="0.0275"/>
-      </geometry>
-    </collision>
-    <!-- spoon tag paddle feature -->
-    <collision>
-      <origin rpy="0 0 0.785398" xyz="0.0266 0.0266 0.0365"/>
-      <geometry>
-        <box size="0.085 0.065 0.065"/>
-      </geometry>
-    </collision>
-    <!-- accurate collision geo for utensil -->
-  </link>
-  <link name="spoon_1oz_mnms_tag">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/april_tag_50mm.obj"/>
-      </geometry>
-    </visual>
-  </link>
-  <joint name="spoon_1oz_mnms_tc_to_spoon_1oz_mnms_tag" type="fixed">
-    <parent link="spoon_1oz_mnms_tc"/>
-    <child link="spoon_1oz_mnms_tag"/>
-    <origin rpy="3.14159 0 2.35619" xyz="0.0344 0.0344 0.0045"/>
-  </joint>
-  <link name="spoon_1oz_mnms_face"/>
-  <joint name="spoon_1oz_mnms_tc_to_spoon_1oz_mnms_face" type="fixed">
-    <parent link="spoon_1oz_mnms_tc"/>
-    <child link="spoon_1oz_mnms_face"/>
-    <origin rpy="0 -2.0944 -2.35619" xyz="0.0506 0.0506 0.1442"/>
-  </joint>
-  <link name="spoon_1oz_mnms_tip"/>
-  <joint name="spoon_1oz_mnms_face_to_spoon_1oz_mnms_tip" type="fixed">
-    <parent link="spoon_1oz_mnms_face"/>
-    <child link="spoon_1oz_mnms_tip"/>
-    <origin rpy="0 0 0" xyz="0.0254 0 0"/>
-  </joint>
-  <joint name="base_link_to_spoon_1oz_kisses_tc_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="spoon_1oz_kisses_tc"/>
-    <origin rpy="0.000 -0.000 1.571" xyz="0.090 0.342 -0.152"/>
-  </joint>
-  <link name="spoon_1oz_kisses_tc">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/spoon_1oz.obj"/>
-      </geometry>
-    </visual>
-    <!-- simpler, box collision geo when the utensil is in a bin -->
-    <!-- spoon tc mating feature -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.012"/>
-      <geometry>
-        <cylinder length="0.03" radius="0.0275"/>
-      </geometry>
-    </collision>
-    <!-- spoon tag paddle feature -->
-    <collision>
-      <origin rpy="0 0 0.785398" xyz="0.0266 0.0266 0.0365"/>
-      <geometry>
-        <box size="0.085 0.065 0.065"/>
-      </geometry>
-    </collision>
-    <!-- accurate collision geo for utensil -->
-  </link>
-  <link name="spoon_1oz_kisses_tag">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/april_tag_50mm.obj"/>
-      </geometry>
-    </visual>
-  </link>
-  <joint name="spoon_1oz_kisses_tc_to_spoon_1oz_kisses_tag" type="fixed">
-    <parent link="spoon_1oz_kisses_tc"/>
-    <child link="spoon_1oz_kisses_tag"/>
-    <origin rpy="3.14159 0 2.35619" xyz="0.0344 0.0344 0.0045"/>
-  </joint>
-  <link name="spoon_1oz_kisses_face"/>
-  <joint name="spoon_1oz_kisses_tc_to_spoon_1oz_kisses_face" type="fixed">
-    <parent link="spoon_1oz_kisses_tc"/>
-    <child link="spoon_1oz_kisses_face"/>
-    <origin rpy="0 -2.0944 -2.35619" xyz="0.0506 0.0506 0.1442"/>
-  </joint>
-  <link name="spoon_1oz_kisses_tip"/>
-  <joint name="spoon_1oz_kisses_face_to_spoon_1oz_kisses_tip" type="fixed">
-    <parent link="spoon_1oz_kisses_face"/>
-    <child link="spoon_1oz_kisses_tip"/>
-    <origin rpy="0 0 0" xyz="0.0254 0 0"/>
-  </joint>
-  <joint name="franka_0_joint_base_link" type="fixed">
+    <link name="world">
+    </link>
+    <joint name="base_foot_world" type="fixed">
+        <parent link="world"/>
+        <child link="base_footprint"/>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+    </joint>
+    <link name="base_link">
+    </link>
+    <link name="base_footprint"/>
+    <joint name="base_foot_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin rpy="0 0 0" xyz="0 0 0"/>
+    </joint>
+
+    <joint name="franka_0_joint_base_link" type="fixed">
     <parent link="base_link"/>
     <child link="franka_0_link0"/>
     <origin rpy="0 0 1.5708" xyz="0 0 0"/>
@@ -301,11 +31,7 @@
         <mesh filename="meshes/visual/link0.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
-        <geometry>
-          <mesh filename="meshes/collision/link0.obj"/>
-        </geometry>
-      </collision> -->
+
     <inertial>
       <!--taken from github.com/mkrizmancic/franka_gazebo
       masses pass the eyeball test so i'm using his parameters-->
@@ -326,11 +52,7 @@
         <mesh filename="meshes/visual/link1.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
-        <geometry>
-          <mesh filename="meshes/collision/link1.obj"/>
-        </geometry>
-      </collision> -->
+
     <inertial>
       <!--taken from github.com/mkrizmancic/franka_gazebo
       masses pass the eyeball test so i'm using his parameters-->
@@ -371,12 +93,7 @@
         <mesh filename="meshes/visual/link2.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
-        <geometry>
-          <cylinder radius="0.09" length="0.25"/>
-           <mesh filename="meshes/collision/link2.obj"/> 
-        </geometry>
-      </collision> -->
+
     <inertial>
       <!-- taken from github.com/mkrizmancic/franka_gazebo
       masses pass the eyeball test so i'm using his parameters -->
@@ -411,11 +128,7 @@
         <mesh filename="meshes/visual/link3.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
-        <geometry>
-          <mesh filename="meshes/collision/link3.obj"/>
-        </geometry>
-      </collision> -->
+
     <inertial>
       <!-- taken from github.com/mkrizmancic/franka_gazebo
       masses pass the eyeball test so i'm using his parameters -->
@@ -450,11 +163,7 @@
         <mesh filename="meshes/visual/link4.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
-        <geometry>
-          <mesh filename="meshes/collision/link4.obj"/>
-        </geometry>
-      </collision> -->
+
     <inertial>
       <!-- taken from github.com/mkrizmancic/franka_gazebo
       masses pass the eyeball test so i'm using his parameters  -->
@@ -489,11 +198,7 @@
         <mesh filename="meshes/visual/link5.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
-        <geometry>
-          <mesh filename="meshes/collision/link5.obj"/>
-        </geometry>
-      </collision> -->
+
     <inertial>
       <!--taken from github.com/mkrizmancic/franka_gazebo
       masses pass the eyeball test so i'm using his parameters -->
@@ -528,11 +233,7 @@
         <mesh filename="meshes/visual/link6.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
-        <geometry>
-          <mesh filename="meshes/collision/link6.obj"/>
-        </geometry>
-      </collision> -->
+
     <inertial>
       <!--taken from github.com/mkrizmancic/franka_gazebo
       masses pass the eyeball test so i'm using his parameters -->
@@ -567,11 +268,7 @@
         <mesh filename="meshes/visual/link7.obj"/>
       </geometry>
     </visual>
-    <!-- <collision>
-        <geometry>
-          <mesh filename="meshes/collision/link7.obj"/>
-        </geometry>
-      </collision> -->
+
     <inertial>
       <!--taken from github.com/mkrizmancic/franka_gazebo
       masses pass the eyeball test so i'm using his parameters -->
@@ -602,530 +299,65 @@
     <child link="franka_0_link8"/>
     <axis xyz="0 0 0"/>
   </joint>
-  <!-- <xacro:cold_table_2_well target_container="${target_container}" /> -->
-  <link name="base_link"> 
-  </link>
-  <link name="base_footprint"/>
-  <joint name="base_foot_joint" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="base_link"/>
-    <origin rpy="0 0 0" xyz="0 0 0"/>
-  </joint>
-  <link name="mobile_demo_frame">
-    <!-- countertop -->
-    <visual>
-      <origin rpy="0 0 0" xyz="0 -0.0879 -0.1186"/>
-      <geometry>
-        <box size="0.923 0.698 0.25"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 -0.0879 -0.1186"/>
-      <geometry>
-        <box size="0.923 0.698 0.25"/>
-      </geometry>
-    </collision>
-    <!-- robot side left counter -->
-    <visual>
-      <origin rpy="0 0 0" xyz="-0.3195 0.5461 -0.1186"/>
-      <geometry>
-        <box size="0.284 0.57 0.25"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="-0.3195 0.5461 -0.1186"/>
-      <geometry>
-        <box size="0.284 0.57 0.25"/>
-      </geometry>
-    </collision>
-    <!-- robot side right counter -->
-    <visual>
-      <origin rpy="0 0 0" xyz="0.3195 0.5461 -0.1186"/>
-      <geometry>
-        <box size="0.284 0.57 0.25"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0.3195 0.5461 -0.1186"/>
-      <geometry>
-        <box size="0.284 0.57 0.25"/>
-      </geometry>
-    </collision>
-    <!-- robot side rear counter -->
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0.7081 -0.1186"/>
-      <geometry>
-        <box size="0.36 0.246 0.25"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0.7081 -0.1186"/>
-      <geometry>
-        <box size="0.36 0.246 0.25"/>
-      </geometry>
-    </collision>
-    <!-- robot side rear wall -->
-    <!-- <visual>
-      <origin rpy="0 0 0" xyz="0 -0.9333 0.5064"/>
-      <geometry>
-        <box size="2 1 1.5"/>
-      </geometry>
-    </visual> -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 -0.9333 0.5064"/>
-      <geometry>
-        <box size="2 1 1.5"/>
-      </geometry>
-    </collision>
-    <!-- robot side left wall -->
-    <!-- <visual>
-      <origin rpy="0 0 0" xyz="-0.95 0.5668 0.5064"/>
-      <geometry>
-        <box size="1 2 1.5"/>
-      </geometry>
-    </visual> -->
-    <collision>
-      <origin rpy="0 0 0" xyz="-1.5 0.5668 0.5064"/>
-      <geometry>
-        <box size="1 2 1.5"/>
-      </geometry>
-    </collision>
-    <!-- robot side right wall -->
-    <!-- <visual>
-      <origin rpy="0 0 0" xyz="0.9794 0.5668 0.5064"/>
-      <geometry>
-        <box size="1 2 1.5"/>
-      </geometry>
-    </visual> -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0.9794 0.5668 0.5064"/>
-      <geometry>
-        <box size="1 2 1.5"/>
-      </geometry>
-    </collision>
-    <!-- robot side rear wall -->
-    <!-- <visual>
-      <origin rpy="0 0 0" xyz="0 1.3311 0.5064"/>
-      <geometry>
-        <box size="2 1 1.5"/>
-      </geometry>
-    </visual>     -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 1.3311 0.5064"/>
-      <geometry>
-        <box size="2 1 1.5"/>
-      </geometry>
-    </collision>
-  </link>
-  <joint name="base_link_to_mobile_demo_frame" type="fixed">
-    <parent link="base_link"/>
-    <child link="mobile_demo_frame"/>
-    <origin rpy="0 0 0" xyz="0 0.5799 0"/>
-  </joint>
-  <link name="hotel_pan_sixth_6in_skittles">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/hotel_pan_sixth_6in.obj"/>
-      </geometry>
-    </visual>
-    <!-- simpler, box collision geo when we don't care about serving from this pan -->
-    <!-- TODO: bounding box for racked utensil -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.0734"/>
-      <geometry>
-        <box size="0.175 0.19 0.17"/>
-      </geometry>
-    </collision>
-    <!-- accurate collision geo for pan -->
-  </link>
-  <joint name="mobile_demo_frame_to_hotel_pan_sixth_6in_skittles" type="fixed">
-    <origin rpy="0 0 1.5708" xyz="-0.0899 0.3421 -0.1524"/>
-    <parent link="mobile_demo_frame"/>
-    <child link="hotel_pan_sixth_6in_skittles"/>
-  </joint>
-  <link name="hotel_pan_sixth_6in_mnms">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/hotel_pan_sixth_6in.obj"/>
-      </geometry>
-    </visual>
-    <!-- simpler, box collision geo when we don't care about serving from this pan -->
-    <!-- TODO: bounding box for racked utensil -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.0734"/>
-      <geometry>
-        <box size="0.175 0.19 0.17"/>
-      </geometry>
-    </collision>
-    <!-- accurate collision geo for pan -->
-  </link>
-  <joint name="mobile_demo_frame_to_hotel_pan_sixth_6in_mnms" type="fixed">
-    <origin rpy="0 0 1.5708" xyz="-0.0899 0.504 -0.1524"/>
-    <parent link="mobile_demo_frame"/>
-    <child link="hotel_pan_sixth_6in_mnms"/>
-  </joint>
-  <link name="hotel_pan_sixth_6in_kisses">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/hotel_pan_sixth_6in.obj"/>
-      </geometry>
-    </visual>
-    <!-- simpler, box collision geo when we don't care about serving from this pan -->
-    <!-- TODO: bounding box for racked utensil -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.0734"/>
-      <geometry>
-        <box size="0.175 0.19 0.17"/>
-      </geometry>
-    </collision>
-    <!-- accurate collision geo for pan -->
-  </link>
-  <joint name="mobile_demo_frame_to_hotel_pan_sixth_6in_kisses" type="fixed">
-    <origin rpy="0 0 1.5708" xyz="0.0899 0.3421 -0.1524"/>
-    <parent link="mobile_demo_frame"/>
-    <child link="hotel_pan_sixth_6in_kisses"/>
-  </joint>
-  <link name="hotel_pan_sixth_6in_reeses">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/hotel_pan_sixth_6in.obj"/>
-      </geometry>
-    </visual>
-    <!-- simpler, box collision geo when we don't care about serving from this pan -->
-    <!-- TODO: bounding box for racked utensil -->
-    <!-- accurate collision geo for pan -->
-    <!-- side of bin -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0.0775 0 0.0734"/>
-      <geometry>
-        <box size="0.02 0.19 0.17"/>
-      </geometry>
-    </collision>
-    <!-- side of bin -->
-    <collision>
-      <origin rpy="0 0 0" xyz="-0.0775 0 0.0734"/>
-      <geometry>
-        <box size="0.02 0.19 0.17"/>
-      </geometry>
-    </collision>
-    <!-- front/back of bin -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 -0.0846 0.0734"/>
-      <geometry>
-        <box size="0.14 0.02 0.17"/>
-      </geometry>
-    </collision>
-    <!-- front/back of bin -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0.0846 0.0734"/>
-      <geometry>
-        <box size="0.14 0.02 0.17"/>
-      </geometry>
-    </collision>
-    <!-- corner of bin -->
-    <collision>
-      <origin rpy="0 0 0.7854" xyz="0.0682 0.0754 0.0734"/>
-      <geometry>
-        <box size="0.04 0.04 0.17"/>
-      </geometry>
-    </collision>
-    <!-- corner of bin -->
-    <collision>
-      <origin rpy="0 0 0.7854" xyz="-0.0682 0.0754 0.0734"/>
-      <geometry>
-        <box size="0.04 0.04 0.17"/>
-      </geometry>
-    </collision>
-    <!-- corner of bin -->
-    <collision>
-      <origin rpy="0 0 0.7854" xyz="0.0682 -0.0754 0.0734"/>
-      <geometry>
-        <box size="0.04 0.04 0.17"/>
-      </geometry>
-    </collision>
-    <!-- corner of bin -->
-    <collision>
-      <origin rpy="0 0 0.7854" xyz="-0.0682 -0.0754 0.0734"/>
-      <geometry>
-        <box size="0.04 0.04 0.17"/>
-      </geometry>
-    </collision>
-    <!-- bottom of bin -->
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 -0.01"/>
-      <geometry>
-        <box size="0.175 0.19 0.02"/>
-      </geometry>
-    </collision>
-  </link>
-  <joint name="mobile_demo_frame_to_hotel_pan_sixth_6in_reeses" type="fixed">
-    <origin rpy="0 0 1.5708" xyz="0.0899 0.504 -0.1524"/>
-    <parent link="mobile_demo_frame"/>
-    <child link="hotel_pan_sixth_6in_reeses"/>
-  </joint>
-  <link name="mobile_demo_cal_right"/>
-  <link name="mobile_demo_cal_left"/>
-  <joint name="mobile_demo_frame_to_cal_right" type="fixed">
-    <parent link="mobile_demo_frame"/>
-    <child link="mobile_demo_cal_right"/>
-    <origin rpy="0 0 0" xyz="0.21 0.42305 0"/>
-  </joint>
-  <joint name="mobile_demo_frame_to_cal_left" type="fixed">
-    <parent link="mobile_demo_frame"/>
-    <child link="mobile_demo_cal_left"/>
-    <origin rpy="0 0 0" xyz="-0.21 0.42305 0"/>
-  </joint>
-  <!-- on top of mnms -->
-  <!-- <xacro:cup
-    name="cup"
-    parent="base_link"
-    xyz="-0.107 0.504 0"
-    rpy="0 0 0">
-  </xacro:cup> -->
-  <joint name="base_link_to_cup_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="cup"/>
-    <origin rpy="0 0 0" xyz="-0.255 0.57 0"/>
-  </joint>
-  <link name="cup">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/cup.obj"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.02731"/>
-      <geometry>
-        <cylinder length="0.05461" radius="0.055"/>
-      </geometry>
-    </collision>
-  </link>
-  <link name="dispense"/>
-  <joint name="cup_to_cup_dispense" type="fixed">
-    <parent link="cup"/>
-    <child link="dispense"/>
-    <origin rpy="0 0 0" xyz="0 0 0.105"/>
-  </joint>
-  <!-- front right corner -->
-  <!-- <xacro:cup
-    name="cup"
-    parent="base_link"
-    xyz="0.195 0.57 0"
-    rpy="0 0 0">
-  </xacro:cup> -->
-  <!-- camera body, with origin at bottom screw mount -->
-  <joint name="realsense_joint" type="fixed">
-    <origin rpy="0.0 0.02 -0.05 " xyz="0 0 0"/>
-    <parent link="realsense_base_link"/>
-    <child link="realsense_link"/>
-  </joint>
-  <link name="camera_link"/>
-  <joint name="realsense_depth_to_camera" type="fixed">
-    <!-- <origin xyz="-0.01991685 -0.011027 0.03193794" rpy="-0.04006083 0.06381617 0.00851559" /> -->
-    <origin rpy="0 0 0" xyz="0 0 -0.01"/>
-    <parent link="realsense_depth_frame"/>
-    <child link="camera_link"/>
-  </joint>
-  <link name="camera_rgb_optical_frame"/>
-  <joint name="camera_link_to_optical" type="fixed">
-    <origin rpy="-1.570 -0.018 -1.573" xyz="-0.000 0.015 0.000"/>
-    <parent link="realsense_depth_frame"/>
-    <child link="camera_rgb_optical_frame"/>
-  </joint>
-  <link name="realsense_link">
-    <visual>
-      <origin rpy="1.57079632679 0 1.57079632679" xyz="0.0149 0.0 0.0125"/>
-      <geometry>
-        <!-- <box size="${d435_cam_width} ${d435_cam_height} ${d435_cam_depth}"/> -->
-        <mesh filename="meshes/visual/d435.obj"/>
-      </geometry>
-    </visual>
-    <collision>
-      <origin rpy="0 0 0" xyz="0.0 0.0 0.0125"/>
-      <geometry>
-        <box size="0.02505 0.09 0.025"/>
-      </geometry>
-    </collision>
+
+
+  <link name="franka_feh">
     <inertial>
-      <!-- reduced realsense mass. -->
-      <mass value="0.072"/>
-      <origin xyz="0 0 0"/>
-      <inertia ixx="0.003881243" ixy="0.0" ixz="0.0" iyy="0.000498940" iyz="0.0" izz="0.003879257"/>
+      <!--treating the FEH parts as a half-kilogram cylinder that's 4 inches across,
+      4 inches tall, and centered on the link. -->
+      <mass value="0.67" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <inertia ixx="0.000729" ixy="0" ixz="0" iyy="0.000729" iyz="0" izz="0.000625" />
     </inertial>
-  </link>
-  <!-- camera depth joints and links -->
-  <joint name="realsense_depth_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0.0149 0.0175 0.0125"/>
-    <parent link="realsense_link"/>
-    <child link="realsense_depth_frame"/>
-  </joint>
-  <link name="realsense_depth_frame"/>
-  <joint name="realsense_depth_optical_joint" type="fixed">
-    <origin rpy="-1.57079632679 0 -1.57079632679" xyz="0 0 0"/>
-    <parent link="realsense_depth_frame"/>
-    <child link="realsense_depth_optical_frame"/>
-  </joint>
-  <link name="realsense_depth_optical_frame"/>
-  <!-- camera left IR joints and links -->
-  <joint name="realsense_left_ir_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.0 0"/>
-    <parent link="realsense_depth_frame"/>
-    <child link="realsense_left_ir_frame"/>
-  </joint>
-  <link name="realsense_left_ir_frame"/>
-  <joint name="realsense_left_ir_optical_joint" type="fixed">
-    <origin rpy="-1.57079632679 0 -1.57079632679" xyz="0 0 0"/>
-    <parent link="realsense_left_ir_frame"/>
-    <child link="realsense_left_ir_optical_frame"/>
-  </joint>
-  <link name="realsense_left_ir_optical_frame"/>
-  <!-- camera right IR joints and links -->
-  <joint name="realsense_right_ir_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 -0.05 0"/>
-    <parent link="realsense_depth_frame"/>
-    <child link="realsense_right_ir_frame"/>
-  </joint>
-  <link name="realsense_right_ir_frame"/>
-  <joint name="realsense_right_ir_optical_joint" type="fixed">
-    <origin rpy="-1.57079632679 0 -1.57079632679" xyz="0 0 0"/>
-    <parent link="realsense_right_ir_frame"/>
-    <child link="realsense_right_ir_optical_frame"/>
-  </joint>
-  <link name="realsense_right_ir_optical_frame"/>
-  <!-- camera color joints and links -->
-  <joint name="realsense_color_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.015 0"/>
-    <parent link="realsense_depth_frame"/>
-    <child link="realsense_color_frame"/>
-  </joint>
-  <link name="realsense_color_frame"/>
-  <joint name="realsense_color_optical_joint" type="fixed">
-    <origin rpy="-1.57079632679 0 -1.57079632679" xyz="0 0 0"/>
-    <parent link="realsense_color_frame"/>
-    <child link="realsense_color_optical_frame"/>
-  </joint>
-  <link name="realsense_color_optical_frame"/>
-  <link name="realsense_tag_alignment_frame"/>
-  <joint name="realsense_color_tag_joint" type="fixed">
-    <origin rpy="0 3.14159265359 0" xyz="0 0 0"/>
-    <parent link="realsense_color_optical_frame"/>
-    <child link="realsense_tag_alignment_frame"/>
-  </joint>
-  <!-- -0.012 -->
-  <joint name="feh_mate_to_spoon_1oz_reeses_tc_joint" type="fixed">
-    <parent link="feh_mate"/>
-    <child link="spoon_1oz_reeses_tc"/>
-    <origin rpy="0 0 3.14159" xyz="0 0 0"/>
-  </joint>
-  <link name="spoon_1oz_reeses_tc">
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="meshes/visual/spoon_1oz.obj"/>
+        <mesh filename="meshes/visual/franka_feh.obj"/>
       </geometry>
     </visual>
-    <!-- simpler, box collision geo when the utensil is in a bin -->
-    <!-- accurate collision geo for utensil -->
-    <!-- spoon tip sphere -->
-    <!-- <collision>
-        <origin rpy="0 0 0" xyz="0.0506 0.0506 0.1442"/>
-        <geometry>
-          <sphere radius=".0254"/>
-        </geometry>
-      </collision> -->
-    <!-- spoon tip cylinder -->
+    <!-- feh cover -->
     <collision>
-      <origin rpy="0 -2.0944 -2.35619" xyz="0.0429 0.0429 0.1506"/>
+      <origin rpy="0 0 0.785398" xyz="0.0424 0.0424 0.032"/>
       <geometry>
-        <cylinder length="0.0254" radius="0.0254"/>
+        <box size="0.09 0.075 0.08"/>
       </geometry>
     </collision>
-    <!-- spoon stem -->
+    <!-- tc tip -->
     <collision>
-      <origin rpy="0 -2.0944 -2.35619" xyz="0.0309 0.0309 0.0988"/>
+      <origin rpy="0 0 0" xyz="0 0 0.0942"/>
       <geometry>
-        <box size="0.06 0.0135 0.0035"/>
+        <cylinder length="0.013" radius="0.01125"/>
       </geometry>
     </collision>
-    <!-- spoon RP mount -->
+
+
     <collision>
-      <origin rpy="0 -2.0944 -2.35619" xyz="0.00726 0.00726 0.0451"/>
+      <origin rpy="0 0 0" xyz="0 0 0.0388"/>
       <geometry>
-        <box size="0.07 0.035 0.0145"/>
+        <cylinder length="0.0957" radius="0.04"/>
       </geometry>
     </collision>
-    <!-- TC race of RP mount -->
+    <!-- camera and valve bank -->
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0.01"/>
+      <origin rpy="0 0 -0.7854" xyz="0.0265 0.0265 0.0377"/>
       <geometry>
-        <cylinder length="0.02" radius="0.0215"/>
-      </geometry>
-    </collision>
-    <!-- tag paddle -->
-    <collision>
-      <origin rpy="0 0 0.785398" xyz="0.0341 0.0341 0.008"/>
-      <geometry>
-        <box size="0.06 0.06 0.008"/>
-      </geometry>
-    </collision>
-    <!-- tag paddle rib -->
-    <collision>
-      <origin rpy="0 0 -0.785398" xyz="0.025 0.025 0.022"/>
-      <geometry>
-        <box size="0.005 0.075 0.032"/>
+        <box size="0.09 0.075 0.096"/>
       </geometry>
     </collision>
   </link>
-  <link name="spoon_1oz_reeses_tag">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <mesh filename="meshes/visual/april_tag_50mm.obj"/>
-      </geometry>
-    </visual>
-  </link>
-  <joint name="spoon_1oz_reeses_tc_to_spoon_1oz_reeses_tag" type="fixed">
-    <parent link="spoon_1oz_reeses_tc"/>
-    <child link="spoon_1oz_reeses_tag"/>
-    <origin rpy="3.14159 0 2.35619" xyz="0.0344 0.0344 0.0045"/>
+  <joint name="franka_0_link8_to_franka_feh" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0"/>
+    <parent link="franka_0_link8"/>
+    <child link="franka_feh"/>
   </joint>
-  <link name="spoon_1oz_reeses_face"/>
-  <joint name="spoon_1oz_reeses_tc_to_spoon_1oz_reeses_face" type="fixed">
-    <parent link="spoon_1oz_reeses_tc"/>
-    <child link="spoon_1oz_reeses_face"/>
-    <origin rpy="0 -2.0944 -2.35619" xyz="0.0506 0.0506 0.1442"/>
+  <link name="feh_mate"/>
+  <joint name="franka_feh_to_feh_mate" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0.0842"/>
+    <parent link="franka_feh"/>
+    <child link="feh_mate"/>
   </joint>
-  <link name="spoon_1oz_reeses_tip"/>
-  <joint name="spoon_1oz_reeses_face_to_spoon_1oz_reeses_tip" type="fixed">
-    <parent link="spoon_1oz_reeses_face"/>
-    <child link="spoon_1oz_reeses_tip"/>
-    <origin rpy="0 0 0" xyz="0.0254 0 0"/>
-  </joint>
-  <!-- Weld table to the floor -->
-  <link name="world">
-  </link>
-  <joint name="base_foot_world" type="fixed">
-    <parent link="world"/>
-    <child link="base_footprint"/>
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
-  </joint>
-  <joint name="global_to_mobile_demo_frame" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="mobile_demo_frame"/>
-    <origin rpy="0 0 0" xyz="-0.017 0 0"/>
-  </joint>
-  <!--Extensions -->
-  <!-- Load Gazebo lib and set the robot namespace -->
-  <gazebo>
-    <plugin filename="libgazebo_ros_control.so" name="gazebo_ros_controller">
-      <robotNamespace>/iiwa</robotNamespace>
-    </plugin>
-  </gazebo>
+
+  
   <collision_filter_group name="base">
     <member link="base_link"/>
     <member link="base_footprint"/>
@@ -1135,15 +367,6 @@
     <member link="franka_0_link2"/>
     <member link="franka_0_link3"/>
     <member link="franka_0_link4"/>
-    <!-- mobile demo bins -->
-    <member link="hotel_pan_sixth_6in_skittles"/>
-    <member link="spoon_1oz_skittles_tc"/>
-    <member link="hotel_pan_sixth_6in_mnms"/>
-    <member link="spoon_1oz_mnms_tc"/>
-    <member link="hotel_pan_sixth_6in_kisses"/>
-    <member link="spoon_1oz_kisses_tc"/>
-    <member link="hotel_pan_sixth_6in_reeses"/>
-    <member link="cup"/>
     <ignored_collision_filter_group collision_filter_group="base"/>
     <!-- <ignored_collision_filter_group collision_filter_group="head"/> -->
   </collision_filter_group>
@@ -1160,8 +383,6 @@
     <member link="franka_0_link7"/>
     <member link="franka_0_link8"/>
     <member link="franka_feh"/>
-    <member link="realsense_link"/>
-    <member link="spoon_1oz_reeses_tc"/>
     <ignored_collision_filter_group collision_filter_group="end_effectors"/>
   </collision_filter_group>
 </robot>
