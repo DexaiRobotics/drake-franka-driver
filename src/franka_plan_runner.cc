@@ -166,9 +166,9 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
 
             std::vector<double> tau_m_vec{0,0,0,0,0,0,0};
             tau_m_vec.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ;
-            momap::log()->info("tau_meas = {}", dru::v_to_e(tau_m_vec).transpose());
-            momap::log()->info("gravity calc v2= {}",  tau_gravity_only.transpose());
-            momap::log()->info("tau_ID = {}", tau.transpose());
+            momap::log()->info("tau_meas: {}", dru::v_to_e(tau_m_vec).transpose());
+            momap::log()->info("gravity: {}",  tau_gravity_only.transpose());
+            momap::log()->info("tau_ID: {}", tau_id.transpose());
             tau = -1*tau_gravity_only;
 
             //calling franka::limitrate is unnecessary because robot.control has limit_rate= default true?
