@@ -428,9 +428,9 @@ private:
                 Eigen::Map<const Eigen::Matrix<double, 6, 7> > jacobian(jacobian_array.data());
                 Eigen::Map<const Eigen::Matrix<double, 7, 1> > q(robot_state.q.data());
                 Eigen::Map<const Eigen::Matrix<double, 7, 1> > dq(robot_state.dq.data());
-                Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
-                Eigen::Vector3d position(transform.translation());
-                Eigen::Quaterniond orientation(transform.linear());
+                // Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
+                // Eigen::Vector3d position(transform.translation());
+                // Eigen::Quaterniond orientation(transform.linear());
 
                 // get desired position:
                 Eigen::Vector3d position_d; // (initial_transform.translation());
@@ -439,7 +439,16 @@ private:
                 std::vector<double> desired_conf_vec;
                 desired_conf_vec.assign(std::begin(robot_state.q_d), std::end(robot_state.q_d)) ;
                 desired_conf = du::v_to_e( desired_conf_vec ); 
-                dracula->GetCS()->GetFK("franka_feh", desired_conf, position_d, orientation_d);
+                dracula->GetCS()->GetFK("disher_2oz_tip", desired_conf, position_d, orientation_d);
+
+                // get actual position:
+                Eigen::Vector3d position; // (transform.translation());
+                Eigen::Quaterniond orientation; //(transform.linear());
+                Eigen::VectorXd actual_conf;
+                std::vector<double> actual_conf_vec;
+                actual_conf_vec.assign(std::begin(robot_state.q), std::end(robot_state.q)) ;
+                actual_conf = du::v_to_e( actual_conf_vec ); 
+                dracula->GetCS()->GetFK("disher_2oz_tip", actual_conf, position, orientation);
 
                 // compute error to desired equilibrium pose
                 // position error
@@ -455,7 +464,7 @@ private:
                 Eigen::Quaterniond error_quaternion(orientation.inverse() * orientation_d);
                 error.tail(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
                 // Transform to base frame
-                error.tail(3) << -transform.linear() * error.tail(3);
+                error.tail(3) << (-1*orientation) * error.tail(3);
 
                 // compute control
                 Eigen::VectorXd tau_task(7), tau_d(7);
