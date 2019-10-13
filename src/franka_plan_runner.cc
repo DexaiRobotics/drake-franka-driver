@@ -154,16 +154,19 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
 
 
             // Robert;s version : only account for gravity
-            auto force_element_contrib = mb_plant_.CalcForceElementsContribution( *mb_plant_context_, &external_forces); //takes care of reading gravity
-            momap::log()->info("gravity = {}", force_element_contrib.transpose());
+            mb_plant_.CalcForceElementsContribution( *mb_plant_context_, &external_forces); //takes care of reading gravity
+            // momap::log()->info("gravity = {}", force_element_contrib.transpose());
 
             // potentially useful methods : get external force (not including gravity) from robot sensors
             // Eigen::Map<const Eigen::Matrix<double, 7, 1> > tau_ext(robot_state.tau_ext_hat_filtered.data());
             // external_forces.mutable_generalized_forces() = tau_ext;
-            tau_id = mb_plant_.CalcInverseDynamics(*mb_plant_context_, desired_vd, external_forces); //calculates the M(q) + C(q) - tau_ap
+            auto tau_id = mb_plant_.CalcInverseDynamics(*mb_plant_context_, desired_vd, external_forces); //calculates the M(q) + C(q) - tau_ap
             // auto t4 = std::chrono::system_clock::now();
             auto tau_gravity_only = mb_plant_.CalcGravityGeneralizedForces(*mb_plant_context_);
 
+            std::vector<double> tau_m_vec{0,0,0,0,0,0,0};
+            tau_m_vec.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ;
+            momap::log()->info("tau_meas = {}", dru::v_to_e(tau_m_vec).transpose());
             momap::log()->info("gravity calc v2= {}",  tau_gravity_only.transpose());
             momap::log()->info("tau_ID = {}", tau.transpose());
             tau = -1*tau_gravity_only;
