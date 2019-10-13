@@ -407,7 +407,7 @@ private:
             // Define callback for the joint torque control loop.
             std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
                 impedance_control_callback =
-                    [&momap::log, &model, k_gains, d_gains](
+                    [&model, k_gains, d_gains](
                         const franka::RobotState& state, franka::Duration /*period*/) -> franka::Torques {
                 
                 // Read current coriolis terms from model.
