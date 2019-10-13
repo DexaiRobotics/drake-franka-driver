@@ -55,10 +55,11 @@
 
 #include "drake/lcmt_iiwa_status.hpp"
 
-#include <franka/exception.h>
-#include <franka/robot.h>
 #include <franka/duration.h>
+#include <franka/exception.h>
+#include <franka/model.h>
 #include <franka/rate_limiting.h>
+#include <franka/robot.h>
 
 #include "examples_common.h"
 
@@ -406,7 +407,7 @@ private:
             // Define callback for the joint torque control loop.
             std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
                 impedance_control_callback =
-                    [&print_data, &model, k_gains, d_gains](
+                    [&momap::log, &model, k_gains, d_gains](
                         const franka::RobotState& state, franka::Duration /*period*/) -> franka::Torques {
                 
                 // Read current coriolis terms from model.
@@ -430,8 +431,8 @@ private:
                 std::vector<double> tau_m_vec{0,0,0,0,0,0,0};
                 std::vector<double> tau_cmd_vec{0,0,0,0,0,0,0};
                 std::vector<double> tau_J_franka{0,0,0,0,0,0,0};
-                tau_m_vec.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ;
-                tau_cmd_vec.assign(std::begin(robot_state.tau_J_d), std::end(robot_state.tau_J_d)) ;
+                tau_m_vec.assign(std::begin(state.tau_J), std::end(state.tau_J)) ;
+                tau_cmd_vec.assign(std::begin(state.tau_J_d), std::end(state.tau_J_d)) ;
                 tau_J_franka.assign(std::begin(tau_d_rate_limited), std::end(tau_d_rate_limited)) ;
                 momap::log()->info("tau_meas: {}", dru::v_to_e(tau_m_vec).transpose());
                 momap::log()->info("tau_cmd: {}", dru::v_to_e(tau_cmd_vec).transpose());
