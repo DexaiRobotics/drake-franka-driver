@@ -451,8 +451,8 @@ private:
                 dracula->GetCS()->GetFK("disher_2oz_tip", actual_conf, position, orientation);
                 // get transform
 
-                Eigen::Matrix4d t_mat = dracula->GetCS()->solveForwardKin(actual_conf, "disher_2oz_tip", dracula->GetParameters()->kBaseLinkWorldFrame);
-                Eigen::Affine3d transform(Eigen::Matrix4d::Map(t_mat));
+                Eigen::Matrix4d t_mat = dracula->GetCS()->solveForwardKin(actual_conf, "disher_2oz_tip", parameters::kBaseLinkWorldFrame);
+                Eigen::Affine3d transform(t_mat);
                 // Eigen::Vector3d position(transform.translation());
                 // Eigen::Quaterniond orientation(transform.linear());
 
