@@ -398,6 +398,81 @@ private:
                 return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
             };
 
+            // Cartesian Compliance parameters
+            const double translational_stiffness{150.0};
+            const double rotational_stiffness{10.0};
+            Eigen::MatrixXd stiffness(6, 6), damping(6, 6);
+            stiffness.setZero();
+            stiffness.topLeftCorner(3, 3) << translational_stiffness * Eigen::MatrixXd::Identity(3, 3);
+            stiffness.bottomRightCorner(3, 3) << rotational_stiffness * Eigen::MatrixXd::Identity(3, 3);
+            damping.setZero();
+            damping.topLeftCorner(3, 3) << 2.0 * sqrt(translational_stiffness) *
+                                                Eigen::MatrixXd::Identity(3, 3);
+            damping.bottomRightCorner(3, 3) << 2.0 * sqrt(rotational_stiffness) *
+                                                    Eigen::MatrixXd::Identity(3, 3);
+
+            // define callback for the torque control loop
+            std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
+                impedance_control_callback = [&](const franka::RobotState& robot_state,
+                                                franka::Duration /*duration*/) -> franka::Torques {
+                // get state variables
+                std::array<double, 7> coriolis_array = model.coriolis(robot_state);
+                std::array<double, 42> jacobian_array =
+                    model.zeroJacobian(franka::Frame::kEndEffector, robot_state);
+
+                // convert to Eigen
+                Eigen::Map<const Eigen::Matrix<double, 7, 1> > coriolis(coriolis_array.data());
+                Eigen::Map<const Eigen::Matrix<double, 6, 7> > jacobian(jacobian_array.data());
+                Eigen::Map<const Eigen::Matrix<double, 7, 1> > q(robot_state.q.data());
+                Eigen::Map<const Eigen::Matrix<double, 7, 1> > dq(robot_state.dq.data());
+                Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
+                Eigen::Vector3d position(transform.translation());
+                Eigen::Quaterniond orientation(transform.linear());
+
+                // compute error to desired equilibrium pose
+                // position error
+                Eigen::Matrix<double, 6, 1> error;
+                error.head(3) << position - position_d;
+
+                // orientation error
+                // "difference" quaternion
+                if (orientation_d.coeffs().dot(orientation.coeffs()) < 0.0) {
+                    orientation.coeffs() << -orientation.coeffs();
+                }
+                // "difference" quaternion
+                Eigen::Quaterniond error_quaternion(orientation.inverse() * orientation_d);
+                error.tail(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
+                // Transform to base frame
+                error.tail(3) << -transform.linear() * error.tail(3);
+
+                // compute control
+                Eigen::VectorXd tau_task(7), tau_d(7);
+
+                // Spring damper system with damping ratio=1
+                tau_task << jacobian.transpose() * (-stiffness * error - damping * (jacobian * dq));
+                tau_d << tau_task + coriolis;
+
+                std::array<double, 7> tau_d_array{};
+                Eigen::VectorXd::Map(&tau_d_array[0], 7) = tau_d;
+
+                std::vector<double> tau_m_vec{0,0,0,0,0,0,0};
+                std::vector<double> tau_cmd_vec{0,0,0,0,0,0,0};
+                // std::vector<double> tau_J_franka{0,0,0,0,0,0,0};
+                // std::vector<double> err_accum_vec{0,0,0,0,0,0,0};
+                tau_m_vec.assign(std::begin(state.tau_J), std::end(state.tau_J)) ;
+                tau_cmd_vec.assign(std::begin(state.tau_J_d), std::end(state.tau_J_d)) ;
+                // tau_J_franka.assign(std::begin(tau_d_rate_limited), std::end(tau_d_rate_limited)) ;
+                // err_accum_vec.assign(std::begin(error_accumulator), std::end(error_accumulator)) ;
+                momap::log()->info("tau_meas: {}", dru::v_to_e(tau_m_vec).transpose());
+                momap::log()->info("tau_cmd: {}", dru::v_to_e(tau_cmd_vec).transpose());
+                // momap::log()->info("error_accumulator: {}", dru::v_to_e(err_accum_vec).transpose());
+
+
+                return tau_d_array;
+            };
+
+            /*
+
             // Set gains for the joint impedance control.
             // Stiffness
             const std::array<double, 7> k_gains = {{700.0, 700.0, 700.0, 700.0, 290.0, 180.0, 70.0}};
@@ -406,12 +481,13 @@ private:
             // integral
             const std::array<double, 7> i_gains = {{5.0, 5.0, 5.0, 5.0, 3.0, 2.5, 1.5}};
             std::array<double, 7> error_accumulator = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
+
             // Define callback for the joint torque control loop.
             
             std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
                 impedance_control_callback =
                     [&model, &error_accumulator, k_gains, d_gains, i_gains](
-                        const franka::RobotState& state, franka::Duration /*period*/) -> franka::Torques {
+                        const franka::RobotState& state, franka::Duration ) -> franka::Torques {
                 
                 // Read current coriolis terms from model.
                 std::array<double, 7> coriolis = model.coriolis(state);
@@ -447,6 +523,7 @@ private:
                 // Send torque command.
                 return tau_d_rate_limited;
             };
+            */
 
             //callback for inverseDynamics - i think all this code should be refactored at some point...
             std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
