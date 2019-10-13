@@ -113,9 +113,9 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
         }
 
         if(plan_.plan){//below is inverseDynamics code
-            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*0;
-            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*0;
-            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*0;
+            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*10;
+            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*10;
+            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*10;
 
             if(franka_time_ == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
 
@@ -165,11 +165,15 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             auto tau_gravity_only = mb_plant_.CalcGravityGeneralizedForces(*mb_plant_context_);
 
             std::vector<double> tau_m_vec{0,0,0,0,0,0,0};
+            std::vector<double> tau_cmd_vec{0,0,0,0,0,0,0};
             tau_m_vec.assign(std::begin(robot_state.tau_J), std::end(robot_state.tau_J)) ;
+            tau_cmd_vec.assign(std::begin(robot_state.tau_J_d), std::end(robot_state.tau_J_d)) ;
             momap::log()->info("tau_meas: {}", dru::v_to_e(tau_m_vec).transpose());
+            momap::log()->info("tau_cmd: {}", dru::v_to_e(tau_cmd_vec).transpose());
             momap::log()->info("gravity: {}",  tau_gravity_only.transpose());
             momap::log()->info("tau_ID: {}", tau_id.transpose());
-            tau = -1*tau_gravity_only;
+            // tau = -1*tau_gravity_only;
+            tau = tau_id;
 
             //calling franka::limitrate is unnecessary because robot.control has limit_rate= default true?
 
