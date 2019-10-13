@@ -275,9 +275,6 @@ public:
         franka_time_ = 0.0; 
         max_accels_ = params.robot_max_accelerations;
 
-        STOP_EPSILON = params.stop_epsilon;
-        STOP_MARGIN = params.stop_margin;
-
         dracula = new Dracula(p);
         lcm_driver_status_channel_ = p.robot_name + "_DRIVER_STATUS";
         joint_limits_ = dracula->GetCS()->GetJointLimits();
@@ -556,8 +553,8 @@ private:
                             temp_target_stop_time_ = stop_time;
                         }
                     }
-                    this->target_stop_time = temp_target_stop_time;
-                    momap::log()->debug("TARGET: {}", target_stop_time);
+                    target_stop_time_ = temp_target_stop_time_ / STOP_SCALE;
+                    momap::log()->debug("TARGET: {}", target_stop_time_);
                 }
 
                 double new_stop = StopPeriod(period.toSec());
@@ -757,12 +754,6 @@ private:
         if ( ! robot_alive_) {
             momap::log()->info("Discarding plan, no status message received yet from the robot");
             return;
-        }
-        // plan_.mutex.lock();
-        while( ! plan_.mutex.try_lock()) {
-            momap::log()->warn("trying to get a lock on the plan_.mutex. Sleeping 1 ms and trying again.");
-            std::this_thread::sleep_for(
-                    std::chrono::milliseconds(static_cast<int>( 1.0 )));
         }
 
         //$ check if in proper mode to receive commands

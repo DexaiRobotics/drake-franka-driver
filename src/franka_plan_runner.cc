@@ -48,62 +48,62 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
         // momap::log()->info("got the lock!");
         // FrankaPlanRunner::check_franka_pause();
 
-        if (pausing) {
-            if (target_stop_time == 0) { //if target_stop_time not set, set target_stop_time
+        if (pausing_) {
+            if (target_stop_time_ == 0) { //if target_stop_time_ not set, set target_stop_time_
                 std::array<double,7> vel = robot_state.dq;
-                float temp_target_stop_time = 0;
+                float temp_target_stop_time_ = 0;
                 for (int i = 0; i < 7; i++) {
-                    float stop_time = fabs(vel[i] / (this->max_accels[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
-                    if(stop_time > temp_target_stop_time){
-                        temp_target_stop_time = stop_time;
+                    float stop_time = fabs(vel[i] / (this->max_accels_[i])); //sets target stop_time in plan as max(vel_i/max_accel_i), where i is each joint. real world stop time ~ 2x stop_time in plan
+                    if (stop_time > temp_target_stop_time_) {
+                        temp_target_stop_time_ = stop_time;
                     }
                 }
-                this->target_stop_time = temp_target_stop_time;
-                momap::log()->debug("TARGET: {}", target_stop_time);
+                target_stop_time_ = temp_target_stop_time_ / STOP_SCALE;
+                momap::log()->debug("TARGET: {}", target_stop_time_);
             }
 
             double new_stop = StopPeriod(period.toSec());
-            franka_time += new_stop;
+            franka_time_ += new_stop;
             momap::log()->debug("STOP PERIOD: {}", new_stop);
-            timestep++;
+            timestep_++;
 
-            if(new_stop >= period.toSec() * STOP_EPSILON){ // robot counts as "stopped" when new_stop is less than a fraction of period
-                this->stop_duration++;
+            if (new_stop >= period.toSec() * p.stop_epsilon) { // robot counts as "stopped" when new_stop is less than a fraction of period
+                this->stop_duration_++;
             }
-            else if(stop_margin_counter <= STOP_MARGIN){ // margin period after pause before robot is allowed to continue
-                stop_margin_counter += period.toSec();
+            else if (stop_margin_counter_ <= p.stop_margin) { // margin period after pause before robot is allowed to continue
+                stop_margin_counter_ += period.toSec();
             }
             else{
-                paused = true;
+                paused_ = true;
                 QueuedCmd();
             }
-
-
-        } else if (unpausing) { //robot is unpausing
-            if (timestep >= 0) { //if robot has reached full speed again
-                unpausing = false;
+            
+            
+        } else if (unpausing_) { //robot is unpausing_
+            if (timestep_ >= 0) { //if robot has reached full speed again
+                unpausing_ = false;
                 QueuedCmd();
             }
             double new_stop = StopPeriod(period.toSec());
-            franka_time += new_stop;
+            franka_time_ += new_stop;
             momap::log()->debug("CONTINUE PERIOD: {}", new_stop);
-            timestep++;
-
-        } else {
-            franka_time += period.toSec();
+            timestep_++;
+            
+        }
+        else {
+            franka_time_ += period.toSec();
         }
 
         if (plan_.plan && plan_number_ != cur_plan_number) {
-            momap::log()->info("Starting new plan at {} s.", franka_time);
-            start_time_us = cur_time_us; // implies that we should have call motion finished
+            momap::log()->info("Starting new plan at {} s.", franka_time_);
+            start_time_us_ = cur_time_us_; // implies that we should have call motion finished
             cur_plan_number = plan_number_;
-            starting_conf = plan_.plan->value(0.0);
-            starting_franka_q = robot_state.q_d;
-            momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q) ).transpose());
-            momap::log()->warn("difference between where we are and where we think = {}",
-                                ( du::v_to_e( ConvertToVector(starting_franka_q) ) - starting_conf ).norm() );
-
-        }
+            starting_conf_ = plan_.plan->value(0.0);
+            starting_franka_q_ = robot_state.q_d; 
+            momap::log()->warn("starting franka q = {}", du::v_to_e( ConvertToVector(starting_franka_q_) ).transpose()); 
+            momap::log()->warn("difference between where we are and where we think = {}", 
+                                ( du::v_to_e( ConvertToVector(starting_franka_q_) ) - starting_conf_ ).norm() );
+        }   
 
         if (robot_data_.mutex.try_lock()) {
             robot_data_.has_data = true;
@@ -116,7 +116,7 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*0;
             const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*0;
 
-            if(franka_time == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
+            if(franka_time_ == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
 
             Eigen::VectorXd desired_vd = Eigen::VectorXd::Zero(kNumJoints);
             // Eigen::Map<const Eigen::Matrix<double, 7, 1> > pos_desired(robot_state.q_d.data());
@@ -178,14 +178,14 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
             Eigen::VectorXd desired_end_conf = plan_.plan->value(plan_.plan->end_time());
             // norm distance from desired_end_conf
             double dist_from_end = (current_conf - desired_end_conf).norm();
-            if (franka_time > plan_.plan->end_time()) {
+            if (franka_time_ > plan_.plan->end_time()) {
                 if (dist_from_end < 0.007) {
                     plan_.plan.release();
                     plan_.has_data = false;
                     // plan_.utime = -1;
                     plan_.mutex.unlock();
 
-                    PublishUtimeToChannel(plan_.utime, p.lcm_plan_complete_channel);
+                    PublishTriggerToChannel(plan_.utime, p.lcm_plan_complete_channel);
                     return franka::MotionFinished(output);
                 } else {
                     momap::log()->info("Plan running overtime and not converged, dist: {}",
