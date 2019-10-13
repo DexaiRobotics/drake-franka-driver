@@ -36,6 +36,7 @@ void FrankaPlanRunner::MultibodySetUp(drake::multibody::MultibodyPlant<double> &
                                 , const std::string urdf_path){
     Parser parser(&mb_plant_);
     parser.AddModelFromFile(urdf_path, "mb_plant_");
+    mb_plant_.mutable_gravity_field().set_gravity_vector( -9.8* drake::Vector3<double>::UnitZ());
     mb_plant_.Finalize();
     mb_plant_context_ = mb_plant_.CreateDefaultContext();
 }
@@ -112,9 +113,9 @@ franka::Torques FrankaPlanRunner::InverseDynamicsControlCallback(const franka::R
         }
 
         if(plan_.plan){//below is inverseDynamics code
-            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*10;
-            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*10;
-            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*10;
+            const Eigen::VectorXd kp = Eigen::VectorXd::Ones(kNumJoints)*1;
+            const Eigen::VectorXd ki = Eigen::VectorXd::Ones(kNumJoints)*1;
+            const Eigen::VectorXd kd = Eigen::VectorXd::Ones(kNumJoints)*1;
 
             if(franka_time_ == 0) integral_error =  Eigen::VectorXd::Zero(kNumJoints); // initialize integral error to 0 at start time
 
