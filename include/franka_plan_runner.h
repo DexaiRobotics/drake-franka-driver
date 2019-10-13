@@ -464,7 +464,7 @@ private:
                 Eigen::Quaterniond error_quaternion(orientation.inverse() * orientation_d);
                 error.tail(3) << error_quaternion.x(), error_quaternion.y(), error_quaternion.z();
                 // Transform to base frame
-                error.tail(3) << (-1*orientation) * error.tail(3);
+                error.tail(3) << (orientation.inverse()) * error.tail(3);
 
                 // compute control
                 Eigen::VectorXd tau_task(7), tau_d(7);
