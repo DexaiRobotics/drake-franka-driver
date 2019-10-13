@@ -480,10 +480,10 @@ private:
                 const drake::Isometry3<double> X_7E =
                         drake::Translation3<double>(drake::Vector3<double>(0.0, 0, 0)) *
                         drake::AngleAxis<double>(0.0, drake::Vector3<double>::UnitZ());
-                const int num_velocities{dracula-GetCS()->GetRigidBodyTreeRef().get_num_velocities()};
+                const int num_velocities{dracula->GetCS()->GetRigidBodyTreeRef().get_num_velocities()};
                 drake::VectorX<double> v = drake::VectorX<double>::Zero(num_velocities);
-                KinematicsCache<double> cache = dracula-GetCS()->GetRigidBodyTreeRef().doKinematics(actual_conf, v);
-                RigidBodyFrame<double> frame_E("frame_E", dracula-GetCS()->GetRigidBodyTreeRef().FindBody(tool_frame), X_7E);
+                KinematicsCache<double> cache = dracula->GetCS()->GetRigidBodyTreeRef().doKinematics(actual_conf, v);
+                RigidBodyFrame<double> frame_E("frame_E", dracula->GetCS()->GetRigidBodyTreeRef().FindBody(tool_frame), X_7E);
                 Eigen::MatrixXd J = dracula->GetCS()->GetRigidBodyTreeRef().CalcFrameSpatialVelocityJacobianInWorldFrame(cache, frame_E);
                 //Calculate vector difference between current and target
                 Eigen::Vector3d difference_xyz = position - position_d;
@@ -491,7 +491,7 @@ private:
                     Eigen::AngleAxis<double>(orientation.inverse() * orientation_d);
                 Eigen::Vector3d delta_orientation = delta_angle_axis.axis()*delta_angle_axis.angle();
                 Eigen::VectorXd difference(6); // angle set config
-                difference << delta_orientation, difference_xyz;
+                difference << difference_xyz, delta_orientation;
 
                 tau_task << J.transpose() * (-stiffness * difference - damping * (J * dq));
                 // tau_task << jacobian.transpose() * (-stiffness * error - damping * (jacobian * dq));
