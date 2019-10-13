@@ -439,7 +439,8 @@ private:
                 std::vector<double> desired_conf_vec;
                 desired_conf_vec.assign(std::begin(robot_state.q_d), std::end(robot_state.q_d)) ;
                 desired_conf = du::v_to_e( desired_conf_vec ); 
-                dracula->GetCS()->GetFK("franka_0_link8", desired_conf, position_d, orientation_d);
+                std::string tool_frame = "disher_2oz_tip";
+                dracula->GetCS()->GetFK(tool_frame, desired_conf, position_d, orientation_d);
 
                 // get actual position:
                 Eigen::Vector3d position; // (transform.translation());
@@ -448,10 +449,10 @@ private:
                 std::vector<double> actual_conf_vec;
                 actual_conf_vec.assign(std::begin(robot_state.q), std::end(robot_state.q)) ;
                 actual_conf = du::v_to_e( actual_conf_vec ); 
-                dracula->GetCS()->GetFK("franka_0_link8", actual_conf, position, orientation);
+                dracula->GetCS()->GetFK(tool_frame, actual_conf, position, orientation);
                 // get transform
 
-                Eigen::Matrix4d t_mat = dracula->GetCS()->solveForwardKin(actual_conf, "franka_0_link8", parameters::kBaseLinkWorldFrame);
+                Eigen::Matrix4d t_mat = dracula->GetCS()->solveForwardKin(actual_conf, tool_frame, parameters::kBaseLinkWorldFrame);
                 Eigen::Affine3d transform(t_mat);
                 // Eigen::Vector3d position(transform.translation());
                 // Eigen::Quaterniond orientation(transform.linear());
@@ -476,7 +477,24 @@ private:
                 Eigen::VectorXd tau_task(7), tau_d(7);
 
                 // Spring damper system with damping ratio=1
-                tau_task << jacobian.transpose() * (-stiffness * error - damping * (jacobian * dq));
+                const drake::Isometry3<double> X_7E =
+                        drake::Translation3<double>(drake::Vector3<double>(0.0, 0, 0)) *
+                        drake::AngleAxis<double>(0.0, drake::Vector3<double>::UnitZ());
+                const int num_velocities{dracula-GetCS()->GetRigidBodyTreeRef().get_num_velocities()};
+                drake::VectorX<double> v = drake::VectorX<double>::Zero(num_velocities);
+                KinematicsCache<double> cache = dracula-GetCS()->GetRigidBodyTreeRef().doKinematics(actual_conf, v);
+                RigidBodyFrame<double> frame_E("frame_E", dracula-GetCS()->GetRigidBodyTreeRef().FindBody(tool_frame), X_7E);
+                Eigen::MatrixXd J = dracula->GetCS()->GetRigidBodyTreeRef().CalcFrameSpatialVelocityJacobianInWorldFrame(cache, frame_E);
+                //Calculate vector difference between current and target
+                Eigen::Vector3d difference_xyz = position - position_d;
+                Eigen::AngleAxis<double> delta_angle_axis =
+                    Eigen::AngleAxis<double>(orientation.inverse() * orientation_d);
+                Eigen::Vector3d delta_orientation = delta_angle_axis.axis()*delta_angle_axis.angle();
+                Eigen::VectorXd difference(6); // angle set config
+                difference << delta_orientation, difference_xyz;
+
+                tau_task << J.transpose() * (-stiffness * difference - damping * (J * dq));
+                // tau_task << jacobian.transpose() * (-stiffness * error - damping * (jacobian * dq));
                 tau_d << tau_task + coriolis;
 
                 std::array<double, 7> tau_d_array{};
