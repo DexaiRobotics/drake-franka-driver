@@ -403,11 +403,14 @@ private:
             const std::array<double, 7> k_gains = {{600.0, 600.0, 600.0, 600.0, 250.0, 150.0, 50.0}};
             // Damping
             const std::array<double, 7> d_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
-
+            // integral
+            const std::array<double, 7> i_gains = {{50.0, 50.0, 50.0, 50.0, 30.0, 25.0, 15.0}};
+            std::array<double, 7> error_accumulator = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
             // Define callback for the joint torque control loop.
+            
             std::function<franka::Torques(const franka::RobotState&, franka::Duration)>
                 impedance_control_callback =
-                    [&model, k_gains, d_gains](
+                    [&model, &error_accumulator, k_gains, d_gains, i_gains](
                         const franka::RobotState& state, franka::Duration /*period*/) -> franka::Torques {
                 
                 // Read current coriolis terms from model.
@@ -419,7 +422,8 @@ private:
                 std::array<double, 7> tau_d_calculated;
                 for (size_t i = 0; i < 7; i++) {
                     tau_d_calculated[i] =
-                        k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + coriolis[i];
+                        k_gains[i] * (state.q_d[i] - state.q[i]) - d_gains[i] * state.dq[i] + i_gains[i] * error_accumulator[i] + coriolis[i];
+                    error_accumulator[i] += (state.q_d[i] - state.q[i]);
                 }
 
                 // The following line is only necessary for printing the rate limited torque. As we activated
@@ -466,6 +470,7 @@ private:
                             robot.control(inverse_dynamics_control_callback);
                         }
                         else{
+                            error_accumulator = {{0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0}};
                             robot.control(impedance_control_callback, joint_position_callback);
                             // robot.control(joint_position_callback);
                         }
