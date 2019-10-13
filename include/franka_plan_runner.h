@@ -439,7 +439,7 @@ private:
                 std::vector<double> desired_conf_vec;
                 desired_conf_vec.assign(std::begin(robot_state.q_d), std::end(robot_state.q_d)) ;
                 desired_conf = du::v_to_e( desired_conf_vec ); 
-                dracula->GetCS()->GetFK("disher_2oz_tip", desired_conf, position_d, orientation_d);
+                dracula->GetCS()->GetFK("franka_0_link8", desired_conf, position_d, orientation_d);
 
                 // get actual position:
                 Eigen::Vector3d position; // (transform.translation());
@@ -448,10 +448,10 @@ private:
                 std::vector<double> actual_conf_vec;
                 actual_conf_vec.assign(std::begin(robot_state.q), std::end(robot_state.q)) ;
                 actual_conf = du::v_to_e( actual_conf_vec ); 
-                dracula->GetCS()->GetFK("disher_2oz_tip", actual_conf, position, orientation);
+                dracula->GetCS()->GetFK("franka_0_link8", actual_conf, position, orientation);
                 // get transform
 
-                Eigen::Matrix4d t_mat = dracula->GetCS()->solveForwardKin(actual_conf, "disher_2oz_tip", parameters::kBaseLinkWorldFrame);
+                Eigen::Matrix4d t_mat = dracula->GetCS()->solveForwardKin(actual_conf, "franka_0_link8", parameters::kBaseLinkWorldFrame);
                 Eigen::Affine3d transform(t_mat);
                 // Eigen::Vector3d position(transform.translation());
                 // Eigen::Quaterniond orientation(transform.linear());
