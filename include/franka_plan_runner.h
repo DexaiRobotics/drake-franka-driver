@@ -710,8 +710,11 @@ private:
         if (current_mode == franka::RobotMode::kIdle) {
             return true;
         }
+        if (current_mode == franka::RobotMode::kMove) {
+            return true;
+        }
+        momap::log()->error("CanReceiveCommands: Wrong mode! Current Mode is: {}", RobotModeToString(current_mode));
 
-        momap::log()->error("CanReceiveCommands: Wrong mode!");
         return false;
     }
 
