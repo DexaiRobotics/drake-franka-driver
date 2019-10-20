@@ -5,13 +5,10 @@ if [[ "$#" == "0" ]]; then
   echo "Default behavior, using hostname: $HOSTNAME"
   echo "to choose yaml"
   name_of_file="franka_$(echo $HOSTNAME | head -c 1)"
+  echo "File chosen: $name_of_file"
 else 
     # idiomatic parameter and option handling in sh
     case "$1" in
-        franka_g) echo "option $1"
-            ;;
-        franka_h) echo "option $1"
-            ;;
         franka_i) echo "option $1"
             ;;
         franka_j) echo "option $1"
@@ -20,11 +17,15 @@ else
             ;;
         franka_l) echo "option $1"
             ;;
+        franka_m) echo "option $1"
+            ;;
+        franka_n) echo "option $1"
+            ;;
         franka_*) echo "robot name $1 does not exist! Exiting..."
             exit 1
             ;;
         *) echo "As the first argument, please supply a robot name "
-            echo "franka_g, ..., franka_l! You supplied : $1! Exiting ..."
+            echo "franka_i, ..., franka_n! You supplied something else: $1! Exiting ..."
             exit 1
     esac
     name_of_file=$1
