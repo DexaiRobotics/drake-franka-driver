@@ -4,8 +4,8 @@
 if [[ "$#" == "0" ]]; then
   echo "Default behavior, using hostname: $HOSTNAME"
   echo "to choose yaml"
-  name_of_file="franka_$(echo $HOSTNAME | head -c 1)"
-  echo "File chosen: $name_of_file"
+  hostname_first_letter="${HOSTNAME:0:1}"
+  name_of_file="franka_${hostname_first_letter}.yaml"
 else 
     # idiomatic parameter and option handling in sh
     case "$1" in
@@ -28,10 +28,12 @@ else
             echo "franka_i, ..., franka_n! You supplied something else: $1! Exiting ..."
             exit 1
     esac
-    name_of_file=$1
+    name_of_file=$1.yaml
 fi
 
-config=$HOME/catkin_ws/src/salad_bar_description/$name_of_file.yaml
+echo "File chosen: $name_of_file"
+
+config=$HOME/catkin_ws/src/salad_bar_description/$name_of_file
 
 echo "choose config file: $config"
 
