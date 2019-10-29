@@ -359,7 +359,7 @@ private:
             // Set additional parameters always before the control loop, NEVER in the control loop!
             // Set collision behavior.
 
-            bool we_care_about_safety = true;
+            bool we_care_about_safety = false;
             if (we_care_about_safety) {
                 robot.setCollisionBehavior(
                     {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}}, {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
