@@ -736,6 +736,16 @@ private:
                     std::chrono::milliseconds(static_cast<int>( 1.0 )));
         }
 
+        if ( rst->utime == plan_.utime )
+        {
+            // Looks like plan received confirmation was not received. Send again!
+            momap::log()->warn("Exact same plan received again. Resending confirmation...");
+            PublishTriggerToChannel(plan_.utime, p.lcm_plan_received_channel);
+            plan_.mutex.unlock();
+            return;
+        }
+
+
         editing_plan_ = true;
     
         momap::log()->info("utime: {}", rst->utime);
