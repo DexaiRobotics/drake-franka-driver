@@ -231,7 +231,7 @@ private:
     float target_stop_time_;
     float STOP_SCALE = 0.8; //this should be yaml param
     float stop_duration_;
-    std::mutex stop_mutex_;
+    std::mutex pause_mutex_;
     std::atomic_bool pausing_;
     std::atomic_bool paused_;
     std::atomic_bool unpausing_;
@@ -690,9 +690,9 @@ private:
                 robot_data_.mutex.unlock();
             }
 
-            if (stop_mutex_.try_lock()) {
+            if (pause_mutex_.try_lock()) {
                 PublishPauseStatus();
-                stop_mutex_.unlock();
+                pause_mutex_.unlock();
             }
         }
     };
@@ -703,10 +703,15 @@ private:
         msg.utime = get_current_utime();
         msg.success = paused_;
         msg.message = "";
-        if (paused_ || pausing_) { // TODO @syler: what if it's unpausing?
-            msg.message = stop_cmd_source_;
+        if (paused_ || pausing_) { // TODO @syler: what if it's unpausing?   
+            for (auto elem : stop_set_) {
+	            msg.message.append(elem);
+              msg.message.append(",");
+            }
+            //momap::log()->info("PublishPauseStatus with msg.message: {}", msg.message);
         }
         lcm_.publish(lcm_pause_status_channel_, &msg);
+
     }
 
     void PublishTriggerToChannel(int64_t utime, std::string lcm_channel, bool success=true, std::string message="") {
@@ -810,7 +815,7 @@ private:
                    , const std::string&
                    , const robot_msgs::pause_cmd* msg
     ) {
-        std::lock_guard<std::mutex> lock(stop_mutex_); //$ unlocks when lock_guard goes out of scope
+        std::lock_guard<std::mutex> lock(pause_mutex_); //$ unlocks when lock_guard goes out of scope
         if (msg->data) { //if pause command received
             if (msg->source != "queued") {
                 stop_set_.insert(msg->source);
