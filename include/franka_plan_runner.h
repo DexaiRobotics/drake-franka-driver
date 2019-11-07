@@ -298,7 +298,7 @@ public:
 
     int Run() {
         // start LCM threads; independent of sim vs. real robot
-        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
+        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmAndPauseStatus, this);
         lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
         int return_value = -1; //
         if (ip_addr_ == home_addr) {
@@ -673,7 +673,7 @@ private:
         }
     }
 
-    void PublishLcmStatus() { //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
+    void PublishLcmAndPauseStatus() { //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
         while (running_) {
             // Sleep to achieve the desired print rate.
             std::this_thread::sleep_for(
