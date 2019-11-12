@@ -673,6 +673,9 @@ private:
         }
     }
 
+    /// PublishLcmAndPauseStatus is called once by a separate thread in the Run() method
+    /// It sends the robot status and the pause status. Pause status isseparate because robot status message 
+    /// used does not have space for indicating the contents of the pause message.
     void PublishLcmAndPauseStatus() { //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
         while (running_) {
             // Sleep to achieve the desired print rate.
