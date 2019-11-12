@@ -231,9 +231,11 @@ private:
     float target_stop_time_;
     float STOP_SCALE = 0.8; //this should be yaml param
     float stop_duration_;
+    std::mutex pause_mutex_;
     std::atomic_bool pausing_;
     std::atomic_bool paused_;
     std::atomic_bool unpausing_;
+    std::string stop_cmd_source_;
     float stop_margin_counter_ = 0;
     QueuedCommand queued_cmd_ = QueuedCommand::NONE;
     std::set <std::string> stop_set_;  
@@ -250,6 +252,7 @@ private:
     std::thread lcm_handle_thread;
 
     std::string lcm_driver_status_channel_;
+    std::string lcm_pause_status_channel_;
 
 public:
     FrankaPlanRunner(const parameters::Parameters params)
@@ -263,6 +266,7 @@ public:
 
         dracula = new Dracula(p);
         lcm_driver_status_channel_ = p.robot_name + "_DRIVER_STATUS";
+        lcm_pause_status_channel_ = p.robot_name + "_PAUSE_STATUS";
         joint_limits_ = dracula->GetCS()->GetJointLimits();
         momap::log()->info("Joint limits: {}", joint_limits_.transpose());
 
@@ -294,7 +298,7 @@ public:
 
     int Run() {
         // start LCM threads; independent of sim vs. real robot
-        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmStatus, this);
+        lcm_publish_status_thread = std::thread(&FrankaPlanRunner::PublishLcmAndPauseStatus, this);
         lcm_handle_thread = std::thread(&FrankaPlanRunner::HandleLcm, this);
         int return_value = -1; //
         if (ip_addr_ == home_addr) {
@@ -669,7 +673,10 @@ private:
         }
     }
 
-    void PublishLcmStatus() { //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
+    /// PublishLcmAndPauseStatus is called once by a separate thread in the Run() method
+    /// It sends the robot status and the pause status. Pause status isseparate because robot status message 
+    /// used does not have space for indicating the contents of the pause message.
+    void PublishLcmAndPauseStatus() { //::lcm::LCM &lcm, RobotData &robot_data, std::atomic_bool &running
         while (running_) {
             // Sleep to achieve the desired print rate.
             std::this_thread::sleep_for(
@@ -685,8 +692,30 @@ private:
                 }
                 robot_data_.mutex.unlock();
             }
+
+            if (pause_mutex_.try_lock()) {
+                PublishPauseStatus();
+                pause_mutex_.unlock();
+            }
         }
     };
+
+
+    void PublishPauseStatus() {
+        robot_msgs::trigger_t msg;
+        msg.utime = get_current_utime();
+        msg.success = paused_;
+        msg.message = "";
+        if (paused_ || pausing_) { // TODO @syler: what if it's unpausing?   
+            for (auto elem : stop_set_) {
+	            msg.message.append(elem);
+              msg.message.append(",");
+            }
+            //momap::log()->info("PublishPauseStatus with msg.message: {}", msg.message);
+        }
+        lcm_.publish(lcm_pause_status_channel_, &msg);
+
+    }
 
     void PublishTriggerToChannel(int64_t utime, std::string lcm_channel, bool success=true, std::string message="") {
         robot_msgs::trigger_t msg;
@@ -747,7 +776,7 @@ private:
         franka_time_ = 0.0;
         piecewise_polynomial_ = TrajectorySolver::RobotSplineTToPPType(*rst);
 
-        if (piecewise_polynomial_.get_number_of_segments()<1)
+        if (piecewise_polynomial_.get_number_of_segments() < 1)
         {
             momap::log()->info("Discarding plan, invalid piecewise polynomial.");
             plan_.mutex.unlock();
@@ -785,8 +814,11 @@ private:
         
     };
 
-    void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
-        const robot_msgs::pause_cmd* msg) {
+    void HandleStop( const ::lcm::ReceiveBuffer*
+                   , const std::string&
+                   , const robot_msgs::pause_cmd* msg
+    ) {
+        std::lock_guard<std::mutex> lock(pause_mutex_); //$ unlocks when lock_guard goes out of scope
         if (msg->data) { //if pause command received
             if (msg->source != "queued") {
                 stop_set_.insert(msg->source);
@@ -794,7 +826,7 @@ private:
             momap::log()->info("Received pause from {}", msg->source);
             if ( ! pausing_) { //if this is first stop received
                 if ( ! unpausing_) { //if robot isn't currently unpausing_
-                    Pause();
+                    Pause(msg->source);
                 }
                 else { //if robot is currently unpausing_, queue pause cmd
                     queued_cmd_ = QueuedCommand::PAUSE;
@@ -823,11 +855,12 @@ private:
         }
     };
 
-    void Pause() {
+    void Pause(const std::string& source) {
         momap::log()->info("Pausing plan.");
         paused_ = false;
         pausing_ = true;
         unpausing_ = false;
+        stop_cmd_source_ = source;
         this->target_stop_time_ = 0;
         this->timestep_ = 1;
         this->stop_duration_ = 0;
@@ -841,6 +874,7 @@ private:
         paused_ = false;
         pausing_ = false;
         unpausing_ = true;
+        stop_cmd_source_ = "";
     }
 };
 } // robot_plan_runner
