@@ -29,6 +29,13 @@ int do_main(std::string param_yaml="franka_test.yaml") {
 
 
 int main(int argc, char** argv) {
+
+    std::string pid_file = "/var/run/cobot_driver.pid";
+    if (! dru::lock_pid_file(pid_file)) {
+        std::cerr << "Failed to set up singleton cobot driver app." << std::endl;
+        return 1;
+    }
+
     if (argc != 1 && argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <params_filepath>" << std::endl;
         return -1;
