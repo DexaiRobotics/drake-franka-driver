@@ -111,6 +111,7 @@ include_directories(
 set(driver_name franka_plan_runner)
 add_executable(${driver_name}
     src/franka_plan_runner.cc
+    src/franka_driver_utils.cc
     src/examples_common.cpp
 )
 
