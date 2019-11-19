@@ -2,14 +2,9 @@
 // Use of this source code is governed by the Apache-2.0 license, see LICENSE
 #pragma once
 
-#include <array>
-
+#include <array>  // for array
 #include <Eigen/Core>
-
-#include <franka/control_types.h>
-#include <franka/duration.h>
 #include <franka/robot.h>
-#include <franka/robot_state.h>
 
 /**
  * @file examples_common.h
