@@ -12,7 +12,22 @@
 
 #include "franka_plan_runner.h"
 
+#include <franka/exception.h>  // for Exception, ControlException
+#include <franka/robot.h>      // for Robot
+#include <cmath>     // for exp
+#include <iostream>  // for size_t
+
+
+
+#include "drake/lcmt_iiwa_status.hpp"
+#include "examples_common.h"            // for setDefaultBehavior
+#include "franka_driver_utils.h"        // for get_current_utime
+#include "robot_msgs/pause_cmd.hpp"     // for pause_cmd
+#include "robot_msgs/trigger_t.hpp"     // for trigger_t
+#include "trajectory_solver.h"          // for TrajectorySolver
+
 using namespace franka_driver;
+// using namespace std::chrono;
 
 FrankaPlanRunner::FrankaPlanRunner(const parameters::Parameters params)
     : p(params),
@@ -72,7 +87,7 @@ int FrankaPlanRunner::Run() {
   // clean-up threads if they're still alive.
   while (!lcm_handle_thread.joinable() ||
          !lcm_publish_status_thread.joinable()) {
-    usleep(1e5 * 1);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     momap::log()->info("Waiting for LCM threads to be joinable...");
   }
 
@@ -225,14 +240,15 @@ int FrankaPlanRunner::RunSim() {
   std::vector<double> vel(7, 1);
   franka::RobotState robot_state;  // internal state; mapping to franka state
   franka::Duration period;
-  milliseconds last_ms =
-      duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+  std::chrono::milliseconds last_ms =
+      std::chrono::duration_cast<std::chrono::milliseconds>(
+          std::chrono::system_clock::now().time_since_epoch());
 
   while (1) {
     std::this_thread::sleep_for(std::chrono::milliseconds(
         static_cast<int>(1000.0 / lcm_publish_rate_)));
 
-    std::vector<double> next_conf_vec = du::e_to_v(next_conf);
+    std::vector<double> next_conf_vec = dracula_utils::e_to_v(next_conf);
     ConvertToArray(next_conf_vec, robot_state.q);
     ConvertToArray(next_conf_vec, robot_state.q_d);
     ConvertToArray(vel, robot_state.dq);
@@ -241,18 +257,19 @@ int FrankaPlanRunner::RunSim() {
 
     prev_conf = next_conf.replicate(1, 1);
 
-    next_conf = du::v_to_e(ConvertToVector(cmd_pos.q));
+    next_conf = dracula_utils::v_to_e(ConvertToVector(cmd_pos.q));
     dracula->GetViz()->displayState(next_conf);
 
-    next_conf_vec = du::e_to_v(next_conf);
-    std::vector<double> prev_conf_vec = du::e_to_v(prev_conf);
+    next_conf_vec = dracula_utils::e_to_v(next_conf);
+    std::vector<double> prev_conf_vec = dracula_utils::e_to_v(prev_conf);
 
     for (int i = 0; i < 7; i++) {
       vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double)period.toSec();
     }
 
-    milliseconds current_ms =
-        duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+    std::chrono::milliseconds current_ms =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch());
     int64_t delta_ms = int64_t((current_ms - last_ms).count());
     period = franka::Duration(delta_ms);
     last_ms = current_ms;
@@ -366,10 +383,12 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       starting_franka_q_ = robot_state.q_d;
       momap::log()->warn(
           "starting franka q = {}",
-          du::v_to_e(ConvertToVector(starting_franka_q_)).transpose());
+          dracula_utils::v_to_e(ConvertToVector(starting_franka_q_))
+              .transpose());
       momap::log()->warn(
           "difference between where we are and where we think = {}",
-          (du::v_to_e(ConvertToVector(starting_franka_q_)) - starting_conf_)
+          (dracula_utils::v_to_e(ConvertToVector(starting_franka_q_)) -
+           starting_conf_)
               .norm());
     }
 
@@ -386,7 +405,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         robot_state.q_d;  // set to actual, not desired
     std::array<double, 7> current_conf =
         robot_state.q_d;  // set to actual, not desired
-    desired_next = du::v_to_e(ConvertToVector(current_cmd));
+    desired_next = dracula_utils::v_to_e(ConvertToVector(current_cmd));
 
     double error = DBL_MAX;
 
@@ -404,19 +423,19 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       }
       Eigen::VectorXd delta = desired_next - starting_conf_;
       Eigen::VectorXd output_eigen =
-          du::v_to_e(ConvertToVector(starting_franka_q_)) + delta;
+          dracula_utils::v_to_e(ConvertToVector(starting_franka_q_)) + delta;
       Eigen::VectorXd delta_end =
           plan_.plan->value(plan_.plan->end_time()) - starting_conf_;
       Eigen::VectorXd starting_q_eigen =
-          du::v_to_e(ConvertToVector(starting_franka_q_));
+          dracula_utils::v_to_e(ConvertToVector(starting_franka_q_));
       Eigen::VectorXd output_end = starting_q_eigen + delta_end;
       Eigen::VectorXd current_conf_eigen =
-          du::v_to_e(ConvertToVector(current_conf));
-      // error = ( du::v_to_e( ConvertToVector(current_conf) ) -
+          dracula_utils::v_to_e(ConvertToVector(current_conf));
+      // error = ( dracula_utils::v_to_e( ConvertToVector(current_conf) ) -
       // plan_.plan->value(plan_.plan->end_time()) ).norm();
       error = (current_conf_eigen - output_end).norm();
 
-      // momap::log()->warn("starting franka q = {}", du::v_to_e(
+      // momap::log()->warn("starting franka q = {}", dracula_utils::v_to_e(
       // ConvertToVector(starting_franka_q_) ).transpose());
       // momap::log()->warn("starting_q_eigen = {}",
       // starting_q_eigen.transpose()); momap::log()->info("error: {}", error);
@@ -454,7 +473,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         } else {
           momap::log()->info(
               "Plan running overtime and not converged, error: {}", error);
-          // momap::log()->info("q:   {}", du::v_to_e(
+          // momap::log()->info("q:   {}", dracula_utils::v_to_e(
           // ConvertToVector(current_conf)).transpose());
           // momap::log()->info("q_d: {}", desired_next.transpose());
         }
@@ -475,7 +494,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 void FrankaPlanRunner::HandleLcm() {
   while (running_) {
     lcm_.handleTimeout(0);
-    usleep(1e3 * 1);  //$ sleep 1ms
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
 }
 
@@ -554,7 +573,7 @@ bool FrankaPlanRunner::CanReceiveCommands() {
 
 void FrankaPlanRunner::HandlePlan(const ::lcm::ReceiveBuffer*,
                                   const std::string&,
-                                  const robot_spline_t* rst) {
+                                  const lcmtypes::robot_spline_t* rst) {
   momap::log()->info("New plan received.");
   if (!robot_alive_) {
     momap::log()->info(
@@ -600,11 +619,12 @@ void FrankaPlanRunner::HandlePlan(const ::lcm::ReceiveBuffer*,
   // Start position == goal position check
   // TODO: add end position==goal position check (upstream)
   // TODO: change to append initial position and respline here
-  VectorXd commanded_start =
+  Eigen::VectorXd commanded_start =
       piecewise_polynomial_.value(piecewise_polynomial_.start_time());
   for (int joint = 0; joint < rst->dof; joint++) {
-    if (!du::EpsEq(commanded_start(joint), robot_data_.robot_state.q[joint],
-                   p.kMediumJointDistance)) {
+    if (!dracula_utils::EpsEq(commanded_start(joint),
+                              robot_data_.robot_state.q[joint],
+                              p.kMediumJointDistance)) {
       momap::log()->info("Discarding plan, mismatched start position.");
       plan_.has_data = false;
       plan_.plan.release();
@@ -686,34 +706,4 @@ void FrankaPlanRunner::Continue() {
   pausing_ = false;
   unpausing_ = true;
   stop_cmd_source_ = "";
-}
-
-namespace franka_driver {
-
-int do_main(std::string param_yaml = "franka_test.yaml") {
-  create_momap_log("franka_plan_runner");
-  int verbose = 0;
-  momap::log()->info("Loading parameters: {}", param_yaml);
-  parameters::Parameters params =
-      parameters::loadYamlParameters(param_yaml, verbose);
-  FrankaPlanRunner frankaPlanRunner(params);
-  return frankaPlanRunner.Run();
-}
-
-}  // namespace franka_driver
-
-int main(int argc, char** argv) {
-  if (argc != 1 && argc != 2) {
-    std::cerr << "Usage: " << argv[0] << " <params_filepath>" << std::endl;
-    return -1;
-  }
-
-  if (argc == 1) {
-    momap::log()->info(
-        "Loading default parameters with sim robot: franka_test.yaml");
-    return franka_driver::do_main();
-  } else {
-    std::string param_yaml = argv[1];
-    return franka_driver::do_main(param_yaml);
-  }
 }

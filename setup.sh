@@ -14,7 +14,7 @@ exclude_pat=${7:-test_multiple_plans} # Regex for excluding some (slow) tests, s
 if (( $build_tests > 0 )); then
     target=all
 else
-    target=franka_plan_runner    # build only the main library
+    target=franka_driver    # build only the main library
 fi
 echo "####### make will use $num_threads jobs to build target: $target #######"
 

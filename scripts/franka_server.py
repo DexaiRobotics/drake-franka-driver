@@ -34,7 +34,7 @@ class FrankaDriverServer:
 
     def handle_stop_driver_request(self, channel, req):
         print("Stopping driver!")
-        cmd = 'pkill -f franka_plan_runner'
+        cmd = 'pkill -f franka_driver'
         print(cmd)
         subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
 

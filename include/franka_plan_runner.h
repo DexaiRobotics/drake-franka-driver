@@ -1,7 +1,7 @@
-/// @file
+/// @file franka_plan_runner
 ///
-/// kuka_plan_runner is designed to wait for LCM messages contraining
-/// a robot_plan_t message, and then execute the plan on an iiwa arm
+/// franka_plan_runner is designed to wait for LCM messages containing
+/// a robot_plan_t message, and then execute the plan on a franka arm
 /// (also communicating via LCM using the
 /// lcmt_iiwa_command/lcmt_iiwa_status messages).
 ///
@@ -12,75 +12,23 @@
 /// current plan and wait until a new plan is received.
 #pragma once
 
+#include <bits/stdint-intn.h>      // for int64_t
+#include <franka/control_types.h>  // for JointPositions
+#include <franka/duration.h>       // for Duration
+#include <franka/robot_state.h>    // for RobotState
 
-#include <gflags/gflags.h>
-#include <math.h>
-#include <poll.h>
+#include <cstdint>                 // for int64_t
+#include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
+#include <robot_msgs/pause_cmd.hpp>  // for pause_cmd
+#include <drake/common/trajectories/piecewise_polynomial.h>  // for Piecewis...
 
-#include <array>
-#include <atomic>
-#include <cassert>
-#include <chrono>
-#include <cmath>
-#include <cstring>
-#include <functional>
-#include <iostream>
-#include <iterator>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <set>
-#include <stdexcept>
-#include <thread>
-#include <vector>
+#include <mutex>   // for mutex
+#include <thread>  // for thread
 
-#include "drake/common/drake_assert.h"
-#include "drake/common/find_resource.h"
-#include "drake/common/trajectories/piecewise_polynomial.h"
-#include "lcm/lcm-cpp.hpp"
-
-// #include "iiwa_common.h" //eventually get from drake binary distro, when it
-// is included
-
-#include <franka/duration.h>
-#include <franka/exception.h>
-#include <franka/rate_limiting.h>
-#include <franka/robot.h>
-
-#include <iostream>
-#include <memory>
-
-#include "drake/lcmt_iiwa_status.hpp"
-#include "drake/multibody/joints/floating_base_types.h"
-#include "drake/multibody/parsers/urdf_parser.h"
-#include "drake/multibody/rigid_body_tree.h"
-#include "examples_common.h"
-
-// #include <momap/momap_robot_plan_v1.h>
-#include <lcmtypes/robot_spline_t.hpp>
-#include <robot_msgs/bool_t.hpp>
-#include <robot_msgs/pause_cmd.hpp>
-#include <robot_msgs/trigger_t.hpp>
-
-#include "dracula_utils.h"
-#include "franka_driver_utils.h"
-#include "mock_dracula.h"
-#include "momap/momap_log.h"
-#include "trajectory_solver.h"
-
-using namespace std::chrono;
-
-using drake::Vector1d;
-using Eigen::MatrixXd;
-using Eigen::Vector2d;
-using Eigen::Vector3d;
-using Eigen::VectorXd;
-using Eigen::VectorXi;
-
-namespace du = dracula_utils;
+#include "dracula.h"     // for Dracula
+#include "parameters.h"  // for Parameters
 
 namespace franka_driver {
-
 
 using drake::trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
@@ -128,10 +76,10 @@ class FrankaPlanRunner {
   void PublishTriggerToChannel(int64_t utime, std::string lcm_channel,
                                bool success = true, std::string message = "");
   //$ check if robot is in a mode that can receive commands, i.e. not user
-  //stopped or error recovery
+  // stopped or error recovery
   bool CanReceiveCommands();
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
-                  const robot_spline_t* rst);
+                  const lcmtypes::robot_spline_t* rst);
   void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
                   const robot_msgs::pause_cmd* msg);
   void Pause(const std::string& source);

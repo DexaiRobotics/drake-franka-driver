@@ -14,6 +14,17 @@ set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
 
+## Removing Unnecessary Headers:
+# 1) Install: 
+# $ sudo apt-get update -y && sudo apt-get install -y iwyu
+# 2) Comment out the following lines:
+# find_program(IWYU_PATH NAMES include-what-you-use iwyu)
+# if(NOT IWYU_PATH)
+#   message(FATAL_ERROR "Could not find the program include-what-you-use")
+# endif()
+# set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU_PATH})
+# set(CMAKE_C_INCLUDE_WHAT_YOU_USE ${IWYU_PATH})
+
 
 ## Set up environment
 message(STATUS "setting up environment!")
@@ -108,8 +119,9 @@ include_directories(
 
 # build the lcm driver that uses Franka Robot Interface (FRI)
 # add_definitions(-std=c++14)
-set(driver_name franka_plan_runner)
+set(driver_name franka_driver)
 add_executable(${driver_name}
+    src/franka_driver.cc
     src/franka_plan_runner.cc
     src/franka_driver_utils.cc
     src/examples_common.cpp

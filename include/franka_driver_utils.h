@@ -1,14 +1,16 @@
+/// @file franka_driver_utils
+
 #pragma once
 
+#include <bits/stdint-intn.h>    // for int64_t
+#include <franka/robot_state.h>  // for RobotState, RobotMode
 
-#include <franka/duration.h>
-#include <franka/exception.h>
-#include <franka/rate_limiting.h>
-#include <franka/robot.h>
+#include <array>    // for array
+#include <cstddef>  // for size_t
+#include <cstdint>  // for int64_t
+#include <string>   // for string
 
-#include "drake/lcmt_iiwa_status.hpp"
-
-#include "lcm/lcm-cpp.hpp"
+#include "drake/lcmt_iiwa_status.hpp" // for lcmt_iiwa_status
 
 namespace franka_driver {
 
