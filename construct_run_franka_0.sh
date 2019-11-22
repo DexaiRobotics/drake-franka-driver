@@ -2,7 +2,7 @@
 set -euxo
 
 cd build
-make -j4 franka_plan_runner
+make -j4 franka_driver
 cd ..
 
 ./franka_0.sh
