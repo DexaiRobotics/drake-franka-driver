@@ -85,8 +85,12 @@ bool CommunicationInterface::HasNewPlan() {
 
 void CommunicationInterface::TakeOverPlan(std::unique_ptr<PPType>& plan) {
   std::lock_guard<std::mutex> lock(plan_mutex_);
-  plan = std::move(robot_plan_.plan_);
+  if (!HasNewPlan() || !(robot_plan_.plan_)) {
+    throw std::runtime_error("No plan to take over!");
+  }
   robot_plan_.has_plan_data_ = false;
+
+  plan = std::move(robot_plan_.plan_);
 }
 
 franka::RobotState CommunicationInterface::GetRobotState() {
@@ -230,18 +234,18 @@ bool CommunicationInterface::CanReceiveCommands() {
 void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
                                         const std::string&,
                                         const lcmtypes::robot_spline_t* rst) {
-  momap::log()->info("New plan received.");
+  momap::log()->info("CommunicationInterface::HandlePlan: New plan received.");
 
   //$ check if in proper mode to receive commands
   if (!CanReceiveCommands()) {
-    momap::log()->error("Discarding plan, in wrong mode!");
+    momap::log()->error("CommunicationInterface::HandlePlan: Discarding plan, in wrong mode!");
     return;
   }
 
   // plan_mutex_.lock();
   while (!plan_mutex_.try_lock()) {
     momap::log()->warn(
-        "trying to get a lock on the plan_mutex_. Sleeping 1 ms and trying "
+        "CommunicationInterface::HandlePlan: trying to get a lock on the plan_mutex_. Sleeping 1 ms and trying "
         "again.");
     std::this_thread::sleep_for(
         std::chrono::milliseconds(static_cast<int>(1.0)));
@@ -250,19 +254,24 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
   momap::log()->info("utime: {}", rst->utime);
   robot_plan_.utime = rst->utime;
   //$ publish confirmation that plan was received with same utime
+  // TODO @rkk: move this to later in the function...
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
-  momap::log()->info("Published confirmation of received plan");
+  momap::log()->info("CommunicationInterface::HandlePlan: "
+      "Published confirmation of received plan");
 
   PPType piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
 
   if (piecewise_polynomial.get_number_of_segments() < 1) {
-    momap::log()->info("Discarding plan, invalid piecewise polynomial.");
+    momap::log()->error("CommunicationInterface::HandlePlan: "
+        "Discarding plan, invalid piecewise polynomial.");
     plan_mutex_.unlock();
     return;
   }
 
-  momap::log()->info("start time: {}", piecewise_polynomial.start_time());
-  momap::log()->info("end time: {}", piecewise_polynomial.end_time());
+  momap::log()->info("CommunicationInterface::HandlePlan: "
+      "plan start time: {}", piecewise_polynomial.start_time());
+  momap::log()->info("CommunicationInterface::HandlePlan: "
+      "plan end time: {}", piecewise_polynomial.end_time());
 
   // Start position == goal position check
   // TODO: add end position==goal position check (upstream)
@@ -275,7 +284,8 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
   for (int joint = 0; joint < rst->dof; joint++) {
     if (!dru::EpsEq(commanded_start(joint), q[joint],
                     params_.kMediumJointDistance)) {
-      momap::log()->info("Discarding plan, mismatched start position.");
+      momap::log()->error("CommunicationInterface::HandlePlan: "
+          "Discarding plan, mismatched start position.");
       robot_plan_.has_plan_data_ = false;
       robot_plan_.plan_.release();
       plan_mutex_.unlock();
@@ -283,12 +293,15 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
     }
   }
 
+  // plan is valid, so release old one first
+  robot_plan_.has_plan_data_ = false;
   robot_plan_.plan_.release();
-  robot_plan_.plan_.reset(&piecewise_polynomial);
+  // assign new plan:
+  robot_plan_.plan_ = std::make_unique<PPType>(piecewise_polynomial);
   robot_plan_.has_plan_data_ = true;
-
-  momap::log()->warn("Finished Handle Plan!");
   plan_mutex_.unlock();
+
+  momap::log()->info("CommunicationInterface::HandlePlan: Finished!");
 };
 
 void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,

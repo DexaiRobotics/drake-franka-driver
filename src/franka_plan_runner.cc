@@ -180,7 +180,7 @@ int FrankaPlanRunner::RunFranka() {
         } else {
           // publish robot_status
           // TODO: add a timer to be closer to 200 Hz.
-          if (counter > 200) {
+          if (counter > static_cast<int>(lcm_publish_rate_ * 2)) {
             momap::log()->info("RunFranka: RobotStatus: {}, waiting for plan.",
                 RobotStatusToString(status_));
             counter = 0; // reset
