@@ -145,25 +145,7 @@ void CommunicationInterface::HandleLcm() {
 
 void CommunicationInterface::PublishLcmAndPauseStatus() {
   while (running_) {
-    // Try to lock data to avoid read write collisions.
-    if (robot_data_mutex_.try_lock()) {
-      if (robot_data_.has_robot_data_) {
-        drake::lcmt_iiwa_status franka_status =
-            ConvertToLcmStatus(robot_data_.robot_state);
-        robot_data_mutex_.unlock();
-        // publish data over lcm
-        lcm_.publish(params_.lcm_status_channel, &franka_status);
-        robot_data_.has_robot_data_ = false;
-      }
-      else {
-        robot_data_mutex_.unlock();
-      }
-    } else {
-      momap::log()->warn(
-          "CommunicationInterface::PublishLcmAndPauseStatus:"
-          " Failed to get a lock on the robot_data_mutex_");
-    }
-
+    PublishRobotStatus();
     // TODO @rkk: make pause status part of the robot status
     PublishPauseStatus();
     // Sleep to achieve the desired print rate.
@@ -172,27 +154,36 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
   }
 }
 
+void CommunicationInterface::PublishRobotStatus() {
+  // Try to lock data to avoid read write collisions.
+  std::unique_lock<std::mutex> lock(robot_data_mutex_);
+  if (robot_data_.has_robot_data_) {
+    drake::lcmt_iiwa_status franka_status =
+        ConvertToLcmStatus(robot_data_.robot_state);
+    // publish data over lcm
+    robot_data_.has_robot_data_ = false;
+    lock.unlock();
+    lcm_.publish(params_.lcm_status_channel, &franka_status);
+  }
+  else {
+    lock.unlock();
+  }
+}
+
 void CommunicationInterface::PublishPauseStatus() {
   robot_msgs::trigger_t msg;
   msg.utime = dru::get_current_utime();
-  if (pause_mutex_.try_lock()) {
-    msg.success = pause_data_.paused_;
-    msg.message = "";
-    if (pause_data_.paused_) {
-      for (auto elem : pause_data_.stop_set_) {
-        msg.message.append(elem);
-        msg.message.append(",");
-      }
-      // momap::log()->info("PublishPauseStatus with msg.message: {}",
-      // msg.message);
+  std::unique_lock<std::mutex> lock(pause_mutex_);
+  msg.success = pause_data_.paused_;
+  msg.message = "";
+  if (pause_data_.paused_) {
+    for (auto elem : pause_data_.stop_set_) {
+      msg.message.append(elem);
+      msg.message.append(",");
     }
-    pause_mutex_.unlock();
-    lcm_.publish(lcm_pause_status_channel_, &msg);
-  } else {
-    momap::log()->warn(
-        "CommunicationInterface::PublishPauseStatus:"
-        " Failed to get a lock on the pause_mutex_");
   }
+  lock.unlock();
+  lcm_.publish(lcm_pause_status_channel_, &msg);
 }
 
 void CommunicationInterface::PublishTriggerToChannel(int64_t utime,

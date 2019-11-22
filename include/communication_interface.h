@@ -82,6 +82,7 @@ class CommunicationInterface {
   /// isseparate because robot status message used does not have space for
   /// indicating the contents of the pause message.
   void PublishLcmAndPauseStatus();
+  void PublishRobotStatus();
   void PublishPauseStatus();
   void PublishTriggerToChannel(int64_t utime, std::string lcm_channel,
                                bool success = true, std::string message = "");

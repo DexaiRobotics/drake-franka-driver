@@ -17,6 +17,7 @@
 #include "franka/exception.h"     // for Exception, ControlException
 #include "franka/robot.h"         // for Robot
 
+#include <bits/stdc++.h> // INT_MAX
 #include <cmath>     // for exp
 #include <iostream>  // for size_t
 
@@ -150,7 +151,7 @@ int FrankaPlanRunner::RunFranka() {
     status_ = RobotStatus::Running;
 
     int error_counter = 0;
-    int counter = 0;
+    int counter = INT_MAX;
 
     //$ main control loop
     while (true) {
@@ -178,13 +179,13 @@ int FrankaPlanRunner::RunFranka() {
           // was thrown
           error_counter = 0;
         } else {
-          // publish robot_status
-          // TODO: add a timer to be closer to 200 Hz.
-          if (counter > static_cast<int>(lcm_publish_rate_ * 2)) {
+          if (counter > static_cast<int>(lcm_publish_rate_ * 10)) {
             momap::log()->info("RunFranka: RobotStatus: {}, waiting for plan.",
                 RobotStatusToString(status_));
             counter = 0; // reset
           }
+          // only publish robot_status
+          // TODO: add a timer to be closer to 200 Hz.
           robot.read([this](const franka::RobotState& robot_state) {
             comm_interface_->SetRobotState(robot_state);
             std::this_thread::sleep_for(std::chrono::milliseconds(
