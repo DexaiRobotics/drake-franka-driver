@@ -123,6 +123,7 @@ set(driver_name franka_driver)
 add_executable(${driver_name}
     src/franka_driver.cc
     src/franka_plan_runner.cc
+    src/communication_interface.cc
     src/franka_driver_utils.cc
     src/examples_common.cpp
 )
