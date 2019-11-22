@@ -323,7 +323,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       }
     }
     target_stop_time_ = temp_target_stop_time_ / STOP_SCALE;
-    momap::log()->debug("target_stop_time_: {}", target_stop_time_);
+    momap::log()->warn("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pausing with target_stop_time_: {}", target_stop_time_);
     status_ == RobotStatus::Pausing;
   }
 
@@ -331,6 +331,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
   if (!paused && status_ == RobotStatus::Paused) {
     // the duration it took to step is now used to unpause:
     timestep_ = -1 * stop_duration_;
+    momap::log()->warn("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing with timestep_: {}", timestep_);
     status_ == RobotStatus::Unpausing;
   }
 
@@ -338,7 +339,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     double new_stop =
         StopPeriod(period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += new_stop;
-    momap::log()->debug("stop period: {}", new_stop);
+    momap::log()->info("stop period: {}", new_stop);
     timestep_++;
 
     if (new_stop >= period_in_seconds * params_.stop_epsilon) {

@@ -301,7 +301,7 @@ void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
   std::lock_guard<std::mutex> lock(pause_mutex_);
   // check if pause command received:
   if (msg->data) {
-    momap::log()->info("Received pause from {}", msg->source);
+    momap::log()->warn("CommunicationInterface::HandlePause: Received pause from {}", msg->source);
     if (pause_data_.stop_set_.insert(msg->source).second == false) {
       momap::log()->warn(
           "CommunicationInterface::HandlePause: "
@@ -311,7 +311,7 @@ void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
   }
   // check if unpause command received
   else if (!msg->data) {
-    momap::log()->info("Received unpause from {}", msg->source);
+    momap::log()->warn("CommunicationInterface::HandlePause: Received unpause from {}", msg->source);
     if (pause_data_.stop_set_.find(msg->source) !=
         pause_data_.stop_set_.end()) {
       pause_data_.stop_set_.erase(msg->source);
