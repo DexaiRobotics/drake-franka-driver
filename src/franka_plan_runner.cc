@@ -387,11 +387,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // get the current plan from the communication interface
   if (comm_interface_->HasNewPlan()) {
-    comm_interface_->TakeOverPlan(plan_);
 
+    comm_interface_->TakeOverPlan(plan_);
+    if(!plan_) {
+      momap::log()->error("FrankaPlanRunner::JointPositionCallback: plan is empty!");
+      return franka::MotionFinished(output_to_franka);
+    }
     // first time step of plan, reset time:
     franka_time_ = 0.0;
-    start_conf_plan_ = plan_->value(franka_time_);
+    start_conf_plan_ = plan_->value(franka_time_); // TODO @rkk: fails
 
     if (!LimitJoints(start_conf_plan_)) {
       momap::log()->warn("plan at {}s is exceeding the joint limits!",
