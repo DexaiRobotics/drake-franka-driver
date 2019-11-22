@@ -16,7 +16,6 @@
 #include "examples_common.h"      // for setDefaultBehavior
 #include "franka/exception.h"     // for Exception, ControlException
 #include "franka/robot.h"         // for Robot
-#include "franka_driver_utils.h"  // dof_
 
 #include <cmath>     // for exp
 #include <iostream>  // for size_t
@@ -151,6 +150,8 @@ int FrankaPlanRunner::RunFranka() {
     status_ = RobotStatus::Running;
 
     int error_counter = 0;
+    int counter = 0;
+
     //$ main control loop
     while (true) {
       // std::cout << "top of loop: Executing motion." << std::endl;
@@ -169,7 +170,7 @@ int FrankaPlanRunner::RunFranka() {
         }
         // prevent the plan from being started if robot is not running...
         if (comm_interface_->HasNewPlan() && status_ == RobotStatus::Running) {
-          momap::log()->error("RunFranka: Got a new plan, attaching callback!");
+          momap::log()->info("RunFranka: Got a new plan, attaching callback!");
           // joint_position_callback or impedance_control_callback can be used
           // here:
           robot.control(joint_position_callback);
@@ -179,13 +180,18 @@ int FrankaPlanRunner::RunFranka() {
         } else {
           // publish robot_status
           // TODO: add a timer to be closer to 200 Hz.
-          // std::cout << "only should be here when sitting.\n";
+          if (counter > 200) {
+            momap::log()->info("RunFranka: RobotStatus: {}, waiting for plan.",
+                RobotStatusToString(status_));
+            counter = 0; // reset
+          }
           robot.read([this](const franka::RobotState& robot_state) {
-            comm_interface_->TryToSetRobotState(robot_state);
+            comm_interface_->SetRobotState(robot_state);
             std::this_thread::sleep_for(std::chrono::milliseconds(
                 static_cast<int>(1000.0 / lcm_publish_rate_)));
             return false;
           });
+          counter++;
         }
       } catch (const franka::ControlException& ce) {
         error_counter++;

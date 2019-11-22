@@ -101,6 +101,28 @@ std::string franka_driver::RobotModeToString(franka::RobotMode mode) {
   return mode_string;
 }
 
+std::string franka_driver::RobotStatusToString(RobotStatus status) {
+  std::string status_string;
+  switch (status) {
+    case RobotStatus::Uninitialized:
+      status_string = "Uninitialized";
+      break;
+    case RobotStatus::Running:
+      status_string = "Running";
+      break;
+    case RobotStatus::Pausing:
+      status_string = "Pausing";
+      break;
+    case RobotStatus::Paused:
+      status_string = "Paused";
+      break;
+    case RobotStatus::Unpausing:
+      status_string = "Unpausing";
+      break;
+  }
+  return status_string;
+}
+
 std::array<double, 7> franka_driver::EigenToArray(
     const Eigen::VectorXd& input) {
   std::array<double, 7> output = {

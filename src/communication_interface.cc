@@ -33,14 +33,13 @@ CommunicationInterface::CommunicationInterface(
                  this);
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
-  running_ = true;
 
   pause_data_.paused_ = false;  // not paused at start
 
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
 
-  robot_plan_.has_data_ = false;
+  robot_plan_.has_plan_data_ = false;
   robot_plan_.plan_.release();
   robot_plan_.utime = -1;
 
@@ -55,10 +54,12 @@ CommunicationInterface::CommunicationInterface(
 
 void CommunicationInterface::StartInterface() {
   // start LCM threads; independent of sim vs. real robot
+  running_ = true;
   momap::log()->info("Start LCM threads");
   lcm_publish_status_thread_ =
       std::thread(&CommunicationInterface::PublishLcmAndPauseStatus, this);
-  lcm_handle_thread_ = std::thread(&CommunicationInterface::HandleLcm, this);
+  lcm_handle_thread_ = 
+      std::thread(&CommunicationInterface::HandleLcm, this);
 };
 
 void CommunicationInterface::StopInterface() {
@@ -79,13 +80,13 @@ void CommunicationInterface::StopInterface() {
 };
 
 bool CommunicationInterface::HasNewPlan() {
-  return robot_plan_.has_data_;  // is atomic
+  return robot_plan_.has_plan_data_;  // is atomic
 }
 
 void CommunicationInterface::TakeOverPlan(std::unique_ptr<PPType>& plan) {
   std::lock_guard<std::mutex> lock(plan_mutex_);
   plan = std::move(robot_plan_.plan_);
-  robot_plan_.has_data_ = false;
+  robot_plan_.has_plan_data_ = false;
 }
 
 franka::RobotState CommunicationInterface::GetRobotState() {
@@ -93,10 +94,17 @@ franka::RobotState CommunicationInterface::GetRobotState() {
   return robot_data_.robot_state;
 }
 
+void CommunicationInterface::SetRobotState(
+    const franka::RobotState& robot_state) {
+  std::lock_guard<std::mutex> lock(robot_data_mutex_);
+  robot_data_.has_robot_data_ = true;
+  robot_data_.robot_state = robot_state;
+}
+
 void CommunicationInterface::TryToSetRobotState(
     const franka::RobotState& robot_state) {
   if (robot_data_mutex_.try_lock()) {
-    robot_data_.has_data_ = true;
+    robot_data_.has_robot_data_ = true;
     robot_data_.robot_state = robot_state;
     robot_data_mutex_.unlock();
   }
@@ -114,7 +122,7 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
 
 void CommunicationInterface::PublishPlanComplete(const int64_t& end_time_us) {
   robot_plan_.plan_.release();
-  robot_plan_.has_data_ = false;
+  robot_plan_.has_plan_data_ = false;
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_complete_channel);
 }
 
@@ -135,20 +143,24 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
   while (running_) {
     // Try to lock data to avoid read write collisions.
     if (robot_data_mutex_.try_lock()) {
-      if (robot_data_.has_data_) {
+      if (robot_data_.has_robot_data_) {
         drake::lcmt_iiwa_status franka_status =
             ConvertToLcmStatus(robot_data_.robot_state);
+        robot_data_mutex_.unlock();
         // publish data over lcm
         lcm_.publish(params_.lcm_status_channel, &franka_status);
-        robot_data_.has_data_ = false;
+        robot_data_.has_robot_data_ = false;
       }
-      robot_data_mutex_.unlock();
+      else {
+        robot_data_mutex_.unlock();
+      }
     } else {
       momap::log()->warn(
           "CommunicationInterface::PublishLcmAndPauseStatus:"
           " Failed to get a lock on the robot_data_mutex_");
     }
-    // TODO @rkk: make this part of the robot status
+
+    // TODO @rkk: make pause status part of the robot status
     PublishPauseStatus();
     // Sleep to achieve the desired print rate.
     std::this_thread::sleep_for(std::chrono::milliseconds(
@@ -160,7 +172,6 @@ void CommunicationInterface::PublishPauseStatus() {
   robot_msgs::trigger_t msg;
   msg.utime = dru::get_current_utime();
   if (pause_mutex_.try_lock()) {
-    std::lock_guard<std::mutex> lock(pause_mutex_);
     msg.success = pause_data_.paused_;
     msg.message = "";
     if (pause_data_.paused_) {
@@ -171,6 +182,7 @@ void CommunicationInterface::PublishPauseStatus() {
       // momap::log()->info("PublishPauseStatus with msg.message: {}",
       // msg.message);
     }
+    pause_mutex_.unlock();
     lcm_.publish(lcm_pause_status_channel_, &msg);
   } else {
     momap::log()->warn(
@@ -264,7 +276,7 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
     if (!dru::EpsEq(commanded_start(joint), q[joint],
                     params_.kMediumJointDistance)) {
       momap::log()->info("Discarding plan, mismatched start position.");
-      robot_plan_.has_data_ = false;
+      robot_plan_.has_plan_data_ = false;
       robot_plan_.plan_.release();
       plan_mutex_.unlock();
       return;
@@ -273,7 +285,7 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
 
   robot_plan_.plan_.release();
   robot_plan_.plan_.reset(&piecewise_polynomial);
-  robot_plan_.has_data_ = true;
+  robot_plan_.has_plan_data_ = true;
 
   momap::log()->warn("Finished Handle Plan!");
   plan_mutex_.unlock();

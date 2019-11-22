@@ -19,6 +19,7 @@
 #include "franka/robot.h"          // for franka::Robot
 #include "franka/robot_state.h"    // for franka::RobotState
 #include "parameters.h"            // for Parameters
+#include "franka_driver_utils.h"  //  for dof_ and for RobotState
 
 #include <Eigen/Dense>                  // for Eigen::VectorXd
 #include <bits/stdint-intn.h>           // for int64_t
@@ -28,8 +29,6 @@
 #include <thread>                       // for thread
 
 namespace franka_driver {
-
-enum class RobotStatus { Uninitialized, Running, Pausing, Paused, Unpausing };
 
 class FrankaPlanRunner {
  public:

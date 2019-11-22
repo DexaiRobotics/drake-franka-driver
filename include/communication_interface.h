@@ -32,7 +32,7 @@ namespace franka_driver {
 
 // TODO @rkk: remove this franka specific state and make it generic:
 struct RobotData {
-  std::atomic<bool> has_data_;
+  std::atomic<bool> has_robot_data_;
   franka::RobotState robot_state;
 };
 
@@ -42,7 +42,7 @@ struct PauseData {
 };
 
 struct RobotPiecewisePolynomial {
-  std::atomic<bool> has_data_;
+  std::atomic<bool> has_plan_data_;
   int64_t utime;
   std::unique_ptr<PPType> plan_;
 };
@@ -60,7 +60,10 @@ class CommunicationInterface {
   bool HasNewPlan();
   void TakeOverPlan(std::unique_ptr<PPType>& plan);
 
+  // TODO @rkk: remove franka specific RobotState type 
+  // and replace with std::array type:
   franka::RobotState GetRobotState();
+  void SetRobotState(const franka::RobotState& robot_state);
   void TryToSetRobotState(const franka::RobotState& robot_state);
 
   bool GetPauseStatus();
