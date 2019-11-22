@@ -3,9 +3,16 @@
 #include <robot_msgs/bool_t.hpp>
 #include <robot_msgs/pause_cmd.hpp>
 #include <sys/time.h>
-#include "drac_util_io.h"            // for get_current_utime
 
 using namespace std;
+
+int64_t get_current_utime() {
+    struct timeval  tv;
+    gettimeofday(&tv, NULL);
+    int64_t current_utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
+    return current_utime;
+}
+
 
 int main(int argc, char** argv)
 {	
@@ -28,7 +35,7 @@ int main(int argc, char** argv)
 		cin >> a;
 		cout << "Enter source: ";
 		cin >> b;
-		cmd.utime = dru::get_current_utime();
+		cmd.utime = get_current_utime();
 		if(a == "s"){
 			cmd.data = true;
 			cmd.source = b;

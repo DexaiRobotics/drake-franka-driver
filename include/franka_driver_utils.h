@@ -2,17 +2,15 @@
 
 #pragma once
 
-#include "drake/lcmt_iiwa_status.hpp" // for lcmt_iiwa_status
+#include "drake/lcmt_iiwa_status.hpp"  // for lcmt_iiwa_status
+#include "franka/robot_state.h"        // for RobotState, RobotMode
 
-#include <bits/stdint-intn.h>    // for int64_t
-#include <franka/robot_state.h>  // for RobotState, RobotMode
-#include <Eigen/Dense>           // for Eigen::VectorXd
-
-#include <array>    // for array
-#include <cstddef>  // for size_t
-#include <cstdint>  // for int64_t
-#include <string>   // for string
-
+#include <Eigen/Dense>         // for Eigen::VectorXd
+#include <array>               // for array
+#include <bits/stdint-intn.h>  // for int64_t
+#include <cstddef>             // for size_t
+#include <cstdint>             // for int64_t
+#include <string>              // for string
 
 namespace franka_driver {
 

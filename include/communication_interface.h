@@ -1,31 +1,29 @@
 #pragma once
-/// @file franka_plan_runner
+/// @file communication_interface
 ///
-/// franka_plan_runner is designed to wait for LCM messages containing
-/// a robot_plan_t message, and then execute the plan on a franka arm
-/// (also communicating via LCM using the
-/// lcmt_iiwa_command/lcmt_iiwa_status messages).
+/// communication_interface is designed to wait for LCM messages containing
+/// a robot_spline_t message, and make it available to the franka_plan_runner
+/// The interface also reports via LCM lcmt_franka_status
+/// lcmt_franka_pause_status messages).
 ///
-/// When a plan is received, it will immediately begin executing that
-/// plan on the arm (replacing any plan in progress).
+/// When a plan is received, it will indicate via HasPlan() that a plan is
+/// available. The plan is moved from this communication interface to a franka
+/// plan runner when the MovePlan() is called.
 ///
-/// If a stop message is received, it will immediately discard the
-/// current plan and wait until a new plan is received.
+/// If a pause message is received, it will set the opause status to true and
+/// keep track of what source paused it.
 
-#include <bits/stdint-intn.h>  // for int64_t
-// #include <franka/control_types.h>  // for JointPositions
-// #include <franka/duration.h>       // for Duration
-#include <drake/common/trajectories/piecewise_polynomial.h>  // for Piecewis...
-#include <franka/robot_state.h>                              // for RobotState
+#include "dracula.h"                                         // for Dracula
+#include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
+#include "franka/robot_state.h"                              // for RobotState
+#include "parameters.h"                                      // for Parameters
 
+#include <bits/stdint-intn.h>           // for int64_t
 #include <cstdint>                      // for int64_t
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
 #include <mutex>                        // for mutex
 #include <robot_msgs/pause_cmd.hpp>     // for pause_cmd
 #include <thread>                       // for thread
-
-#include "dracula.h"     // for Dracula
-#include "parameters.h"  // for Parameters
 
 using drake::trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
@@ -61,7 +59,7 @@ class CommunicationInterface {
 
   bool HasNewPlan();
   void TakeOverPlan(std::unique_ptr<PPType>& plan);
-  
+
   franka::RobotState GetRobotState();
   void TryToSetRobotState(const franka::RobotState& robot_state);
 
@@ -90,7 +88,7 @@ class CommunicationInterface {
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
                   const lcmtypes::robot_spline_t* rst);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
-                  const robot_msgs::pause_cmd* msg);
+                   const robot_msgs::pause_cmd* msg);
 
  private:
   parameters::Parameters params_;
@@ -113,7 +111,6 @@ class CommunicationInterface {
   std::string lcm_driver_status_channel_;
   std::string lcm_pause_status_channel_;
   double lcm_publish_rate_;  // Hz
-
 };
 
 }  // namespace franka_driver

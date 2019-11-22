@@ -14,11 +14,9 @@
 
 #include "drake/lcmt_iiwa_status.hpp"
 #include "examples_common.h"      // for setDefaultBehavior
-
+#include "franka/exception.h"     // for Exception, ControlException
+#include "franka/robot.h"         // for Robot
 #include "franka_driver_utils.h"  // dof_
-
-#include <franka/exception.h>  // for Exception, ControlException
-#include <franka/robot.h>      // for Robot
 
 #include <cmath>     // for exp
 #include <iostream>  // for size_t
@@ -28,9 +26,8 @@ namespace dru = dracula_utils;
 
 FrankaPlanRunner::FrankaPlanRunner(const parameters::Parameters params)
     : params_(params), ip_addr_(params.robot_ip) {
-
   // define robot's state as uninitialized at start:
-  status_ = RobotStatus::Uninitialized;  
+  status_ = RobotStatus::Uninitialized;
 
   // setup communication interface
   comm_interface_ =
@@ -50,7 +47,6 @@ FrankaPlanRunner::FrankaPlanRunner(const parameters::Parameters params)
 }
 
 int FrankaPlanRunner::Run() {
-  
   comm_interface_->StartInterface();
 
   int return_value = 1;  //
@@ -62,25 +58,27 @@ int FrankaPlanRunner::Run() {
 
   comm_interface_->StopInterface();
 
-  status_ = RobotStatus::Uninitialized;  
+  status_ = RobotStatus::Uninitialized;
 
   return return_value;
 }
 
-void FrankaPlanRunner::SetCollisionBehaviour(franka::Robot& robot, bool safety_on) {
+void FrankaPlanRunner::SetCollisionBehaviour(franka::Robot& robot,
+                                             bool safety_on) {
   if (status_ != RobotStatus::Uninitialized) {
-    throw std::runtime_error("robot is already initialized, cannot change collision behaviour!");
+    throw std::runtime_error(
+        "robot is already initialized, cannot change collision behaviour!");
     return;
-  } 
+  }
   if (safety_on) {
     robot.setCollisionBehavior({{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
-                                {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
-                                {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
-                                {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
-                                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
-                                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
-                                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
-                                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}});
+                               {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                               {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                               {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                               {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
+                               {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
+                               {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
+                               {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}});
   } else {
     robot.setCollisionBehavior(
         {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
@@ -107,16 +105,22 @@ int FrankaPlanRunner::RunFranka() {
       current_mode = robot_state.robot_mode;
       return count++ < 100;
     });
-    momap::log()->info("RunFranka: Franka's current mode: {}", RobotModeToString(current_mode));
+    momap::log()->info("RunFranka: Franka's current mode: {}",
+                       RobotModeToString(current_mode));
 
     if (current_mode != franka::RobotMode::kIdle) {
-      momap::log()->error("RunFranka: Robot cannot receive commands in mode: {}",
-                         RobotModeToString(current_mode));
-      comm_interface_->PublishDriverStatus(false, RobotModeToString(current_mode));
+      momap::log()->error(
+          "RunFranka: Robot cannot receive commands in mode: {}",
+          RobotModeToString(current_mode));
+      comm_interface_->PublishDriverStatus(false,
+                                           RobotModeToString(current_mode));
       return 1;
     }
   } catch (franka::Exception const& e) {
-    momap::log()->error( "RunFranka: Received franka exception: {} - Do not have error handling for it yet...", e.what() );
+    momap::log()->error(
+        "RunFranka: Received franka exception: {} - Do not have error handling "
+        "for it yet...",
+        e.what());
     comm_interface_->PublishDriverStatus(false, e.what());
     return 1;
   }
@@ -144,8 +148,7 @@ int FrankaPlanRunner::RunFranka() {
     };
 
     // Initilization is done, define robot as running:
-    status_ = RobotStatus::Running; 
-
+    status_ = RobotStatus::Running;
 
     int error_counter = 0;
     //$ main control loop
@@ -153,7 +156,9 @@ int FrankaPlanRunner::RunFranka() {
       // std::cout << "top of loop: Executing motion." << std::endl;
       try {
         if (error_counter == 2) {
-          momap::log()->error("RunFranka: Error happened twice in a row, running franka's automaticErrorRecovery!");
+          momap::log()->error(
+              "RunFranka: Error happened twice in a row, running franka's "
+              "automaticErrorRecovery!");
           robot.automaticErrorRecovery();
         }
         auto paused_by_lcm = comm_interface_->GetPauseStatus();
@@ -165,9 +170,11 @@ int FrankaPlanRunner::RunFranka() {
         // prevent the plan from being started if robot is not running...
         if (comm_interface_->HasNewPlan() && status_ == RobotStatus::Running) {
           momap::log()->error("RunFranka: Got a new plan, attaching callback!");
-          // joint_position_callback or impedance_control_callback can be used here:
-          robot.control(joint_position_callback);  
-          // reset error counter once motion was successful, i.e. no exception was thrown
+          // joint_position_callback or impedance_control_callback can be used
+          // here:
+          robot.control(joint_position_callback);
+          // reset error counter once motion was successful, i.e. no exception
+          // was thrown
           error_counter = 0;
         } else {
           // publish robot_status
@@ -182,7 +189,8 @@ int FrankaPlanRunner::RunFranka() {
         }
       } catch (const franka::ControlException& ce) {
         error_counter++;
-        momap::log()->warn("RunFranka: Caught control exception: {}.", ce.what());
+        momap::log()->warn("RunFranka: Caught control exception: {}.",
+                           ce.what());
         if (error_counter > 2) {
           momap::log()->error("RunFranka: Error recovery did not work!");
           comm_interface_->PublishDriverStatus(false, ce.what());
@@ -192,8 +200,8 @@ int FrankaPlanRunner::RunFranka() {
     }
 
   } catch (const franka::Exception& ex) {
-    momap::log()->error("RunFranka: Caught expection during initilization, msg: {}",
-                        ex.what());
+    momap::log()->error(
+        "RunFranka: Caught expection during initilization, msg: {}", ex.what());
     comm_interface_->PublishDriverStatus(false, ex.what());
     return 1;  // bad things happened.
   }
@@ -204,8 +212,7 @@ int FrankaPlanRunner::RunSim() {
   momap::log()->info("Starting sim robot.");
   // first, load some parameters
   dracula_->MutableViz()->loadRobot();
-  Eigen::VectorXd next_conf =
-      Eigen::VectorXd::Zero(dof_);  // output state
+  Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(dof_);  // output state
   next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542,
       -2.5114236381136448, 0.6720116891296624, 1.9928838396072361,
       -1.2954019628351783;  // set robot in a starting position which is not in
@@ -221,8 +228,8 @@ int FrankaPlanRunner::RunSim() {
   status_ = RobotStatus::Running;  // define robot as running at start
 
   while (1) {
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(static_cast<int>(1000.0 / lcm_publish_rate_)));
+    std::this_thread::sleep_for(std::chrono::milliseconds(
+        static_cast<int>(1000.0 / lcm_publish_rate_)));
 
     std::vector<double> next_conf_vec = dru::e_to_v(next_conf);
     VectorToArray(next_conf_vec, robot_state.q);
@@ -283,7 +290,8 @@ double FrankaPlanRunner::StopPeriod(double period, double target_stop_time,
   return (current_time - prev_time);
 }
 
-void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(const std::array<double, 7>& vel, double period_in_seconds) {
+void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
+    const std::array<double, 7>& vel, double period_in_seconds) {
   // get pause data from the communication interface
   auto paused = comm_interface_->GetPauseStatus();
 
@@ -320,7 +328,8 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(const std::array<double, 
   }
 
   if (status_ == RobotStatus::Pausing) {
-    double new_stop = StopPeriod(period_in_seconds, target_stop_time_, timestep_);
+    double new_stop =
+        StopPeriod(period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += new_stop;
     momap::log()->debug("stop period: {}", new_stop);
     timestep_++;
@@ -339,14 +348,14 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(const std::array<double, 
     }
 
   } else if (status_ == RobotStatus::Unpausing) {
-
     if (timestep_ >= 0) {
       // robot has reached full speed again
       // set robot pause status to false:
       comm_interface_->SetPauseStatus(false);
       status_ == RobotStatus::Running;
     }
-    double new_stop = StopPeriod(period_in_seconds, target_stop_time_, timestep_);
+    double new_stop =
+        StopPeriod(period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += new_stop;
     momap::log()->debug("Unpausing period: {}", new_stop);
     timestep_++;
@@ -359,9 +368,8 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(const std::array<double, 
 
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const franka::RobotState& robot_state, franka::Duration period) {
-
   // check pause status and update franka_time_:
-  IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec() );
+  IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec());
 
   // read out robot state
   franka::JointPositions output_to_franka = robot_state.q_d;
@@ -373,16 +381,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // get the current plan from the communication interface
   if (comm_interface_->HasNewPlan()) {
-    
     comm_interface_->TakeOverPlan(plan_);
 
     // first time step of plan, reset time:
     franka_time_ = 0.0;
     start_conf_plan_ = plan_->value(franka_time_);
 
-    if(!LimitJoints(start_conf_plan_) ) {
-      momap::log()->warn(
-        "plan at {}s is exceeding the joint limits!", franka_time_);
+    if (!LimitJoints(start_conf_plan_)) {
+      momap::log()->warn("plan at {}s is exceeding the joint limits!",
+                         franka_time_);
     }
 
     // the current (desired) position of franka is the starting position:
@@ -390,22 +397,22 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
     Eigen::VectorXd delta_start_to_end_plan =
         plan_->value(plan_->end_time()) - start_conf_plan_;
-    
+
     end_conf_franka_ = start_conf_franka_ + delta_start_to_end_plan;
     // TODO @rkk: move this print into another thread
     momap::log()->debug("starting franka q = {}",
-                       start_conf_franka_.transpose());
-    momap::log()->debug("starting plan q = {}",
-                       start_conf_plan_.transpose());
-    if (!dru::VectorEpsEq(start_conf_plan_, start_conf_franka_, 
-        params_.kMediumJointDistance)) {
-      momap::log()->error("JointPositionCallback: Discarding plan, mismatched start position.");
+                        start_conf_franka_.transpose());
+    momap::log()->debug("starting plan q = {}", start_conf_plan_.transpose());
+    if (!dru::VectorEpsEq(start_conf_plan_, start_conf_franka_,
+                          params_.kMediumJointDistance)) {
+      momap::log()->error(
+          "JointPositionCallback: Discarding plan, mismatched start position.");
       return franka::MotionFinished(output_to_franka);
     }
 
     double error_start = (start_conf_franka_ - start_conf_plan_).norm();
     // TODO @rkk: move this print into another thread
-    if(error_start > allowable_error_) {
+    if (error_start > allowable_error_) {
       momap::log()->warn(
           "too large a difference between where we are and where we think = {}",
           error_start);
@@ -419,14 +426,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // read out plan for current franka time from plan:
   Eigen::VectorXd next_conf_plan = plan_->value(franka_time_);
-  if(!LimitJoints(next_conf_plan)) {
-    momap::log()->warn(
-      "plan at {}s is exceeding the joint limits!", franka_time_);
+  if (!LimitJoints(next_conf_plan)) {
+    momap::log()->warn("plan at {}s is exceeding the joint limits!",
+                       franka_time_);
   }
 
   // delta between conf at start of plan to conft at current time of plan:
   Eigen::VectorXd delta_conf_plan = next_conf_plan - start_conf_plan_;
-  
+
   // add delta to current robot state to achieve a continuous motion:
   Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
 
@@ -437,7 +444,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   if (franka_time_ > plan_->end_time()) {
     // TODO @rkk: replace allowable_error_ with non arbitrary number
-    if (error_final < allowable_error_) {  
+    if (error_final < allowable_error_) {
       momap::log()->info("Finished motion, exiting controller");
       comm_interface_->PublishPlanComplete(franka_time_);
       return franka::MotionFinished(output_to_franka);
@@ -445,7 +452,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       momap::log()->warn(
           "Plan running overtime and not converged, error distance: {}",
           error_final);
-      momap::log()->info("current_conf_franka: {}", current_conf_franka.transpose());
+      momap::log()->info("current_conf_franka: {}",
+                         current_conf_franka.transpose());
       momap::log()->info("next_conf_franka: {}", next_conf_franka.transpose());
       momap::log()->info("next_conf_plan: {}", next_conf_plan.transpose());
       return franka::MotionFinished(output_to_franka);

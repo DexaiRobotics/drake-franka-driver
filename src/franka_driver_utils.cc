@@ -1,12 +1,12 @@
 /// @file franka_driver_utilsils.cc
 
 #include "franka_driver_utils.h"
+
 #include "drake/lcmt_iiwa_status.hpp"  // for lcmt_iiwa_status
 
 #include <bits/types/struct_timeval.h>  // for timeval
+#include <cstddef>                      // for NULL
 #include <sys/time.h>                   // gettimeofday()
-
-#include <cstddef>                     // for NULL
 
 using namespace franka_driver;
 
@@ -101,9 +101,9 @@ std::string franka_driver::RobotModeToString(franka::RobotMode mode) {
   return mode_string;
 }
 
-std::array<double, 7> franka_driver::EigenToArray(const Eigen::VectorXd& input) {
-  std::array<double, 7> output = {{input[0], input[1], input[2],
-              input[3], input[4], input[5],
-              input[6]}};
+std::array<double, 7> franka_driver::EigenToArray(
+    const Eigen::VectorXd& input) {
+  std::array<double, 7> output = {
+      {input[0], input[1], input[2], input[3], input[4], input[5], input[6]}};
   return output;
 }
