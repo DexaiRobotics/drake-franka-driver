@@ -323,23 +323,27 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       }
     }
     target_stop_time_ = temp_target_stop_time_ / STOP_SCALE;
-    momap::log()->warn("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pausing with target_stop_time_: {}", target_stop_time_);
-    status_ == RobotStatus::Pausing;
+    // momap::log()->warn("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pausing with target_stop_time_: {}", target_stop_time_);
+    status_ = RobotStatus::Pausing;
+    // momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Started Pausing: RobotStatus: {}",
+    //             RobotStatusToString(status_));
   }
 
   // check if robot should get unpaused
   if (!paused && status_ == RobotStatus::Paused) {
     // the duration it took to step is now used to unpause:
     timestep_ = -1 * stop_duration_;
-    momap::log()->warn("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing with timestep_: {}", timestep_);
-    status_ == RobotStatus::Unpausing;
+    // momap::log()->warn("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing with timestep_: {}", timestep_);
+    status_ = RobotStatus::Unpausing;
+    momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Started Unpausing: RobotStatus: {}",
+                RobotStatusToString(status_));
   }
 
   if (status_ == RobotStatus::Pausing) {
     double new_stop =
         StopPeriod(period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += new_stop;
-    momap::log()->info("stop period: {}", new_stop);
+    momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pausing period: {}", new_stop);
     timestep_++;
 
     if (new_stop >= period_in_seconds * params_.stop_epsilon) {
@@ -352,26 +356,26 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       stop_margin_counter_ += period_in_seconds;
     } else {
       comm_interface_->SetPauseStatus(true);
-      status_ == RobotStatus::Paused;
+      status_ = RobotStatus::Paused;
     }
-
   } else if (status_ == RobotStatus::Unpausing) {
     if (timestep_ >= 0) {
       // robot has reached full speed again
       // set robot pause status to false:
       comm_interface_->SetPauseStatus(false);
-      status_ == RobotStatus::Running;
+      status_ = RobotStatus::Running;
     }
     double new_stop =
         StopPeriod(period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += new_stop;
-    momap::log()->debug("Unpausing period: {}", new_stop);
+    momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing period: {}", new_stop);
     timestep_++;
-
   } else {
     // robot is neither pausing nor unpausing, just increase franka time...
     franka_time_ += period_in_seconds;
   }
+  momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: End of function - RobotStatus: {}",
+                RobotStatusToString(status_));
 }
 
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
