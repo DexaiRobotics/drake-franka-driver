@@ -316,7 +316,7 @@ void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
         pause_data_.stop_set_.end()) {
       pause_data_.stop_set_.erase(msg->source);
     } else {
-      momap::log()->info(
+      momap::log()->warn(
           "Unpausing command rejected: No matching "
           "pause command by source: {}'",
           msg->source);

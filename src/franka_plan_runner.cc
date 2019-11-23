@@ -180,7 +180,7 @@ int FrankaPlanRunner::RunFranka() {
           error_counter = 0;
         } else {
           if (counter > static_cast<int>(lcm_publish_rate_ * 10)) {
-            momap::log()->info("RunFranka: RobotStatus: {}, waiting for plan.",
+            momap::log()->info("RunFranka: RobotStatus: {}, waiting for plan or unpause.",
                                RobotStatusToString(status_));
             counter = 0;  // reset
           }
