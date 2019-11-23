@@ -13,13 +13,13 @@
 #include "franka_plan_runner.h"
 
 #include "drake/lcmt_iiwa_status.hpp"
-#include "examples_common.h"      // for setDefaultBehavior
-#include "franka/exception.h"     // for Exception, ControlException
-#include "franka/robot.h"         // for Robot
+#include "examples_common.h"   // for setDefaultBehavior
+#include "franka/exception.h"  // for Exception, ControlException
+#include "franka/robot.h"      // for Robot
 
-#include <bits/stdc++.h> // INT_MAX
-#include <cmath>     // for exp
-#include <iostream>  // for size_t
+#include <bits/stdc++.h>  // INT_MAX
+#include <cmath>          // for exp
+#include <iostream>       // for size_t
 
 using namespace franka_driver;
 namespace dru = dracula_utils;
@@ -181,8 +181,8 @@ int FrankaPlanRunner::RunFranka() {
         } else {
           if (counter > static_cast<int>(lcm_publish_rate_ * 10)) {
             momap::log()->info("RunFranka: RobotStatus: {}, waiting for plan.",
-                RobotStatusToString(status_));
-            counter = 0; // reset
+                               RobotStatusToString(status_));
+            counter = 0;  // reset
           }
           // only publish robot_status
           // TODO: add a timer to be closer to 200 Hz.
@@ -323,27 +323,31 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       }
     }
     target_stop_time_ = temp_target_stop_time_ / STOP_SCALE;
-    // momap::log()->warn("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pausing with target_stop_time_: {}", target_stop_time_);
     status_ = RobotStatus::Pausing;
-    // momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Started Pausing: RobotStatus: {}",
-    //             RobotStatusToString(status_));
+    momap::log()->warn(
+        "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: "
+        "{} with target_stop_time_: {}",
+        RobotStatusToString(status_), target_stop_time_);
   }
 
   // check if robot should get unpaused
   if (!paused && status_ == RobotStatus::Paused) {
     // the duration it took to step is now used to unpause:
     timestep_ = -1 * stop_duration_;
-    // momap::log()->warn("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing with timestep_: {}", timestep_);
     status_ = RobotStatus::Unpausing;
-    momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Started Unpausing: RobotStatus: {}",
-                RobotStatusToString(status_));
+    momap::log()->warn(
+        "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: "
+        "{} with new timestep_: {}",
+        RobotStatusToString(status_), timestep_);
   }
 
   if (status_ == RobotStatus::Pausing) {
     double new_stop =
         StopPeriod(period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += new_stop;
-    momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pausing period: {}", new_stop);
+    momap::log()->info(
+        "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pausing period: {}",
+        new_stop);
     timestep_++;
 
     if (new_stop >= period_in_seconds * params_.stop_epsilon) {
@@ -368,14 +372,18 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     double new_stop =
         StopPeriod(period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += new_stop;
-    momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing period: {}", new_stop);
+    momap::log()->info(
+        "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing period: "
+        "{}",
+        new_stop);
     timestep_++;
-  } else {
-    // robot is neither pausing nor unpausing, just increase franka time...
+  } else if (status_ == RobotStatus::Running) {
+    // robot is neither pausing, paused nor unpausing, just increase franka
+    // time...
     franka_time_ += period_in_seconds;
+  } else if (status_ == RobotStatus::Paused) {
+    // do nothing
   }
-  momap::log()->info("FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: End of function - RobotStatus: {}",
-                RobotStatusToString(status_));
 }
 
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
@@ -393,15 +401,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // get the current plan from the communication interface
   if (comm_interface_->HasNewPlan()) {
-
     comm_interface_->TakeOverPlan(plan_);
-    if(!plan_) {
-      momap::log()->error("FrankaPlanRunner::JointPositionCallback: plan is empty!");
+    if (!plan_) {
+      momap::log()->error(
+          "FrankaPlanRunner::JointPositionCallback: plan is empty!");
       return franka::MotionFinished(output_to_franka);
     }
     // first time step of plan, reset time:
     franka_time_ = 0.0;
-    start_conf_plan_ = plan_->value(franka_time_); // TODO @rkk: fails
+    start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
 
     if (!LimitJoints(start_conf_plan_)) {
       momap::log()->warn("plan at {}s is exceeding the joint limits!",
