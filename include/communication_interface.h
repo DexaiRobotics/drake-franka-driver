@@ -10,7 +10,7 @@
 /// available. The plan is moved from this communication interface to a franka
 /// plan runner when the MovePlan() is called.
 ///
-/// If a pause message is received, it will set the opause status to true and
+/// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
 
 #include "dracula.h"                                         // for Dracula
@@ -47,8 +47,6 @@ struct RobotPiecewisePolynomial {
   std::unique_ptr<PPType> plan_;
 };
 
-// enum class QueuedCommand { NONE, PAUSE, CONTINUE };
-
 class CommunicationInterface {
  public:
   CommunicationInterface(const parameters::Parameters params,
@@ -60,7 +58,7 @@ class CommunicationInterface {
   bool HasNewPlan();
   void TakeOverPlan(std::unique_ptr<PPType>& plan);
 
-  // TODO @rkk: remove franka specific RobotState type 
+  // TODO @rkk: remove franka specific RobotState type
   // and replace with std::array type:
   franka::RobotState GetRobotState();
   void SetRobotState(const franka::RobotState& robot_state);
@@ -73,21 +71,18 @@ class CommunicationInterface {
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
 
  protected:
-  double StopPeriod(double period);
-  // void QueuedCmd();
-
   void HandleLcm();
   /// PublishLcmAndPauseStatus is called once by a separate thread in the Run()
   /// method It sends the robot status and the pause status. Pause status
-  /// isseparate because robot status message used does not have space for
+  /// is separate because robot status message used does not have space for
   /// indicating the contents of the pause message.
   void PublishLcmAndPauseStatus();
   void PublishRobotStatus();
   void PublishPauseStatus();
   void PublishTriggerToChannel(int64_t utime, std::string lcm_channel,
                                bool success = true, std::string message = "");
-  //$ check if robot is in a mode that can receive commands, i.e. not user
-  // stopped or error recovery
+  /// check if robot is in a mode that can receive commands, i.e. not user
+  /// stopped or error recovery
   bool CanReceiveCommands();
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
                   const lcmtypes::robot_spline_t* rst);
@@ -105,7 +100,6 @@ class CommunicationInterface {
   RobotData robot_data_;
   std::mutex robot_data_mutex_;
 
-  // QueuedCommand queued_cmd_ = QueuedCommand::NONE;
   PauseData pause_data_;
   std::mutex pause_mutex_;
 

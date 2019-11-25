@@ -18,8 +18,8 @@
 #include "franka/duration.h"       // for franka::Duration
 #include "franka/robot.h"          // for franka::Robot
 #include "franka/robot_state.h"    // for franka::RobotState
+#include "franka_driver_utils.h"   //  for dof_ and for RobotState
 #include "parameters.h"            // for Parameters
-#include "franka_driver_utils.h"  //  for dof_ and for RobotState
 
 #include <Eigen/Dense>                  // for Eigen::VectorXd
 #include <bits/stdint-intn.h>           // for int64_t
@@ -37,13 +37,19 @@ class FrankaPlanRunner {
   int Run();
 
  protected:
+  /// Sets collision behaviour of robot: when is Franka's Reflex triggered
+  /// Note: Never call this method in the realtime control loop!
+  /// Only call this method during initialization.
+  /// If robot was already initialized, this method will throw an exception ...
   void SetCollisionBehaviour(franka::Robot& robot, bool we_care_about_safety);
   int RunFranka();
   int RunSim();
 
   bool LimitJoints(Eigen::VectorXd& conf);
-
-  double StopPeriod(double period, double target_stop_time, double timestep);
+  /// Calculate the time to advance while pausing or unpausing
+  /// all inputs have seconds as their unit
+  double TimeToAdvanceWhilePausing(double period, double target_stop_time,
+                                   double timestep);
 
   void IncreaseFrankaTimeBasedOnStatus(const std::array<double, 7>& vel,
                                        double period_in_seconds);

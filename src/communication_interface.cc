@@ -21,6 +21,8 @@
 #include "robot_msgs/trigger_t.hpp"  // for trigger_t
 #include "trajectory_solver.h"       // for TrajectorySolver
 
+#include <chrono>  // for steady_clock, for duration
+
 using namespace franka_driver;
 namespace dru = dracula_utils;
 
@@ -58,8 +60,7 @@ void CommunicationInterface::StartInterface() {
   momap::log()->info("Start LCM threads");
   lcm_publish_status_thread_ =
       std::thread(&CommunicationInterface::PublishLcmAndPauseStatus, this);
-  lcm_handle_thread_ = 
-      std::thread(&CommunicationInterface::HandleLcm, this);
+  lcm_handle_thread_ = std::thread(&CommunicationInterface::HandleLcm, this);
 };
 
 void CommunicationInterface::StopInterface() {
@@ -121,7 +122,6 @@ bool CommunicationInterface::GetPauseStatus() {
 void CommunicationInterface::SetPauseStatus(bool paused) {
   std::lock_guard<std::mutex> lock(pause_mutex_);
   pause_data_.paused_ = paused;
-  // QueuedCmd();
 }
 
 void CommunicationInterface::PublishPlanComplete(const int64_t& end_time_us) {
@@ -144,13 +144,26 @@ void CommunicationInterface::HandleLcm() {
 }
 
 void CommunicationInterface::PublishLcmAndPauseStatus() {
+  auto desired_wait =
+      std::chrono::milliseconds(static_cast<int>(1000.0 / lcm_publish_rate_));
   while (running_) {
+    auto time_start = std::chrono::steady_clock::now();
     PublishRobotStatus();
     // TODO @rkk: make pause status part of the robot status
     PublishPauseStatus();
-    // Sleep to achieve the desired print rate.
-    std::this_thread::sleep_for(std::chrono::milliseconds(
-        static_cast<int>(1000.0 / lcm_publish_rate_)));
+    // Sleep dynamically to achieve the desired print rate.
+    auto time_end = std::chrono::steady_clock::now();
+    auto time_elapsed = time_start - time_end;
+    auto remaining_wait = desired_wait - time_elapsed;
+    if (remaining_wait < std::chrono::seconds(0)) {
+      std::string err_msg =
+          "CommunicationInterface::PublishLcmAndPauseStatus: can't publish "
+          "quick enough with a loop rate of " +
+          std::to_string(lcm_publish_rate_) + " Hz!";
+      momap::log()->error(err_msg);
+      throw std::runtime_error(err_msg);
+    }
+    std::this_thread::sleep_for(remaining_wait);
   }
 }
 
@@ -164,8 +177,7 @@ void CommunicationInterface::PublishRobotStatus() {
     robot_data_.has_robot_data_ = false;
     lock.unlock();
     lcm_.publish(params_.lcm_status_channel, &franka_status);
-  }
-  else {
+  } else {
     lock.unlock();
   }
 }
@@ -208,13 +220,17 @@ bool CommunicationInterface::CanReceiveCommands() {
     return true;
   }
   if (current_mode == franka::RobotMode::kMove) {
-    momap::log()->warn("Allowing to receive command while in {}"
-        ", this needs testing!", RobotModeToString(current_mode));
+    momap::log()->warn(
+        "Allowing to receive command while in {}"
+        ", this needs testing!",
+        RobotModeToString(current_mode));
     return true;
   }
   if (current_mode == franka::RobotMode::kReflex) {
-    momap::log()->warn("Allowing to receive command while in {},"
-        " this needs testing!", RobotModeToString(current_mode));
+    momap::log()->warn(
+        "Allowing to receive command while in {},"
+        " this needs testing!",
+        RobotModeToString(current_mode));
     return true;
   }
 
@@ -229,14 +245,16 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
 
   //$ check if in proper mode to receive commands
   if (!CanReceiveCommands()) {
-    momap::log()->error("CommunicationInterface::HandlePlan: Discarding plan, in wrong mode!");
+    momap::log()->error(
+        "CommunicationInterface::HandlePlan: Discarding plan, in wrong mode!");
     return;
   }
 
   // plan_mutex_.lock();
   while (!plan_mutex_.try_lock()) {
     momap::log()->warn(
-        "CommunicationInterface::HandlePlan: trying to get a lock on the plan_mutex_. Sleeping 1 ms and trying "
+        "CommunicationInterface::HandlePlan: trying to get a lock on the "
+        "plan_mutex_. Sleeping 1 ms and trying "
         "again.");
     std::this_thread::sleep_for(
         std::chrono::milliseconds(static_cast<int>(1.0)));
@@ -247,22 +265,28 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
   //$ publish confirmation that plan was received with same utime
   // TODO @rkk: move this to later in the function...
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
-  momap::log()->info("CommunicationInterface::HandlePlan: "
+  momap::log()->info(
+      "CommunicationInterface::HandlePlan: "
       "Published confirmation of received plan");
 
   PPType piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
 
   if (piecewise_polynomial.get_number_of_segments() < 1) {
-    momap::log()->error("CommunicationInterface::HandlePlan: "
+    momap::log()->error(
+        "CommunicationInterface::HandlePlan: "
         "Discarding plan, invalid piecewise polynomial.");
     plan_mutex_.unlock();
     return;
   }
 
-  momap::log()->info("CommunicationInterface::HandlePlan: "
-      "plan start time: {}", piecewise_polynomial.start_time());
-  momap::log()->info("CommunicationInterface::HandlePlan: "
-      "plan end time: {}", piecewise_polynomial.end_time());
+  momap::log()->info(
+      "CommunicationInterface::HandlePlan: "
+      "plan start time: {}",
+      piecewise_polynomial.start_time());
+  momap::log()->info(
+      "CommunicationInterface::HandlePlan: "
+      "plan end time: {}",
+      piecewise_polynomial.end_time());
 
   // Start position == goal position check
   // TODO: add end position==goal position check (upstream)
@@ -275,7 +299,8 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
   for (int joint = 0; joint < rst->dof; joint++) {
     if (!dru::EpsEq(commanded_start(joint), q[joint],
                     params_.kMediumJointDistance)) {
-      momap::log()->error("CommunicationInterface::HandlePlan: "
+      momap::log()->error(
+          "CommunicationInterface::HandlePlan: "
           "Discarding plan, mismatched start position.");
       robot_plan_.has_plan_data_ = false;
       robot_plan_.plan_.release();
@@ -301,7 +326,9 @@ void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
   std::lock_guard<std::mutex> lock(pause_mutex_);
   // check if pause command received:
   if (msg->data) {
-    momap::log()->warn("CommunicationInterface::HandlePause: Received pause from {}", msg->source);
+    momap::log()->warn(
+        "CommunicationInterface::HandlePause: Received pause from {}",
+        msg->source);
     if (pause_data_.stop_set_.insert(msg->source).second == false) {
       momap::log()->warn(
           "CommunicationInterface::HandlePause: "
@@ -311,7 +338,9 @@ void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
   }
   // check if unpause command received
   else if (!msg->data) {
-    momap::log()->warn("CommunicationInterface::HandlePause: Received unpause from {}", msg->source);
+    momap::log()->warn(
+        "CommunicationInterface::HandlePause: Received unpause from {}",
+        msg->source);
     if (pause_data_.stop_set_.find(msg->source) !=
         pause_data_.stop_set_.end()) {
       pause_data_.stop_set_.erase(msg->source);
