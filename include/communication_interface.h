@@ -38,7 +38,7 @@ struct RobotData {
 
 struct PauseData {
   std::atomic<bool> paused_;
-  std::set<std::string> stop_set_;
+  std::set<std::string> pause_sources_set_;
 };
 
 struct RobotPiecewisePolynomial {
@@ -61,7 +61,9 @@ class CommunicationInterface {
   // TODO @rkk: remove franka specific RobotState type
   // and replace with std::array type:
   franka::RobotState GetRobotState();
+  /// Blocking call that sets the robot state
   void SetRobotState(const franka::RobotState& robot_state);
+  /// Non-blocking call that sets the robot state if possible
   void TryToSetRobotState(const franka::RobotState& robot_state);
 
   bool GetPauseStatus();
@@ -71,6 +73,7 @@ class CommunicationInterface {
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
 
  protected:
+  void ResetData();
   void HandleLcm();
   /// PublishLcmAndPauseStatus is called once by a separate thread in the Run()
   /// method It sends the robot status and the pause status. Pause status
@@ -95,7 +98,7 @@ class CommunicationInterface {
   ::lcm::LCM lcm_;
 
   RobotPiecewisePolynomial robot_plan_;
-  std::mutex plan_mutex_;
+  std::mutex robot_plan_mutex_;
 
   RobotData robot_data_;
   std::mutex robot_data_mutex_;

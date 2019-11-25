@@ -34,6 +34,8 @@ class FrankaPlanRunner {
  public:
   FrankaPlanRunner(const parameters::Parameters params);
   ~FrankaPlanRunner(){};
+  
+  /// This starts the franka driver
   int Run();
 
  protected:
@@ -42,15 +44,27 @@ class FrankaPlanRunner {
   /// Only call this method during initialization.
   /// If robot was already initialized, this method will throw an exception ...
   void SetCollisionBehaviour(franka::Robot& robot, bool we_care_about_safety);
+  
   int RunFranka();
+  
   int RunSim();
 
+  /// Check and limit conf according to provided parameters for joint limits
   bool LimitJoints(Eigen::VectorXd& conf);
+
   /// Calculate the time to advance while pausing or unpausing
-  /// all inputs have seconds as their unit
+  /// Inputs to method have seconds as their unit.
+  /// Algorithm: Uses a logistic growth function: 
+  /// t' = f - 4 / [a (e^{a*t} + 1] where
+  /// f = target_stop_time, t' = franka_time, t = real_time
+  /// Returns delta t', the period that should be incremented to franka time
   double TimeToAdvanceWhilePausing(double period, double target_stop_time,
                                    double timestep);
 
+  /// The franka time advances according to the pause status of the robot.
+  /// The franka time is used to read out a value from a piecewise polynomial.
+  /// If the robot is pausing or unpausing, then the franka time advances slower
+  //  If the robot is paused, then the franka time is not advancing at all.
   void IncreaseFrankaTimeBasedOnStatus(const std::array<double, 7>& vel,
                                        double period_in_seconds);
 
@@ -76,7 +90,7 @@ class FrankaPlanRunner {
   const double lcm_publish_rate_ = 200.0;  // Hz
 
   Eigen::MatrixXd joint_limits_;
-  float STOP_SCALE = 0.5;  // this should be yaml param, previously 0.8
+  float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
 
   Eigen::VectorXd start_conf_plan_;
   Eigen::VectorXd start_conf_franka_;

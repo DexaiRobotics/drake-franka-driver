@@ -178,18 +178,18 @@ int FrankaPlanRunner::RunFranka() {
           // was thrown
           error_counter = 0;
         } else {
-          if (counter > static_cast<int>(lcm_publish_rate_ * 10)) {
+          if (counter > static_cast<int>(lcm_publish_rate_ * 20)) {
             momap::log()->info(
                 "RunFranka: RobotStatus: {}, waiting for plan or unpause.",
                 RobotStatusToString(status_));
             counter = 0;  // reset
           }
-          // only publish robot_status
-          // TODO: add a timer to be closer to 200 Hz.
+          // only publish robot_status, do that twice as fast as the lcm publish rate ...
+          // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
           robot.read([this](const franka::RobotState& robot_state) {
             comm_interface_->SetRobotState(robot_state);
             std::this_thread::sleep_for(std::chrono::milliseconds(
-                static_cast<int>(1000.0 / lcm_publish_rate_)));
+                static_cast<int>( 1000.0 / (lcm_publish_rate_ * 2.0) )));
             return false;
           });
           counter++;
@@ -267,10 +267,10 @@ int FrankaPlanRunner::RunSim() {
   return 0;
 }
 
+/// Check and limit conf according to provided parameters for joint limits
 bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
-  // check and limit according to joint limits:
-  // TODO @rkk: get limits from urdf
-  // TODO @rkk: use eigen operator to do this
+  // TODO @rkk: get limits from urdf (instead of parameter file)
+  // TODO @rkk: use eigen operator to do these operations
   bool within_limits = true;
   for (int j = 0; j < conf.size(); j++) {
     if (conf(j) > joint_limits_(j, 1)) {
@@ -284,12 +284,15 @@ bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
   return within_limits;
 }
 
+/// Calculate the time to advance while pausing or unpausing
+/// Inputs to method have seconds as their unit.
+/// Algorithm: Uses a logistic growth function: 
+/// t' = f - 4 / [a (e^{a*t} + 1] where
+/// f = target_stop_time, t' = franka_time, t = real_time
+/// Returns delta t', the period that should be incremented to franka time
 double FrankaPlanRunner::TimeToAdvanceWhilePausing(double period,
                                                    double target_stop_time,
                                                    double timestep) {
-  // Logistic growth function: t' = f - 4 / [a (e^{a*t} + 1] where
-  // f = target_stop_time, t' = franka_time, t = real_time
-  // Returns delta t', the period that should be incremented to franka time
   double a = 2 / target_stop_time;
   double t_current = period * timestep;
   double current_franka_time =
@@ -320,12 +323,12 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       // max(vel_i/max_accel_i), where i
       // is each joint. real world stop
       // time ~ 2x stop_time in plan
-      float stop_time = fabs(vel[i] / (max_accels_[i]));
+      float stop_time = fabs(vel[i] / (max_accels_[i])) * stop_delay_factor_;
       if (stop_time > temp_target_stop_time_) {
         temp_target_stop_time_ = stop_time;
       }
     }
-    target_stop_time_ = temp_target_stop_time_ / STOP_SCALE;
+    target_stop_time_ = temp_target_stop_time_;
     status_ = RobotStatus::Pausing;
     momap::log()->warn(
         "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: "
@@ -485,6 +488,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     if (error_final < allowable_error_) {
       momap::log()->info("Finished motion, exiting controller");
       comm_interface_->PublishPlanComplete(franka_time_);
+      // releasing just finished plan:
+      plan_.release();
       return franka::MotionFinished(output_to_franka);
     } else {
       momap::log()->warn(

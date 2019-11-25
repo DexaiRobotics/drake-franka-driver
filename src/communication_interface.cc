@@ -36,14 +36,10 @@ CommunicationInterface::CommunicationInterface(
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
 
-  pause_data_.paused_ = false;  // not paused at start
-
+  // TODO @rkk: define this in parameters file?
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
+  // TODO @rkk: remove this status channel by combining it with the robot status channel:
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
-
-  robot_plan_.has_plan_data_ = false;
-  robot_plan_.plan_.release();
-  robot_plan_.utime = -1;
 
   momap::log()->info("Plan channel: {}", params_.lcm_plan_channel);
   momap::log()->info("Stop channel: {}", params_.lcm_stop_channel);
@@ -52,12 +48,37 @@ CommunicationInterface::CommunicationInterface(
   momap::log()->info("Plan complete channel: {}",
                      params_.lcm_plan_complete_channel);
   momap::log()->info("Status channel: {}", params_.lcm_status_channel);
+  momap::log()->info("Driver status channel: {}", lcm_driver_status_channel_);
+  momap::log()->info("Pause status channel: {}", lcm_pause_status_channel_);
 };
 
+void CommunicationInterface::ResetData() {
+  
+  std::unique_lock<std::mutex> lock_data(robot_data_mutex_);
+  robot_data_.has_robot_data_ = false;
+  robot_data_.robot_state = franka::RobotState();
+  lock_data.unlock();
+
+  // initialize plan as empty:
+  std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
+  robot_plan_.has_plan_data_ = false; // no new plan 
+  robot_plan_.plan_.release(); // unique ptr points to no plan
+  robot_plan_.utime = -1; // utime set to -1 at start
+  lock_plan.unlock();
+
+  // initialize pause as false:
+  std::unique_lock<std::mutex> lock_pause(pause_mutex_);
+  pause_data_.paused_ = false;  // not paused at start
+  pause_data_.pause_sources_set_.clear(); // no pause sources at start
+  lock_pause.unlock();
+}
+
 void CommunicationInterface::StartInterface() {
+  // Initialize data as empty for exchange with robot driver
+  ResetData();
   // start LCM threads; independent of sim vs. real robot
-  running_ = true;
   momap::log()->info("Start LCM threads");
+  running_ = true; // sets the lcm threads to active.
   lcm_publish_status_thread_ =
       std::thread(&CommunicationInterface::PublishLcmAndPauseStatus, this);
   lcm_handle_thread_ = std::thread(&CommunicationInterface::HandleLcm, this);
@@ -65,8 +86,9 @@ void CommunicationInterface::StartInterface() {
 
 void CommunicationInterface::StopInterface() {
   momap::log()->info(
-      "CommunicationInterface::StopInterface: Before LCM thread join");
+      "CommunicationInterface::StopInterface: Before LCM threads join");
   // clean-up threads if they're still alive.
+  running_ = false; // sets the lcm threads to inactive.
   while (!lcm_handle_thread_.joinable() ||
          !lcm_publish_status_thread_.joinable()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -78,6 +100,7 @@ void CommunicationInterface::StopInterface() {
   lcm_handle_thread_.join();
   momap::log()->info(
       "CommunicationInterface::StopInterface: After LCM thread join");
+  ResetData();
 };
 
 bool CommunicationInterface::HasNewPlan() {
@@ -85,7 +108,7 @@ bool CommunicationInterface::HasNewPlan() {
 }
 
 void CommunicationInterface::TakeOverPlan(std::unique_ptr<PPType>& plan) {
-  std::lock_guard<std::mutex> lock(plan_mutex_);
+  std::lock_guard<std::mutex> lock(robot_plan_mutex_);
   if (!HasNewPlan() || !(robot_plan_.plan_)) {
     throw std::runtime_error("No plan to take over!");
   }
@@ -108,20 +131,20 @@ void CommunicationInterface::SetRobotState(
 
 void CommunicationInterface::TryToSetRobotState(
     const franka::RobotState& robot_state) {
-  if (robot_data_mutex_.try_lock()) {
+  std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
+  if (lock.try_lock()) {
     robot_data_.has_robot_data_ = true;
     robot_data_.robot_state = robot_state;
-    robot_data_mutex_.unlock();
+    lock.unlock();
   }
 }
 
 bool CommunicationInterface::GetPauseStatus() {
-  return pause_data_.paused_;  // this is atomic
+  return pause_data_.paused_; // this is atomic
 }
 
 void CommunicationInterface::SetPauseStatus(bool paused) {
-  std::lock_guard<std::mutex> lock(pause_mutex_);
-  pause_data_.paused_ = paused;
+  pause_data_.paused_ = paused; // this is atomic
 }
 
 void CommunicationInterface::PublishPlanComplete(const int64_t& end_time_us) {
@@ -189,7 +212,7 @@ void CommunicationInterface::PublishPauseStatus() {
   msg.success = pause_data_.paused_;
   msg.message = "";
   if (pause_data_.paused_) {
-    for (auto elem : pause_data_.stop_set_) {
+    for (auto elem : pause_data_.pause_sources_set_) {
       msg.message.append(elem);
       msg.message.append(",");
     }
@@ -250,12 +273,11 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
     return;
   }
 
-  // plan_mutex_.lock();
-  while (!plan_mutex_.try_lock()) {
+  std::unique_lock<std::mutex> lock(robot_plan_mutex_, std::defer_lock);
+  while (!lock.try_lock()) {
     momap::log()->warn(
         "CommunicationInterface::HandlePlan: trying to get a lock on the "
-        "plan_mutex_. Sleeping 1 ms and trying "
-        "again.");
+        "robot_plan_mutex_. Sleeping 1 ms and trying again.");
     std::this_thread::sleep_for(
         std::chrono::milliseconds(static_cast<int>(1.0)));
   }
@@ -275,7 +297,7 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
     momap::log()->error(
         "CommunicationInterface::HandlePlan: "
         "Discarding plan, invalid piecewise polynomial.");
-    plan_mutex_.unlock();
+    lock.unlock();
     return;
   }
 
@@ -304,7 +326,7 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
           "Discarding plan, mismatched start position.");
       robot_plan_.has_plan_data_ = false;
       robot_plan_.plan_.release();
-      plan_mutex_.unlock();
+      lock.unlock();
       return;
     }
   }
@@ -315,7 +337,7 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
   // assign new plan:
   robot_plan_.plan_ = std::make_unique<PPType>(piecewise_polynomial);
   robot_plan_.has_plan_data_ = true;
-  plan_mutex_.unlock();
+  lock.unlock();
 
   momap::log()->info("CommunicationInterface::HandlePlan: Finished!");
 };
@@ -324,26 +346,26 @@ void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
                                          const std::string&,
                                          const robot_msgs::pause_cmd* msg) {
   std::lock_guard<std::mutex> lock(pause_mutex_);
-  // check if pause command received:
-  if (msg->data) {
+  // check if paused = true or paused = false was received:
+  bool paused = msg->data;
+  if (paused) {
     momap::log()->warn(
-        "CommunicationInterface::HandlePause: Received pause from {}",
+        "CommunicationInterface::HandlePause: Received 'pause = true' from {}",
         msg->source);
-    if (pause_data_.stop_set_.insert(msg->source).second == false) {
+    if (pause_data_.pause_sources_set_.insert(msg->source).second == false) {
       momap::log()->warn(
           "CommunicationInterface::HandlePause: "
           "Already paused by source: {}",
           msg->source);
     }
   }
-  // check if unpause command received
-  else if (!msg->data) {
+  else {
     momap::log()->warn(
-        "CommunicationInterface::HandlePause: Received unpause from {}",
+        "CommunicationInterface::HandlePause: Received 'pause = false' from {}",
         msg->source);
-    if (pause_data_.stop_set_.find(msg->source) !=
-        pause_data_.stop_set_.end()) {
-      pause_data_.stop_set_.erase(msg->source);
+    if (pause_data_.pause_sources_set_.find(msg->source) !=
+        pause_data_.pause_sources_set_.end()) {
+      pause_data_.pause_sources_set_.erase(msg->source);
     } else {
       momap::log()->warn(
           "Unpausing command rejected: No matching "
@@ -351,7 +373,10 @@ void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
           msg->source);
     }
   }
-  if (pause_data_.stop_set_.size() == 0) {
+  
+  // if the set of pause sources is empty, then 
+  // the robot is not paused anymore:
+  if (pause_data_.pause_sources_set_.size() == 0) {
     pause_data_.paused_ = false;
   } else {
     pause_data_.paused_ = true;
