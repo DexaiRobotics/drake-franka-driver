@@ -107,7 +107,23 @@ int FrankaPlanRunner::RunFranka() {
     momap::log()->info("RunFranka: Franka's current mode: {}",
                        RobotModeToString(current_mode));
 
-    if (current_mode != franka::RobotMode::kIdle) {
+    if (current_mode == franka::RobotMode::kReflex) {
+      momap::log()->warn(
+            "RunFranka: Robot in mode: {} at startup, trying to do automaticErrorRecovery ...",
+            RobotModeToString(current_mode));
+      try {
+        robot.automaticErrorRecovery();
+        momap::log()->info(
+            "RunFranka: automaticErrorRecovery() succeeded, robot now in mode: {}",
+            RobotModeToString(current_mode));
+      } catch (const franka::ControlException& ce) {
+        momap::log()->warn("RunFranka: Caught control exception: {}.",
+                          ce.what());
+        momap::log()->error("RunFranka: Error recovery did not work!");
+        comm_interface_->PublishDriverStatus(false, ce.what());
+        return 1;
+      }
+    } else if (current_mode != franka::RobotMode::kIdle) {
       momap::log()->error(
           "RunFranka: Robot cannot receive commands in mode: {}",
           RobotModeToString(current_mode));
@@ -127,6 +143,8 @@ int FrankaPlanRunner::RunFranka() {
   try {
     // Connect to robot.
     franka::Robot robot(ip_addr_);
+    momap::log()->info(
+          "RunFranka: Setting Default Behaviour...");
     setDefaultBehavior(robot);
 
     momap::log()->info("RunFranka: Ready.");

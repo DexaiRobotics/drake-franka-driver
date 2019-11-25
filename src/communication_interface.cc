@@ -176,7 +176,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
     PublishPauseStatus();
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
-    auto time_elapsed = time_start - time_end;
+    auto time_elapsed = time_end - time_start;
     auto remaining_wait = desired_wait - time_elapsed;
     if (remaining_wait < std::chrono::seconds(0)) {
       std::string err_msg =
