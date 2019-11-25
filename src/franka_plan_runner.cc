@@ -176,7 +176,7 @@ int FrankaPlanRunner::RunFranka() {
       try {
         if (error_counter == 2) {
           momap::log()->error(
-              "RunFranka: Error happened twice in a row, running franka's "
+              "RunFranka: Error happened twice in a row, running Franka's "
               "automaticErrorRecovery!");
           robot.automaticErrorRecovery();
         }
@@ -216,6 +216,19 @@ int FrankaPlanRunner::RunFranka() {
         error_counter++;
         momap::log()->warn("RunFranka: Caught control exception: {}.",
                            ce.what());
+        // if(plan_) {
+        //   momap::log()->warn("RunFranka: Active plan at time {}"
+        //       " was not finished because of the exception!",
+        //       franka_time_);
+        //   bool safety_on = false;
+        //   SetCollisionBehaviour(robot, safety_on);
+        //   status_ = RobotStatus::Reversing;
+        //   Reverse(distance);
+        //   comm_interface_->PublishPlanComplete(franka_time_, 
+        //       false, "control_exception");
+        //   plan_.release();
+        // }
+                                 
         if (error_counter > 2) {
           momap::log()->error("RunFranka: Error recovery did not work!");
           comm_interface_->PublishDriverStatus(false, ce.what());
@@ -416,6 +429,8 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     // robot is neither pausing, paused nor unpausing, just increase franka
     // time...
     franka_time_ += period_in_seconds;
+  // } else if (status_ == RobotStatus::Reversing) {
+  //   franka_time_ -= period_in_seconds;
   } else if (status_ == RobotStatus::Paused) {
     // do nothing
   }
@@ -499,27 +514,36 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // overwrite the output_to_franka of this callback:
   output_to_franka = EigenToArray(next_conf_franka);
 
-  double error_final = (current_conf_franka - end_conf_franka_).norm();
 
+  // Final Checks:
+  // if(status_ == RobotStatus::Reversing) {
+  //   double error_reverse = (current_conf_franka - start_reverse__conf_franka_).norm();
+  //   // reversing is complete once we 
+  //   error_reverse > 0.01;
+  //   plan_.release();
+  //   return franka::MotionFinished(output_to_franka);
+  // } else 
   if (franka_time_ > plan_->end_time()) {
+    double error_final = (current_conf_franka - end_conf_franka_).norm();
+
     // TODO @rkk: replace allowable_error_ with non arbitrary number
     if (error_final < allowable_error_) {
       momap::log()->info("Finished motion, exiting controller");
-      comm_interface_->PublishPlanComplete(franka_time_);
-      // releasing just finished plan:
-      plan_.release();
-      return franka::MotionFinished(output_to_franka);
+      comm_interface_->PublishPlanComplete(franka_time_, true /*success*/);
     } else {
       momap::log()->warn(
-          "Plan running overtime and not converged, error distance: {}",
+          "Plan running overtime and robot diverged, error distance: {}",
           error_final);
       momap::log()->info("current_conf_franka: {}",
                          current_conf_franka.transpose());
       momap::log()->info("next_conf_franka: {}", next_conf_franka.transpose());
       momap::log()->info("next_conf_plan: {}", next_conf_plan.transpose());
-      return franka::MotionFinished(output_to_franka);
+      comm_interface_->PublishPlanComplete(franka_time_, false  /*success*/,
+           "diverged");
     }
+    // releasing finished plan:
+    plan_.release();
+    return franka::MotionFinished(output_to_franka);
   }
-
   return output_to_franka;
 }

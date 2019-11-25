@@ -147,10 +147,12 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
   pause_data_.paused_ = paused; // this is atomic
 }
 
-void CommunicationInterface::PublishPlanComplete(const int64_t& end_time_us) {
+void CommunicationInterface::PublishPlanComplete(const int64_t& end_time_us, 
+    bool success, std::string plan_status_string) {
   robot_plan_.plan_.release();
   robot_plan_.has_plan_data_ = false;
-  PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_complete_channel);
+  PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_complete_channel,
+                          success, plan_status_string);
 }
 
 void CommunicationInterface::PublishDriverStatus(
@@ -178,13 +180,12 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
     auto time_end = std::chrono::steady_clock::now();
     auto time_elapsed = time_end - time_start;
     auto remaining_wait = desired_wait - time_elapsed;
+    std::chrono::milliseconds remaining_wait_ms = 
+        std::chrono::duration_cast<std::chrono::milliseconds> (remaining_wait);
     if (remaining_wait < std::chrono::seconds(0)) {
-      std::string err_msg =
-          "CommunicationInterface::PublishLcmAndPauseStatus: can't publish "
-          "quick enough with a loop rate of " +
-          std::to_string(lcm_publish_rate_) + " Hz!";
-      momap::log()->error(err_msg);
-      throw std::runtime_error(err_msg);
+      momap::log()->warn("CommunicationInterface::PublishLcmAndPauseStatus:"
+          " publish took too long at {} ms > {} ms!", 
+          remaining_wait_ms.count(), 1000.0/lcm_publish_rate_);
     }
     std::this_thread::sleep_for(remaining_wait);
   }

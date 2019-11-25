@@ -119,6 +119,9 @@ std::string franka_driver::RobotStatusToString(RobotStatus status) {
     case RobotStatus::Unpausing:
       status_string = "Unpausing";
       break;
+    case RobotStatus::Reversing:
+      status_string = "Reversing";
+      break;
   }
   return status_string;
 }

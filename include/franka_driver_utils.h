@@ -17,7 +17,7 @@ namespace franka_driver {
 const int dof_ = 7;
 const std::string home_addr = "192.168.1.1";
 
-enum class RobotStatus { Uninitialized, Running, Pausing, Paused, Unpausing };
+enum class RobotStatus { Uninitialized, Running, Pausing, Paused, Unpausing, Reversing };
 
 template <typename T, std::size_t SIZE>
 std::vector<T> ArrayToVector(const std::array<T, SIZE>& a) {
