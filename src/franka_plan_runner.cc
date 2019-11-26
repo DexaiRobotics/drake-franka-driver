@@ -181,7 +181,6 @@ int FrankaPlanRunner::RunFranka() {
     status_ = RobotStatus::Running;
 
     int error_counter = 0;
-    int counter = INT_MAX;
     bool status_has_changed = true;
     //$ main control loop
     while (true) {
@@ -210,6 +209,7 @@ int FrankaPlanRunner::RunFranka() {
         // prevent the plan from being started if robot is not running...
         if (comm_interface_->HasNewPlan() && status_ == RobotStatus::Running) {
           momap::log()->info("RunFranka: Got a new plan, attaching callback!");
+          status_has_changed = true;
           // joint_position_callback or impedance_control_callback can be used
           // here:
           robot.control(joint_position_callback);
@@ -219,7 +219,7 @@ int FrankaPlanRunner::RunFranka() {
         } else {
           // no plan available or paused
           // print out status after (lcm_publish_rate_ * 40) times:
-          if (counter > static_cast<int>(lcm_publish_rate_ * 40) || status_has_changed) {
+          if (status_has_changed) {
             if (status_ == RobotStatus::Running) {
               momap::log()->info(
                 "RunFranka: Robot is {} and waiting for plan...",
@@ -233,7 +233,6 @@ int FrankaPlanRunner::RunFranka() {
                   "RunFranka: Robot is {}, this state should not have happened!",
                   RobotStatusToString(status_));
             }
-            counter = 0;  // reset
             status_has_changed = false; // reset
           }
           // only publish robot_status, do that twice as fast as the lcm publish rate ...
@@ -244,10 +243,10 @@ int FrankaPlanRunner::RunFranka() {
                 static_cast<int>( 1000.0 / (lcm_publish_rate_ * 2.0) )));
             return false;
           });
-          counter++;
         }
       } catch (const franka::ControlException& ce) {
         error_counter++;
+        status_has_changed = true;
         momap::log()->warn("RunFranka: Caught control exception: {}.",
                            ce.what());
         if(plan_) {

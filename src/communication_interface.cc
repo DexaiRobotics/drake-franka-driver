@@ -243,12 +243,10 @@ bool CommunicationInterface::CanReceiveCommands() {
   franka::RobotMode current_mode = robot_data_.robot_state.robot_mode;
   lock.unlock();
 
-  momap::log()->info("CanReceiveCommands: Current mode: {}", 
-      RobotModeToString(current_mode));
-  
   switch (current_mode) {
     case franka::RobotMode::kOther:
-      momap::log()->error("CanReceiveCommands: Wrong mode!");
+      momap::log()->error("CanReceiveCommands: Wrong mode: {}!",
+          RobotModeToString(current_mode));
       return false;
     case franka::RobotMode::kIdle:
       return true;
@@ -256,7 +254,7 @@ bool CommunicationInterface::CanReceiveCommands() {
       momap::log()->warn(
           "CanReceiveCommands: "
           "Allowing to receive commands while in {}"
-          ", but this needs testing!",
+          ", but this needs more testing!",
           RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kGuiding:
@@ -266,14 +264,16 @@ bool CommunicationInterface::CanReceiveCommands() {
       momap::log()->warn(
           "CanReceiveCommands: "
           "Allowing to receive commands while in {},"
-          " but this needs testing!",
+          " but this needs more testing!",
           RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kUserStopped:
-      momap::log()->error("CanReceiveCommands: Wrong mode!");
+      momap::log()->error("CanReceiveCommands: Wrong mode: {}!", 
+          RobotModeToString(current_mode));
       return false;
     case franka::RobotMode::kAutomaticErrorRecovery:
-      momap::log()->error("CanReceiveCommands: Wrong mode!");
+      momap::log()->error("CanReceiveCommands: Wrong mode: {}!",
+          RobotModeToString(current_mode));
       return false;
     default:
       momap::log()->error("CanReceiveCommands: Mode unknown!");
@@ -284,7 +284,7 @@ bool CommunicationInterface::CanReceiveCommands() {
 void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
                                         const std::string&,
                                         const lcmtypes::robot_spline_t* robot_spline) {
-  momap::log()->info("CommunicationInterface::HandlePlan: New plan received.");
+  momap::log()->info("CommunicationInterface::HandlePlan: Received new plan {}", robot_spline->utime);
 
   //$ check if in proper mode to receive commands
   if (!CanReceiveCommands()) {
@@ -304,14 +304,13 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
         std::chrono::milliseconds(static_cast<int>(1.0)));
   }
 
-  momap::log()->info("utime: {}", robot_spline->utime);
   robot_plan_.utime = robot_spline->utime;
   //$ publish confirmation that plan was received with same utime
   // TODO @rkk: move this to later in the function...
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
   momap::log()->info(
       "CommunicationInterface::HandlePlan: "
-      "Published confirmation of received plan");
+      "Published confirmation of received plan {}", robot_spline->utime);
 
   PPType piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*robot_spline);
 
@@ -325,11 +324,9 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
 
   momap::log()->info(
       "CommunicationInterface::HandlePlan: "
-      "plan start time: {}",
-      piecewise_polynomial.start_time());
-  momap::log()->info(
-      "CommunicationInterface::HandlePlan: "
-      "plan end time: {}",
+      "plan {}: start time: {}, end time: {}",
+      robot_spline->utime,
+      piecewise_polynomial.start_time(),
       piecewise_polynomial.end_time());
 
   // Start position == goal position check
@@ -345,7 +342,8 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
                     params_.kMediumJointDistance)) {
       momap::log()->error(
           "CommunicationInterface::HandlePlan: "
-          "Discarding plan, mismatched start position.");
+          "Discarding plan {}, mismatched start position.",
+          robot_spline->utime);
       robot_plan_.has_plan_data_ = false;
       robot_plan_.plan_.release();
       lock.unlock();
@@ -361,7 +359,7 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
   robot_plan_.has_plan_data_ = true;
   lock.unlock();
 
-  momap::log()->info("CommunicationInterface::HandlePlan: Finished!");
+  momap::log()->debug("CommunicationInterface::HandlePlan: Finished!");
 };
 
 void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
