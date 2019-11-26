@@ -39,12 +39,16 @@ class FrankaPlanRunner {
   int Run();
 
  protected:
-  /// Sets collision behaviour of robot: when is Franka's Reflex triggered
+  /// Sets collision behavior of robot: at what force threshold 
+  /// is Franka's Reflex triggered.
   /// Note: Never call this method in the realtime control loop!
-  /// Only call this method during initialization.
-  /// If robot was already initialized, this method will throw an exception ...
-  void SetCollisionBehaviour(franka::Robot& robot, bool we_care_about_safety);
-  
+  /// Only call this method during initialization. If robot was 
+  /// already initialized, this method will throw an exception!
+  void SetCollisionBehaviorSafetyOn(franka::Robot& robot);
+  void SetCollisionBehaviorSafetyOff(franka::Robot& robot);
+
+  franka::RobotMode GetRobotMode(franka::Robot& robot);
+
   int RunFranka();
   
   int RunSim();

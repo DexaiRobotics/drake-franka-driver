@@ -185,7 +185,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
       std::chrono::milliseconds time_elapsed_ms = 
           std::chrono::duration_cast<std::chrono::milliseconds> (time_elapsed);
       momap::log()->warn("CommunicationInterface::PublishLcmAndPauseStatus:"
-          " publish took too long at {} ms > {} ms!", 
+          " publish took too long with {} ms > {} ms!", 
           time_elapsed_ms.count(), 1000.0/lcm_publish_rate_);
     }
     std::this_thread::sleep_for(remaining_wait);

@@ -65,14 +65,14 @@ int FrankaPlanRunner::Run() {
   return return_value;
 }
 
-void FrankaPlanRunner::SetCollisionBehaviour(franka::Robot& robot,
-                                             bool safety_on) {
-  if (status_ != RobotStatus::Uninitialized) {
+void FrankaPlanRunner::SetCollisionBehaviorSafetyOn(franka::Robot& robot) {
+  auto mode = GetRobotMode(robot);
+  if (mode == franka::RobotMode::kMove) {
     throw std::runtime_error(
-        "robot is already initialized, cannot change collision behaviour!");
+        "robot is in mode: " + RobotModeToString(mode) + 
+        " cannot change collision behavior!");
   }
-  if (safety_on) {
-    robot.setCollisionBehavior({{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+  robot.setCollisionBehavior({{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
                                {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
                                {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
                                {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
@@ -80,8 +80,16 @@ void FrankaPlanRunner::SetCollisionBehaviour(franka::Robot& robot,
                                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
                                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
                                {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}});
-  } else {
-    robot.setCollisionBehavior(
+}
+
+void FrankaPlanRunner::SetCollisionBehaviorSafetyOff(franka::Robot& robot) {
+  auto mode = GetRobotMode(robot);
+  if (mode == franka::RobotMode::kMove) {
+    throw std::runtime_error(
+        "robot is in mode: " + RobotModeToString(mode) + 
+        " cannot change collision behavior!");
+  }
+  robot.setCollisionBehavior(
         {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
         {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
         {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
@@ -90,7 +98,17 @@ void FrankaPlanRunner::SetCollisionBehaviour(franka::Robot& robot,
         {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
         {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
         {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
-  }
+}
+
+franka::RobotMode FrankaPlanRunner::GetRobotMode(franka::Robot& robot) {
+  franka::RobotMode current_mode;
+  robot.read([&current_mode](const franka::RobotState& robot_state) {
+    current_mode = robot_state.robot_mode;
+    return false;
+  });
+  momap::log()->info("RunFranka: Franka's current mode is: {}",
+                      RobotModeToString(current_mode));
+  return current_mode; 
 }
 
 int FrankaPlanRunner::RunFranka() {
@@ -101,13 +119,7 @@ int FrankaPlanRunner::RunFranka() {
     franka::Robot robot(ip_addr_);
 
     size_t count = 0;
-    franka::RobotMode current_mode;
-    robot.read([&count, &current_mode](const franka::RobotState& robot_state) {
-      current_mode = robot_state.robot_mode;
-      return count++ < 100;
-    });
-    momap::log()->info("RunFranka: Franka's current mode: {}",
-                       RobotModeToString(current_mode));
+    auto current_mode = GetRobotMode(robot);
 
     if (current_mode == franka::RobotMode::kReflex) {
       momap::log()->warn(
@@ -153,10 +165,9 @@ int FrankaPlanRunner::RunFranka() {
     comm_interface_->PublishDriverStatus(true);
 
     // Set additional parameters always before the control loop, NEVER in the
-    // control loop! Set collision behavior.
-
-    bool safety_on = true;
-    SetCollisionBehaviour(robot, safety_on);
+    // control loop! 
+    // Set collision behavior:
+    SetCollisionBehaviorSafetyOn(robot);
 
     std::function<franka::JointPositions(const franka::RobotState&,
                                          franka::Duration)>
@@ -171,7 +182,7 @@ int FrankaPlanRunner::RunFranka() {
 
     int error_counter = 0;
     int counter = INT_MAX;
-
+    bool status_has_changed = true;
     //$ main control loop
     while (true) {
       // std::cout << "top of loop: Executing motion." << std::endl;
@@ -182,12 +193,20 @@ int FrankaPlanRunner::RunFranka() {
               "automaticErrorRecovery!");
           robot.automaticErrorRecovery();
         }
+        // get Pause status:
         auto paused_by_lcm = comm_interface_->GetPauseStatus();
+        RobotStatus new_status;
         if (paused_by_lcm) {
-          status_ = RobotStatus::Paused;
+          new_status = RobotStatus::Paused;
         } else {
-          status_ = RobotStatus::Running;
+          new_status = RobotStatus::Running;
         }
+        // check if status has changed
+        if(status_ != new_status){
+          status_has_changed = true;
+          status_ = new_status;
+        }
+
         // prevent the plan from being started if robot is not running...
         if (comm_interface_->HasNewPlan() && status_ == RobotStatus::Running) {
           momap::log()->info("RunFranka: Got a new plan, attaching callback!");
@@ -198,11 +217,24 @@ int FrankaPlanRunner::RunFranka() {
           // was thrown
           error_counter = 0;
         } else {
-          if (counter > static_cast<int>(lcm_publish_rate_ * 40)) {
-            momap::log()->info(
-                "RunFranka: RobotStatus: {}, waiting for plan or unpause.",
+          // no plan available or paused
+          // print out status after (lcm_publish_rate_ * 40) times:
+          if (counter > static_cast<int>(lcm_publish_rate_ * 40) || status_has_changed) {
+            if (status_ == RobotStatus::Running) {
+              momap::log()->info(
+                "RunFranka: Robot is {} and waiting for plan...",
                 RobotStatusToString(status_));
+            } else if (status_ == RobotStatus::Paused) {
+              momap::log()->info(
+                  "RunFranka: Robot is {}, waiting to get unpaused...",
+                  RobotStatusToString(status_));
+            } else {
+              momap::log()->error(
+                  "RunFranka: Robot is {}, this state should not have happened!",
+                  RobotStatusToString(status_));
+            }
             counter = 0;  // reset
+            status_has_changed = false; // reset
           }
           // only publish robot_status, do that twice as fast as the lcm publish rate ...
           // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
