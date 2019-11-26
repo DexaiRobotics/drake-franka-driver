@@ -50,6 +50,8 @@ class FrankaPlanRunner {
   franka::RobotMode GetRobotMode(franka::Robot& robot);
 
   int RunFranka();
+  
+  bool RecoverFromControlException(franka::Robot& robot);
 
   int RunSim();
 
@@ -85,6 +87,10 @@ class FrankaPlanRunner {
   parameters::Parameters params_;
   std::string ip_addr_;
 
+  std::function<franka::JointPositions(const franka::RobotState&,
+                                         franka::Duration)>
+        joint_position_callback_;
+
   // keeping track of time along plan:
   double franka_time_;
   // pause related:
@@ -101,11 +107,14 @@ class FrankaPlanRunner {
 
   Eigen::VectorXd start_conf_plan_;
   Eigen::VectorXd start_conf_franka_;
+  Eigen::VectorXd start_reversing_conf_franka_;
   Eigen::VectorXd end_conf_franka_;
 
   Eigen::VectorXd max_accels_;
   // TODO @rkk: replace allowable_error_ with non arbitrary number
   double allowable_error_ = 0.007;
+
+  double max_error_norm_reversing_ = 0.1; // norm of joint delta when reversing
 
 };  // FrankaPlanRunner
 

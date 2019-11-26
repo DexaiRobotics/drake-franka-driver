@@ -51,6 +51,12 @@ FrankaPlanRunner::FrankaPlanRunner(const parameters::Parameters params)
 
   start_conf_franka_ = Eigen::VectorXd::Zero(dof_);
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
+
+  // define the joint_position_callback_ needed for the robot control loop:
+  joint_position_callback_ = [&, this](const franka::RobotState& robot_state,
+                      franka::Duration period) -> franka::JointPositions {
+      return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
+    };
 }
 
 int FrankaPlanRunner::Run() {
@@ -173,30 +179,14 @@ int FrankaPlanRunner::RunFranka() {
     // Set collision behavior:
     SetCollisionBehaviorSafetyOn(robot);
 
-    std::function<franka::JointPositions(const franka::RobotState&,
-                                         franka::Duration)>
-        joint_position_callback =
-            [&, this](const franka::RobotState& robot_state,
-                      franka::Duration period) -> franka::JointPositions {
-      return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
-    };
-
     // Initilization is done, define robot as running:
     status_ = RobotStatus::Running;
 
-    int error_counter = 0;
     bool status_has_changed = true;
     //$ main control loop
     while (true) {
       // std::cout << "top of loop: Executing motion." << std::endl;
       try {
-        if (error_counter == 2) {
-          momap::log()->error(
-              "RunFranka: Error happened twice in a row, running Franka's "
-              "automaticErrorRecovery!");
-          robot.automaticErrorRecovery();
-        }
-        // get Pause status:
         auto paused_by_lcm = comm_interface_->GetPauseStatus();
         RobotStatus new_status;
         if (paused_by_lcm) {
@@ -214,12 +204,9 @@ int FrankaPlanRunner::RunFranka() {
         if (comm_interface_->HasNewPlan() && status_ == RobotStatus::Running) {
           momap::log()->info("RunFranka: Got a new plan, attaching callback!");
           status_has_changed = true;
-          // joint_position_callback or impedance_control_callback can be used
+          // joint_position_callback_ or impedance_control_callback_ can be used
           // here:
-          robot.control(joint_position_callback);
-          // reset error counter once motion was successful, i.e. no exception
-          // was thrown
-          error_counter = 0;
+          robot.control(joint_position_callback_);
         } else {
           // no plan available or paused
           // print out status after (lcm_publish_rate_ * 40) times:
@@ -251,23 +238,12 @@ int FrankaPlanRunner::RunFranka() {
           });
         }
       } catch (const franka::ControlException& ce) {
-        error_counter++;
         status_has_changed = true;
         momap::log()->warn("RunFranka: Caught control exception: {}.",
                            ce.what());
-        if (plan_) {
-          momap::log()->warn(
-              "RunFranka: Active plan at time {}"
-              " was not finished because of the control exception!",
-              franka_time_);
-          comm_interface_->PublishPlanComplete(plan_utime_, false,
-                                               "control_exception");
-          plan_.release();
-          plan_utime_ = -1;  // reset plan utime to -1
-        }
 
-        if (error_counter > 2) {
-          momap::log()->error("RunFranka: Error recovery did not work!");
+        if(!RecoverFromControlException(robot)) {
+          momap::log()->error("RunFranka: RecoverFromControlException did not work!");
           comm_interface_->PublishDriverStatus(false, ce.what());
           return 1;
         }
@@ -282,6 +258,44 @@ int FrankaPlanRunner::RunFranka() {
   }
   return 0;
 };
+
+bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
+  status_ = RobotStatus::Reversing;
+  momap::log()->warn("RunFranka: Turning Safety off!");
+  SetCollisionBehaviorSafetyOff(robot);
+  momap::log()->warn("RunFranka: Turned Safety off!");
+  momap::log()->warn("RunFranka: Running Franka's automaticErrorRecovery!");
+  robot.automaticErrorRecovery();
+  momap::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery!");
+
+  if(plan_) {
+    momap::log()->warn("RunFranka: Active plan at franka_time: {}"
+        " was not finished because of the caught control exception!",
+        franka_time_);
+    momap::log()->info("RunFranka: Attaching callback to reverse!");
+    try {
+      robot.control(joint_position_callback_);
+    } catch (const franka::ControlException& ce) {
+        momap::log()->warn("RunFranka: While reversing, caught control exception: {}.",
+                           ce.what());                                 
+        momap::log()->error("RunFranka: Error recovery did not work!");
+        comm_interface_->PublishDriverStatus(false, ce.what());
+        return false;
+    }
+    momap::log()->info("RunFranka: Finished reversing!");
+    momap::log()->info("RunFranka: PublishPlanComplete({},"
+        "false, 'control_exception')",franka_time_);
+    comm_interface_->PublishPlanComplete(plan_utime_, 
+        false, "control_exception");
+    plan_.release();
+    plan_utime_ = -1;  // reset plan utime to -1
+  }
+  momap::log()->info("RunFranka: Turning Safety on again!");
+  SetCollisionBehaviorSafetyOn(robot);
+  momap::log()->info("RunFranka: Turned Safety on again!");
+  status_ = RobotStatus::Running;
+  return true;
+}
 
 int FrankaPlanRunner::RunSim() {
   momap::log()->info("Starting sim robot.");
@@ -466,8 +480,9 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     // robot is neither pausing, paused nor unpausing, just increase franka
     // time...
     franka_time_ += period_in_seconds;
-    // } else if (status_ == RobotStatus::Reversing) {
-    //   franka_time_ -= period_in_seconds;
+  } else if (status_ == RobotStatus::Reversing) {
+    // walk back in time
+    franka_time_ -= period_in_seconds;
   } else if (status_ == RobotStatus::Paused) {
     // do nothing
   }
@@ -486,8 +501,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // TODO @rkk: do not use franka robot state but use a generic Eigen instead
   comm_interface_->TryToSetRobotState(robot_state);
 
-  // get the current plan from the communication interface
-  if (comm_interface_->HasNewPlan()) {
+  static bool first_run = true;
+
+  if(first_run && status_ == RobotStatus::Reversing ) {
+    start_reversing_conf_franka_ = current_conf_franka;
+    first_run = false;
+  }
+  
+  if (comm_interface_->HasNewPlan() && status_ != RobotStatus::Reversing ) {
+    // get the current plan from the communication interface
     comm_interface_->TakePlan(plan_, plan_utime_);
     // first time step of plan, reset time:
     franka_time_ = 0.0;
@@ -553,17 +575,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // overwrite the output_to_franka of this callback:
   output_to_franka = EigenToArray(next_conf_franka);
 
-  // Final Checks:
-  // if(status_ == RobotStatus::Reversing) {
-  //   double error_reverse = (current_conf_franka -
-  //   start_reverse__conf_franka_).norm();
-  //   // reversing is complete once we
-  //   error_reverse > 0.01;
-  //   plan_.release();
-  //   plan_utime_ = -1;
-  //   return franka::MotionFinished(output_to_franka);
-  // } else
-  if (franka_time_ > plan_->end_time()) {
+  // Finish Checks:
+  if(status_ == RobotStatus::Reversing) {
+    double error_reverse = (current_conf_franka - start_conf_franka_).norm();
+    // reversing is complete once we have achieve a norm of 0.1: 
+    if( error_reverse > max_error_norm_reversing_) {
+      plan_.release();
+      return franka::MotionFinished(output_to_franka);
+    }
+  }
+  if (franka_time_ > plan_->end_time() && status_ != RobotStatus::Reversing ) {
     double error_final = (current_conf_franka - end_conf_franka_).norm();
 
     // TODO @rkk: replace allowable_error_ with non arbitrary number
