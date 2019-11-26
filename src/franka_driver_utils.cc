@@ -61,7 +61,6 @@ drake::lcmt_iiwa_status franka_driver::ConvertToLcmStatus(
   return robot_status;
 }
 
-
 std::string franka_driver::RobotModeToString(franka::RobotMode mode) {
   std::string mode_string;
   switch (mode) {

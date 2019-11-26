@@ -34,15 +34,15 @@ class FrankaPlanRunner {
  public:
   FrankaPlanRunner(const parameters::Parameters params);
   ~FrankaPlanRunner(){};
-  
+
   /// This starts the franka driver
   int Run();
 
  protected:
-  /// Sets collision behavior of robot: at what force threshold 
+  /// Sets collision behavior of robot: at what force threshold
   /// is Franka's Reflex triggered.
   /// Note: Never call this method in the realtime control loop!
-  /// Only call this method during initialization. If robot was 
+  /// Only call this method during initialization. If robot was
   /// already initialized, this method will throw an exception!
   void SetCollisionBehaviorSafetyOn(franka::Robot& robot);
   void SetCollisionBehaviorSafetyOff(franka::Robot& robot);
@@ -50,7 +50,7 @@ class FrankaPlanRunner {
   franka::RobotMode GetRobotMode(franka::Robot& robot);
 
   int RunFranka();
-  
+
   int RunSim();
 
   /// Check and limit conf according to provided parameters for joint limits
@@ -58,7 +58,7 @@ class FrankaPlanRunner {
 
   /// Calculate the time to advance while pausing or unpausing
   /// Inputs to method have seconds as their unit.
-  /// Algorithm: Uses a logistic growth function: 
+  /// Algorithm: Uses a logistic growth function:
   /// t' = f - 4 / [a (e^{a*t} + 1] where
   /// f = target_stop_time, t' = franka_time, t = real_time
   /// Returns delta t', the period that should be incremented to franka time
@@ -76,8 +76,8 @@ class FrankaPlanRunner {
       const franka::RobotState& robot_state, franka::Duration period);
 
  private:
-  const int dof_; // degrees of freedom of franka
-  const std::string home_addr_; // home address of robot
+  const int dof_;                // degrees of freedom of franka
+  const std::string home_addr_;  // home address of robot
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;

@@ -14,7 +14,14 @@
 
 namespace franka_driver {
 
-enum class RobotStatus { Uninitialized, Running, Pausing, Paused, Unpausing, Reversing };
+enum class RobotStatus {
+  Uninitialized,
+  Running,
+  Pausing,
+  Paused,
+  Unpausing,
+  Reversing
+};
 
 template <typename T, std::size_t SIZE>
 std::vector<T> ArrayToVector(const std::array<T, SIZE>& a) {
