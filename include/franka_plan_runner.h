@@ -18,7 +18,7 @@
 #include "franka/duration.h"       // for franka::Duration
 #include "franka/robot.h"          // for franka::Robot
 #include "franka/robot_state.h"    // for franka::RobotState
-#include "franka_driver_utils.h"   //  for dof_ and for RobotState
+#include "franka_driver_utils.h"   // for RobotStatus
 #include "parameters.h"            // for Parameters
 
 #include <Eigen/Dense>                  // for Eigen::VectorXd
@@ -76,8 +76,11 @@ class FrankaPlanRunner {
       const franka::RobotState& robot_state, franka::Duration period);
 
  private:
+  const int dof_; // degrees of freedom of franka
+  const std::string home_addr_; // home address of robot
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
+  int64_t plan_utime_ = -1;
   std::unique_ptr<Dracula> dracula_;
   parameters::Parameters params_;
   std::string ip_addr_;

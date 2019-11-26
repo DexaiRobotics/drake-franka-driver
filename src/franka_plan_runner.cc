@@ -25,7 +25,7 @@ using namespace franka_driver;
 namespace dru = dracula_utils;
 
 FrankaPlanRunner::FrankaPlanRunner(const parameters::Parameters params)
-    : params_(params), ip_addr_(params.robot_ip) {
+    : dof_(7), home_addr_("192.168.1.1"), params_(params), ip_addr_(params.robot_ip) {
   // define robot's state as uninitialized at start:
   status_ = RobotStatus::Uninitialized;
 
@@ -52,7 +52,7 @@ int FrankaPlanRunner::Run() {
   comm_interface_->StartInterface();
 
   int return_value = 1;  //
-  if (ip_addr_ == home_addr) {
+  if (ip_addr_ == home_addr_) {
     return_value = RunSim();
   } else {
     return_value = RunFranka();
@@ -254,9 +254,10 @@ int FrankaPlanRunner::RunFranka() {
           momap::log()->warn("RunFranka: Active plan at time {}"
               " was not finished because of the control exception!",
               franka_time_);
-          comm_interface_->PublishPlanComplete(franka_time_, 
+          comm_interface_->PublishPlanComplete(plan_utime_, 
               false, "control_exception");
           plan_.release();
+          plan_utime_ = -1; // reset plan utime to -1
         }
                                  
         if (error_counter > 2) {
@@ -314,7 +315,7 @@ int FrankaPlanRunner::RunSim() {
     next_conf_vec = dru::e_to_v(next_conf);
     std::vector<double> prev_conf_vec = dru::e_to_v(prev_conf);
 
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < dof_; i++) {
       vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double)period.toSec();
     }
 
@@ -379,7 +380,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
 
     // set a target_stop_time_ given the current state of the robot:
     float temp_target_stop_time_ = 0;
-    for (int i = 0; i < 7; i++) {
+    for (int i = 0; i < dof_; i++) {
       // sets target stop_time in plan as
       // max(vel_i/max_accel_i), where i
       // is each joint. real world stop
@@ -481,18 +482,13 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // get the current plan from the communication interface
   if (comm_interface_->HasNewPlan()) {
-    comm_interface_->TakeOverPlan(plan_);
-    if (!plan_) {
-      momap::log()->error(
-          "FrankaPlanRunner::JointPositionCallback: plan is empty!");
-      return franka::MotionFinished(output_to_franka);
-    }
+    comm_interface_->TakePlan(plan_, plan_utime_);
     // first time step of plan, reset time:
     franka_time_ = 0.0;
     start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
 
     if (!LimitJoints(start_conf_plan_)) {
-      momap::log()->warn("plan at {}s is exceeding the joint limits!",
+      momap::log()->warn("JointPositionCallback: plan at {}s is exceeding the joint limits!",
                          franka_time_);
     }
 
@@ -504,9 +500,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
     end_conf_franka_ = start_conf_franka_ + delta_start_to_end_plan;
     // TODO @rkk: move this print into another thread
-    momap::log()->debug("starting franka q = {}",
+    momap::log()->debug("JointPositionCallback: starting franka q = {}",
                         start_conf_franka_.transpose());
-    momap::log()->debug("starting plan q = {}", start_conf_plan_.transpose());
+    momap::log()->debug("JointPositionCallback: starting plan q = {}", start_conf_plan_.transpose());
     if (!dru::VectorEpsEq(start_conf_plan_, start_conf_franka_,
                           params_.kMediumJointDistance)) {
       momap::log()->error(
@@ -518,20 +514,20 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // TODO @rkk: move this print into another thread
     if (error_start > allowable_error_) {
       momap::log()->warn(
-          "too large a difference between where we are and where we think = {}",
+          "JointPositionCallback: too large a difference between where we are and where we think = {}",
           error_start);
     }
   }
 
   if (!plan_) {
-    momap::log()->info("No plan exists (anymore), exiting controller...");
+    momap::log()->info("JointPositionCallback: No plan exists (anymore), exiting controller...");
     return franka::MotionFinished(output_to_franka);
   }
 
   // read out plan for current franka time from plan:
   Eigen::VectorXd next_conf_plan = plan_->value(franka_time_);
   if (!LimitJoints(next_conf_plan)) {
-    momap::log()->warn("plan at {}s is exceeding the joint limits!",
+    momap::log()->warn("JointPositionCallback: plan at {}s is exceeding the joint limits!",
                        franka_time_);
   }
 
@@ -551,6 +547,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   //   // reversing is complete once we 
   //   error_reverse > 0.01;
   //   plan_.release();
+  //   plan_utime_ = -1;
   //   return franka::MotionFinished(output_to_franka);
   // } else 
   if (franka_time_ > plan_->end_time()) {
@@ -558,21 +555,22 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
     // TODO @rkk: replace allowable_error_ with non arbitrary number
     if (error_final < allowable_error_) {
-      momap::log()->info("Finished motion, exiting controller");
-      comm_interface_->PublishPlanComplete(franka_time_, true /*success*/);
+      momap::log()->info("JointPositionCallback: Finished plan {}, exiting controller", plan_utime_);
+      comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
       momap::log()->warn(
-          "Plan running overtime and robot diverged, error distance: {}",
-          error_final);
-      momap::log()->info("current_conf_franka: {}",
+          "JointPositionCallback: Overtimed plan {}: robot diverged, error distance: {}",
+          plan_utime_, error_final);
+      momap::log()->info("JointPositionCallback: current_conf_franka: {}",
                          current_conf_franka.transpose());
-      momap::log()->info("next_conf_franka: {}", next_conf_franka.transpose());
-      momap::log()->info("next_conf_plan: {}", next_conf_plan.transpose());
-      comm_interface_->PublishPlanComplete(franka_time_, false  /*success*/,
+      momap::log()->info("JointPositionCallback: next_conf_franka: {}", next_conf_franka.transpose());
+      momap::log()->info("JointPositionCallback: next_conf_plan: {}", next_conf_plan.transpose());
+      comm_interface_->PublishPlanComplete(plan_utime_, false  /*  = failed*/,
            "diverged");
     }
     // releasing finished plan:
     plan_.release();
+    plan_utime_ = -1; //reset plan to -1
     return franka::MotionFinished(output_to_franka);
   }
   return output_to_franka;

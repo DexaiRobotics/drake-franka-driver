@@ -56,7 +56,7 @@ class CommunicationInterface {
   void StopInterface();
 
   bool HasNewPlan();
-  void TakeOverPlan(std::unique_ptr<PPType>& plan);
+  void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
 
   // TODO @rkk: remove franka specific RobotState type
   // and replace with std::array type:
@@ -69,7 +69,7 @@ class CommunicationInterface {
   bool GetPauseStatus();
   void SetPauseStatus(bool paused);
 
-  void PublishPlanComplete(const int64_t& end_time_us, 
+  void PublishPlanComplete(const int64_t& plan_utime, 
       bool success = true, std::string driver_status_string = "");
 
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
@@ -90,9 +90,9 @@ class CommunicationInterface {
   /// stopped or error recovery
   bool CanReceiveCommands();
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
-                  const lcmtypes::robot_spline_t* rst);
+                  const lcmtypes::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
-                   const robot_msgs::pause_cmd* msg);
+                   const robot_msgs::pause_cmd* pause_cmd_msg);
 
  private:
   parameters::Parameters params_;

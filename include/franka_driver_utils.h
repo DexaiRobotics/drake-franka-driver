@@ -14,9 +14,6 @@
 
 namespace franka_driver {
 
-const int dof_ = 7;
-const std::string home_addr = "192.168.1.1";
-
 enum class RobotStatus { Uninitialized, Running, Pausing, Paused, Unpausing, Reversing };
 
 template <typename T, std::size_t SIZE>
@@ -38,7 +35,7 @@ static void AssignToLcmStatus(franka::RobotState& robot_state,
 
 drake::lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState& robot_state);
 
-void ResizeStatusMessage(drake::lcmt_iiwa_status& lcm_status);
+// void ResizeStatusMessage(drake::lcmt_iiwa_status& lcm_status, int dof);
 
 std::string RobotModeToString(franka::RobotMode mode);
 

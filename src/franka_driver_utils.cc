@@ -61,17 +61,6 @@ drake::lcmt_iiwa_status franka_driver::ConvertToLcmStatus(
   return robot_status;
 }
 
-void franka_driver::ResizeStatusMessage(drake::lcmt_iiwa_status& lcm_status) {
-  lcm_status.utime = -1;
-  lcm_status.num_joints = dof_;
-  lcm_status.joint_position_measured.resize(dof_, 0);
-  lcm_status.joint_position_commanded.resize(dof_, 0);
-  lcm_status.joint_position_ipo.resize(dof_, 0);
-  lcm_status.joint_velocity_estimated.resize(dof_, 0);
-  lcm_status.joint_torque_measured.resize(dof_, 0);
-  lcm_status.joint_torque_commanded.resize(dof_, 0);
-  lcm_status.joint_torque_external.resize(dof_, 0);
-}
 
 std::string franka_driver::RobotModeToString(franka::RobotMode mode) {
   std::string mode_string;

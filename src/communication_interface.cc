@@ -107,14 +107,18 @@ bool CommunicationInterface::HasNewPlan() {
   return robot_plan_.has_plan_data_;  // is atomic
 }
 
-void CommunicationInterface::TakeOverPlan(std::unique_ptr<PPType>& plan) {
+void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
+                                      int64_t& plan_utime) {
   std::lock_guard<std::mutex> lock(robot_plan_mutex_);
   if (!HasNewPlan() || !(robot_plan_.plan_)) {
-    throw std::runtime_error("No plan to take over!");
+    throw std::runtime_error("TakePlan: No plan to take over!");
   }
   robot_plan_.has_plan_data_ = false;
-
   plan = std::move(robot_plan_.plan_);
+  if (!plan) {
+    throw std::runtime_error("TakePlan: Failed to take plan!");
+  }
+  plan_utime = robot_plan_.utime;
 }
 
 franka::RobotState CommunicationInterface::GetRobotState() {
@@ -147,11 +151,11 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
   pause_data_.paused_ = paused; // this is atomic
 }
 
-void CommunicationInterface::PublishPlanComplete(const int64_t& end_time_us, 
+void CommunicationInterface::PublishPlanComplete(const int64_t& plan_utime, 
     bool success, std::string plan_status_string) {
   robot_plan_.plan_.release();
   robot_plan_.has_plan_data_ = false;
-  PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_complete_channel,
+  PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
                           success, plan_status_string);
 }
 
@@ -239,39 +243,55 @@ bool CommunicationInterface::CanReceiveCommands() {
   franka::RobotMode current_mode = robot_data_.robot_state.robot_mode;
   lock.unlock();
 
-  momap::log()->info("Current mode: {}", RobotModeToString(current_mode));
-
-  if (current_mode == franka::RobotMode::kIdle) {
-    return true;
+  momap::log()->info("CanReceiveCommands: Current mode: {}", 
+      RobotModeToString(current_mode));
+  
+  switch (current_mode) {
+    case franka::RobotMode::kOther:
+      momap::log()->error("CanReceiveCommands: Wrong mode!");
+      return false;
+    case franka::RobotMode::kIdle:
+      return true;
+    case franka::RobotMode::kMove:
+      momap::log()->warn(
+          "CanReceiveCommands: "
+          "Allowing to receive commands while in {}"
+          ", but this needs testing!",
+          RobotModeToString(current_mode));
+      return true;
+    case franka::RobotMode::kGuiding:
+      momap::log()->error("CanReceiveCommands: Wrong mode!");
+      return false;
+    case franka::RobotMode::kReflex:
+      momap::log()->warn(
+          "CanReceiveCommands: "
+          "Allowing to receive commands while in {},"
+          " but this needs testing!",
+          RobotModeToString(current_mode));
+      return true;
+    case franka::RobotMode::kUserStopped:
+      momap::log()->error("CanReceiveCommands: Wrong mode!");
+      return false;
+    case franka::RobotMode::kAutomaticErrorRecovery:
+      momap::log()->error("CanReceiveCommands: Wrong mode!");
+      return false;
+    default:
+      momap::log()->error("CanReceiveCommands: Mode unknown!");
+      return false;
   }
-  if (current_mode == franka::RobotMode::kMove) {
-    momap::log()->warn(
-        "Allowing to receive command while in {}"
-        ", this needs testing!",
-        RobotModeToString(current_mode));
-    return true;
-  }
-  if (current_mode == franka::RobotMode::kReflex) {
-    momap::log()->warn(
-        "Allowing to receive command while in {},"
-        " this needs testing!",
-        RobotModeToString(current_mode));
-    return true;
-  }
-
-  momap::log()->error("CanReceiveCommands: Wrong mode!");
-  return false;
 }
 
 void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
                                         const std::string&,
-                                        const lcmtypes::robot_spline_t* rst) {
+                                        const lcmtypes::robot_spline_t* robot_spline) {
   momap::log()->info("CommunicationInterface::HandlePlan: New plan received.");
 
   //$ check if in proper mode to receive commands
   if (!CanReceiveCommands()) {
     momap::log()->error(
-        "CommunicationInterface::HandlePlan: Discarding plan, in wrong mode!");
+        "CommunicationInterface::HandlePlan: "
+        "Discarding plan with utime: {},"
+        " robot is in wrong mode!", robot_spline->utime);
     return;
   }
 
@@ -284,8 +304,8 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
         std::chrono::milliseconds(static_cast<int>(1.0)));
   }
 
-  momap::log()->info("utime: {}", rst->utime);
-  robot_plan_.utime = rst->utime;
+  momap::log()->info("utime: {}", robot_spline->utime);
+  robot_plan_.utime = robot_spline->utime;
   //$ publish confirmation that plan was received with same utime
   // TODO @rkk: move this to later in the function...
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
@@ -293,7 +313,7 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
       "CommunicationInterface::HandlePlan: "
       "Published confirmation of received plan");
 
-  PPType piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
+  PPType piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*robot_spline);
 
   if (piecewise_polynomial.get_number_of_segments() < 1) {
     momap::log()->error(
@@ -320,7 +340,7 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
 
   auto q = this->GetRobotState().q;
   // TODO @rkk: move this check to franka plan runner...
-  for (int joint = 0; joint < rst->dof; joint++) {
+  for (int joint = 0; joint < robot_spline->dof; joint++) {
     if (!dru::EpsEq(commanded_start(joint), q[joint],
                     params_.kMediumJointDistance)) {
       momap::log()->error(
@@ -346,33 +366,33 @@ void CommunicationInterface::HandlePlan(const ::lcm::ReceiveBuffer*,
 
 void CommunicationInterface::HandlePause(const ::lcm::ReceiveBuffer*,
                                          const std::string&,
-                                         const robot_msgs::pause_cmd* msg) {
+                                         const robot_msgs::pause_cmd* pause_cmd_msg) {
   std::lock_guard<std::mutex> lock(pause_mutex_);
   // check if paused = true or paused = false was received:
-  bool paused = msg->data;
+  bool paused = pause_cmd_msg->data;
   if (paused) {
     momap::log()->warn(
         "CommunicationInterface::HandlePause: Received 'pause = true' from {}",
-        msg->source);
-    if (pause_data_.pause_sources_set_.insert(msg->source).second == false) {
+        pause_cmd_msg->source);
+    if (pause_data_.pause_sources_set_.insert(pause_cmd_msg->source).second == false) {
       momap::log()->warn(
           "CommunicationInterface::HandlePause: "
           "Already paused by source: {}",
-          msg->source);
+          pause_cmd_msg->source);
     }
   }
   else {
     momap::log()->warn(
         "CommunicationInterface::HandlePause: Received 'pause = false' from {}",
-        msg->source);
-    if (pause_data_.pause_sources_set_.find(msg->source) !=
+        pause_cmd_msg->source);
+    if (pause_data_.pause_sources_set_.find(pause_cmd_msg->source) !=
         pause_data_.pause_sources_set_.end()) {
-      pause_data_.pause_sources_set_.erase(msg->source);
+      pause_data_.pause_sources_set_.erase(pause_cmd_msg->source);
     } else {
       momap::log()->warn(
           "Unpausing command rejected: No matching "
           "pause command by source: {}'",
-          msg->source);
+          pause_cmd_msg->source);
     }
   }
   
