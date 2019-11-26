@@ -38,9 +38,11 @@ FrankaPlanRunner::FrankaPlanRunner(const parameters::Parameters params)
   max_accels_ = params.robot_max_accelerations;
 
   // setup dracula instance
+  // TODO @rkk: remove dracula
   dracula_ = std::make_unique<Dracula>(params_);
   joint_limits_ = dracula_->GetCS()->GetJointLimits();
-  momap::log()->info("Joint limits: {}", joint_limits_.transpose());
+  momap::log()->info("Lower Joint limits: {}", joint_limits_.col(0).transpose());
+  momap::log()->info("Upper Joint limits: {}", joint_limits_.col(1).transpose());
 
   start_conf_franka_ = Eigen::VectorXd::Zero(dof_);
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
