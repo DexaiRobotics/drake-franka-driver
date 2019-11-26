@@ -216,18 +216,14 @@ int FrankaPlanRunner::RunFranka() {
         error_counter++;
         momap::log()->warn("RunFranka: Caught control exception: {}.",
                            ce.what());
-        // if(plan_) {
-        //   momap::log()->warn("RunFranka: Active plan at time {}"
-        //       " was not finished because of the exception!",
-        //       franka_time_);
-        //   bool safety_on = false;
-        //   SetCollisionBehaviour(robot, safety_on);
-        //   status_ = RobotStatus::Reversing;
-        //   Reverse(distance);
-        //   comm_interface_->PublishPlanComplete(franka_time_, 
-        //       false, "control_exception");
-        //   plan_.release();
-        // }
+        if(plan_) {
+          momap::log()->warn("RunFranka: Active plan at time {}"
+              " was not finished because of the control exception!",
+              franka_time_);
+          comm_interface_->PublishPlanComplete(franka_time_, 
+              false, "control_exception");
+          plan_.release();
+        }
                                  
         if (error_counter > 2) {
           momap::log()->error("RunFranka: Error recovery did not work!");
