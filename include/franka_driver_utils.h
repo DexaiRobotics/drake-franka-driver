@@ -2,29 +2,35 @@
 
 #pragma once
 
-#include <bits/stdint-intn.h>    // for int64_t
-#include <franka/robot_state.h>  // for RobotState, RobotMode
+#include "drake/lcmt_iiwa_status.hpp"  // for lcmt_iiwa_status
+#include "franka/robot_state.h"        // for RobotState, RobotMode
 
-#include <array>    // for array
-#include <cstddef>  // for size_t
-#include <cstdint>  // for int64_t
-#include <string>   // for string
-
-#include "drake/lcmt_iiwa_status.hpp" // for lcmt_iiwa_status
+#include <Eigen/Dense>         // for Eigen::VectorXd
+#include <array>               // for array
+#include <bits/stdint-intn.h>  // for int64_t
+#include <cstddef>             // for size_t
+#include <cstdint>             // for int64_t
+#include <string>              // for string
 
 namespace franka_driver {
 
-const int kNumJoints_ = 7;
-const std::string home_addr = "192.168.1.1";
+enum class RobotStatus {
+  Uninitialized,
+  Running,
+  Pausing,
+  Paused,
+  Unpausing,
+  Reversing
+};
 
 template <typename T, std::size_t SIZE>
-std::vector<T> ConvertToVector(std::array<T, SIZE>& a) {
+std::vector<T> ArrayToVector(const std::array<T, SIZE>& a) {
   std::vector<T> v(a.begin(), a.end());
   return v;
 }
 
 template <typename T, std::size_t SIZE>
-void ConvertToArray(std::vector<T>& v, std::array<T, SIZE>& a) {
+void VectorToArray(const std::vector<T>& v, std::array<T, SIZE>& a) {
   for (int i = 0; i < SIZE; i++) {
     a[i] = v[i];
   }
@@ -36,11 +42,12 @@ static void AssignToLcmStatus(franka::RobotState& robot_state,
 
 drake::lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState& robot_state);
 
-void ResizeStatusMessage(drake::lcmt_iiwa_status& lcm_status);
+// void ResizeStatusMessage(drake::lcmt_iiwa_status& lcm_status, int dof);
 
 std::string RobotModeToString(franka::RobotMode mode);
 
-// TODO: use this
-int64_t get_current_utime();
+std::string RobotStatusToString(RobotStatus status);
+
+std::array<double, 7> EigenToArray(const Eigen::VectorXd& input);
 
 }  // namespace franka_driver

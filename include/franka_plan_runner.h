@@ -1,136 +1,112 @@
 /// @file franka_plan_runner
 ///
-/// franka_plan_runner is designed to wait for LCM messages containing
-/// a robot_plan_t message, and then execute the plan on a franka arm
-/// (also communicating via LCM using the
-/// lcmt_iiwa_command/lcmt_iiwa_status messages).
+/// franka_plan_runner is designed to get a plan from the comm interface,
+/// and then execute the plan on a franka arm
 ///
-/// When a plan is received, it will immediately begin executing that
+/// When a new plan is received from the comm interface,
+/// it will immediately begin executing that
 /// plan on the arm (replacing any plan in progress).
 ///
 /// If a stop message is received, it will immediately discard the
 /// current plan and wait until a new plan is received.
 #pragma once
 
-#include <bits/stdint-intn.h>      // for int64_t
-#include <franka/control_types.h>  // for JointPositions
-#include <franka/duration.h>       // for Duration
-#include <franka/robot_state.h>    // for RobotState
+#include "communication_interface.h"  // for CommunicationInterface
+#include "dracula.h"                  // for Dracula
+#include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
+#include "franka/control_types.h"  // for franka::JointPositions
+#include "franka/duration.h"       // for franka::Duration
+#include "franka/robot.h"          // for franka::Robot
+#include "franka/robot_state.h"    // for franka::RobotState
+#include "franka_driver_utils.h"   // for RobotStatus
+#include "parameters.h"            // for Parameters
 
-#include <cstdint>                 // for int64_t
+#include <Eigen/Dense>                  // for Eigen::VectorXd
+#include <bits/stdint-intn.h>           // for int64_t
+#include <cstdint>                      // for int64_t
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
-#include <robot_msgs/pause_cmd.hpp>  // for pause_cmd
-#include <drake/common/trajectories/piecewise_polynomial.h>  // for Piecewis...
-
-#include <mutex>   // for mutex
-#include <thread>  // for thread
-
-#include "dracula.h"     // for Dracula
-#include "parameters.h"  // for Parameters
+#include <mutex>                        // for mutex
+#include <thread>                       // for thread
 
 namespace franka_driver {
-
-using drake::trajectories::PiecewisePolynomial;
-typedef PiecewisePolynomial<double> PPType;
-typedef PPType::PolynomialType PPPoly;
-typedef PPType::PolynomialMatrix PPMatrix;
-
-struct RobotData {
-  std::mutex mutex;
-  bool has_data;
-  franka::RobotState robot_state;
-};
-
-struct RobotPiecewisePolynomial {
-  std::mutex mutex;
-  std::atomic<bool> has_data;
-  int64_t utime;
-  std::unique_ptr<PiecewisePolynomial<double>> plan;
-  int64_t end_time_us;
-};
-
-enum class QueuedCommand { NONE, PAUSE, CONTINUE };
 
 class FrankaPlanRunner {
  public:
   FrankaPlanRunner(const parameters::Parameters params);
   ~FrankaPlanRunner(){};
+
+  /// This starts the franka driver
   int Run();
 
  protected:
+  /// Sets collision behavior of robot: at what force threshold
+  /// is Franka's Reflex triggered.
+  /// Note: Never call this method in the realtime control loop!
+  /// Only call this method during initialization. If robot was
+  /// already initialized, this method will throw an exception!
+  void SetCollisionBehaviorSafetyOn(franka::Robot& robot);
+  void SetCollisionBehaviorSafetyOff(franka::Robot& robot);
+
+  franka::RobotMode GetRobotMode(franka::Robot& robot);
+
   int RunFranka();
+
   int RunSim();
 
-  double StopPeriod(double period);
-  void QueuedCmd();
+  /// Check and limit conf according to provided parameters for joint limits
+  bool LimitJoints(Eigen::VectorXd& conf);
+
+  /// Calculate the time to advance while pausing or unpausing
+  /// Inputs to method have seconds as their unit.
+  /// Algorithm: Uses a logistic growth function:
+  /// t' = f - 4 / [a (e^{a*t} + 1] where
+  /// f = target_stop_time, t' = franka_time, t = real_time
+  /// Returns delta t', the period that should be incremented to franka time
+  double TimeToAdvanceWhilePausing(double period, double target_stop_time,
+                                   double timestep);
+
+  /// The franka time advances according to the pause status of the robot.
+  /// The franka time is used to read out a value from a piecewise polynomial.
+  /// If the robot is pausing or unpausing, then the franka time advances slower
+  //  If the robot is paused, then the franka time is not advancing at all.
+  void IncreaseFrankaTimeBasedOnStatus(const std::array<double, 7>& vel,
+                                       double period_in_seconds);
 
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
-  void HandleLcm();
-  /// PublishLcmAndPauseStatus is called once by a separate thread in the Run()
-  /// method It sends the robot status and the pause status. Pause status
-  /// isseparate because robot status message used does not have space for
-  /// indicating the contents of the pause message.
-  void PublishLcmAndPauseStatus();
-  void PublishPauseStatus();
-  void PublishTriggerToChannel(int64_t utime, std::string lcm_channel,
-                               bool success = true, std::string message = "");
-  //$ check if robot is in a mode that can receive commands, i.e. not user
-  // stopped or error recovery
-  bool CanReceiveCommands();
-  void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
-                  const lcmtypes::robot_spline_t* rst);
-  void HandleStop(const ::lcm::ReceiveBuffer*, const std::string&,
-                  const robot_msgs::pause_cmd* msg);
-  void Pause(const std::string& source);
-  void Continue();
 
  private:
-  Dracula* dracula = nullptr;
-  std::string param_yaml_;
-  parameters::Parameters p;
+  const int dof_;                // degrees of freedom of franka
+  const std::string home_addr_;  // home address of robot
+  std::unique_ptr<CommunicationInterface> comm_interface_;
+  std::unique_ptr<PPType> plan_;
+  int64_t plan_utime_ = -1;
+  std::unique_ptr<Dracula> dracula_;
+  parameters::Parameters params_;
   std::string ip_addr_;
-  std::atomic_bool running_{false};
-  std::atomic_bool robot_alive_{false};
-  ::lcm::LCM lcm_;
-  int plan_number_{};
-  int cur_plan_number{};
-  int64_t cur_plan_utime_{};
-  int64_t cur_time_us_{};
-  int64_t start_time_us_{};
-  RobotPiecewisePolynomial plan_;
-  RobotData robot_data_{};
-  PPType piecewise_polynomial_;
 
-  int sign_{};
-  std::atomic_bool editing_plan_{false};
-  std::array<double, 16> initial_pose_;
-  Eigen::MatrixXd joint_limits_;
-  long timestep_;
-  float target_stop_time_;
-  float STOP_SCALE = 0.8;  // this should be yaml param
-  float stop_duration_;
-  std::mutex pause_mutex_;
-  std::atomic_bool pausing_;
-  std::atomic_bool paused_;
-  std::atomic_bool unpausing_;
-  std::string stop_cmd_source_;
-  float stop_margin_counter_ = 0;
-  QueuedCommand queued_cmd_ = QueuedCommand::NONE;
-  std::set<std::string> stop_set_;
-
-  Eigen::VectorXd starting_conf_;
-  std::array<double, 7> starting_franka_q_;
-
-  const double lcm_publish_rate_ = 200.0;  // Hz
+  // keeping track of time along plan:
   double franka_time_;
+  // pause related:
+  RobotStatus status_;
+  long timestep_ = 1;
+  float target_stop_time_;
+  float stop_duration_;
+  float stop_margin_counter_ = 0;
+  int cur_plan_number_ = -1;               // for ensuring the plan is new
+  const double lcm_publish_rate_ = 200.0;  // Hz
+
+  Eigen::MatrixXd joint_limits_;
+  float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
+
+  Eigen::VectorXd start_conf_plan_;
+  Eigen::VectorXd start_conf_franka_;
+  Eigen::VectorXd end_conf_franka_;
+
   Eigen::VectorXd max_accels_;
+  // TODO @rkk: replace allowable_error_ with non arbitrary number
+  double allowable_error_ = 0.007;
 
-  std::thread lcm_publish_status_thread;
-  std::thread lcm_handle_thread;
-
-  std::string lcm_driver_status_channel_;
-  std::string lcm_pause_status_channel_;
-};
+};  // FrankaPlanRunner
 
 }  // namespace franka_driver

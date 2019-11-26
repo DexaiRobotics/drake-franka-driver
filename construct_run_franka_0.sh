@@ -1,5 +1,5 @@
 #! /bin/bash
-set -euxo
+set -eux
 
 cd build
 make -j4 franka_driver
