@@ -300,7 +300,7 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
 int FrankaPlanRunner::RunSim() {
   momap::log()->info("Starting sim robot.");
   // first, load some parameters
-  dracula_->MutableViz()->loadRobot();
+  // dracula_->MutableViz()->loadRobot();
   Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(dof_);  // output state
   next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542,
       -2.5114236381136448, 0.6720116891296624, 1.9928838396072361,
