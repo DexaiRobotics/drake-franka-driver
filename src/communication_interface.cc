@@ -42,15 +42,15 @@ CommunicationInterface::CommunicationInterface(
   // with the robot status channel:
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
 
-  momap::log()->info("Plan channel: {}", params_.lcm_plan_channel);
-  momap::log()->info("Stop channel: {}", params_.lcm_stop_channel);
+  momap::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
+  momap::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
   momap::log()->info("Plan received channel: {}",
                      params_.lcm_plan_received_channel);
   momap::log()->info("Plan complete channel: {}",
                      params_.lcm_plan_complete_channel);
-  momap::log()->info("Status channel: {}", params_.lcm_status_channel);
+  momap::log()->info("Status channel:        {}", params_.lcm_status_channel);
   momap::log()->info("Driver status channel: {}", lcm_driver_status_channel_);
-  momap::log()->info("Pause status channel: {}", lcm_pause_status_channel_);
+  momap::log()->info("Pause status channel:  {}", lcm_pause_status_channel_);
 };
 
 void CommunicationInterface::ResetData() {
@@ -168,7 +168,7 @@ void CommunicationInterface::PublishDriverStatus(
 void CommunicationInterface::HandleLcm() {
   while (running_) {
     lcm_.handleTimeout(0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
   }
 }
 

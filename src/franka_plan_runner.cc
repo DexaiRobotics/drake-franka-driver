@@ -272,17 +272,17 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
     momap::log()->warn("RunFranka: Active plan at franka_time: {}"
         " was not finished because of the caught control exception!",
         franka_time_);
-    momap::log()->info("RunFranka: Attaching callback to reverse!");
-    try {
-      robot.control(joint_position_callback_);
-    } catch (const franka::ControlException& ce) {
-        momap::log()->warn("RunFranka: While reversing, caught control exception: {}.",
-                           ce.what());                                 
-        momap::log()->error("RunFranka: Error recovery did not work!");
-        comm_interface_->PublishDriverStatus(false, ce.what());
-        return false;
-    }
-    momap::log()->info("RunFranka: Finished reversing!");
+  //   momap::log()->info("RunFranka: Attaching callback to reverse!");
+  //   try {
+  //     robot.control(joint_position_callback_);
+  //   } catch (const franka::ControlException& ce) {
+  //       momap::log()->warn("RunFranka: While reversing, caught control exception: {}.",
+  //                          ce.what());                                 
+  //       momap::log()->error("RunFranka: Error recovery did not work!");
+  //       comm_interface_->PublishDriverStatus(false, ce.what());
+  //       return false;
+  //   }
+  //   momap::log()->info("RunFranka: Finished reversing!");
     momap::log()->info("RunFranka: PublishPlanComplete({},"
         "false, 'control_exception')",franka_time_);
     comm_interface_->PublishPlanComplete(plan_utime_, 
