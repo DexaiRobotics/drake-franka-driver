@@ -336,15 +336,15 @@ void CommunicationInterface::HandlePlan(
   // Start position == goal position check
   // TODO: add end position==goal position check (upstream)
   // TODO: change to append initial position and respline here
-  auto commanded_start =
+  Eigen::VectorXd commanded_start =
       piecewise_polynomial.value(piecewise_polynomial.start_time());
 
   auto q = this->GetRobotState().q;
   // TODO @rkk: move this check to franka plan runner...
-  auto q_eigen = dru::v_to_e(ArrayToVector(q));
+  Eigen::VectorXd q_eigen = dru::v_to_e(ArrayToVector(q));
 
   auto max_angular_distance = dru::max_angular_distance(commanded_start, q_eigen);
-  if (max_angular_distance > GetParameters()->kMediumJointDistance)
+  if (max_angular_distance > params_.kMediumJointDistance)
   {
       // discard the plan if we are too far away from current robot start
       Eigen::VectorXd joint_delta = q_eigen - commanded_start; 
