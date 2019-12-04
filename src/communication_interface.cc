@@ -336,23 +336,26 @@ void CommunicationInterface::HandlePlan(
   // Start position == goal position check
   // TODO: add end position==goal position check (upstream)
   // TODO: change to append initial position and respline here
-  Eigen::VectorXd commanded_start =
+  auto commanded_start =
       piecewise_polynomial.value(piecewise_polynomial.start_time());
 
   auto q = this->GetRobotState().q;
   // TODO @rkk: move this check to franka plan runner...
-  for (int joint = 0; joint < robot_spline->dof; joint++) {
-    if (!dru::EpsEq(commanded_start(joint), q[joint],
-                    params_.kMediumJointDistance)) {
+  auto q_eigen = dru::v_to_e(ArrayToVector(q));
+
+  auto max_angular_distance = dru::max_angular_distance(commanded_start, q_eigen);
+  if (max_angular_distance > GetParameters()->kMediumJointDistance)
+  {
+      // discard the plan if we are too far away from current robot start
+      Eigen::VectorXd joint_delta = q_eigen - commanded_start; 
       momap::log()->error(
           "CommunicationInterface::HandlePlan: "
-          "Discarding plan {}, mismatched start position.",
-          robot_spline->utime);
+          "Discarding plan {}, mismatched start position with delta: {}.",
+          robot_spline->utime, joint_delta.transpose());
       robot_plan_.has_plan_data_ = false;
       robot_plan_.plan_.release();
       lock.unlock();
       return;
-    }
   }
 
   // plan is valid, so release old one first
