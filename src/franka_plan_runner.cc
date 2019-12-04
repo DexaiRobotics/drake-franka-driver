@@ -268,10 +268,7 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   robot.automaticErrorRecovery();
   momap::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery!");
 
-  if(plan_) {
-    momap::log()->warn("RunFranka: Active plan at franka_time: {}"
-        " was not finished because of the caught control exception!",
-        franka_time_);
+  // if(plan_) {
   //   momap::log()->info("RunFranka: Attaching callback to reverse!");
   //   try {
   //     robot.control(joint_position_callback_);
@@ -283,6 +280,16 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   //       return false;
   //   }
   //   momap::log()->info("RunFranka: Finished reversing!");
+  // }
+
+  momap::log()->info("RunFranka: Turning Safety on again!");
+  SetCollisionBehaviorSafetyOn(robot);
+  momap::log()->info("RunFranka: Turned Safety on again!");
+  status_ = RobotStatus::Running;
+  if(plan_) {
+    momap::log()->warn("RunFranka: Active plan at franka_time: {}"
+        " was not finished because of the caught control exception!",
+        franka_time_);
     momap::log()->info("RunFranka: PublishPlanComplete({},"
         "false, 'control_exception')",franka_time_);
     comm_interface_->PublishPlanComplete(plan_utime_, 
@@ -290,10 +297,6 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
     plan_.release();
     plan_utime_ = -1;  // reset plan utime to -1
   }
-  momap::log()->info("RunFranka: Turning Safety on again!");
-  SetCollisionBehaviorSafetyOn(robot);
-  momap::log()->info("RunFranka: Turned Safety on again!");
-  status_ = RobotStatus::Running;
   return true;
 }
 

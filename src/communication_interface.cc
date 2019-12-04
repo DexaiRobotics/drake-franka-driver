@@ -352,6 +352,8 @@ void CommunicationInterface::HandlePlan(
           "CommunicationInterface::HandlePlan: "
           "Discarding plan {}, mismatched start position with delta: {}.",
           robot_spline->utime, joint_delta.transpose());
+      PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
+          "mismatched_start_position");
       robot_plan_.has_plan_data_ = false;
       robot_plan_.plan_.release();
       lock.unlock();
