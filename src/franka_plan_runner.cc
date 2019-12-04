@@ -511,6 +511,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (comm_interface_->HasNewPlan() && status_ != RobotStatus::Reversing ) {
     // get the current plan from the communication interface
     comm_interface_->TakePlan(plan_, plan_utime_);
+    
+    // auto plan_received_time = std::chrono::high_resolution_clock::now();
+    // int64_t plan_received_utime = (std::chrono::time_point_cast< std::chrono::microseconds > (plan_received_time) ).time_since_epoch().count();
+    // auto plan_time_delta = plan_received_utime - plan_utime_;
+    // if(plan_time_delta )
     // first time step of plan, reset time:
     franka_time_ = 0.0;
     start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
