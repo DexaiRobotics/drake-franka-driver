@@ -111,10 +111,7 @@ class FrankaPlanRunner {
   Eigen::VectorXd end_conf_franka_;
 
   Eigen::VectorXd max_accels_;
-  // TODO @rkk: replace allowable_error_ with non arbitrary number
-  double allowable_error_ = 0.007;
-
-  double max_error_norm_reversing_ = 0.1; // norm of joint delta when reversing
+  double allowable_norm_error_ = 0.007; // empirically proven
 
 };  // FrankaPlanRunner
 

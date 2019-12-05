@@ -77,7 +77,7 @@ void CommunicationInterface::StartInterface() {
   // Initialize data as empty for exchange with robot driver
   ResetData();
   // start LCM threads; independent of sim vs. real robot
-  momap::log()->info("Start LCM threads");
+  momap::log()->info("CommunicationInterface::StartInterface: Start LCM threads");
   running_ = true;  // sets the lcm threads to active.
   lcm_publish_status_thread_ =
       std::thread(&CommunicationInterface::PublishLcmAndPauseStatus, this);

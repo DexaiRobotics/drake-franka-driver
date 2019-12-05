@@ -115,7 +115,7 @@ franka::RobotMode FrankaPlanRunner::GetRobotMode(franka::Robot& robot) {
     current_mode = robot_state.robot_mode;
     return false;
   });
-  momap::log()->info("RunFranka: Franka's current mode is: {}",
+  momap::log()->info("GetRobotMode: Franka's current mode is: {}",
                      RobotModeToString(current_mode));
   return current_mode;
 }
@@ -268,14 +268,16 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   robot.automaticErrorRecovery();
   momap::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery!");
 
+  /// TODO @rkk: add reverse capability if found to be needed in the next weeks,
+  /// uncomment the following to unleash the capabilitiy and add the proper 
+  ///  timing for reversing into the joint control loop
   // if(plan_) {
   //   momap::log()->info("RunFranka: Attaching callback to reverse!");
   //   try {
   //     robot.control(joint_position_callback_);
   //   } catch (const franka::ControlException& ce) {
-  //       momap::log()->warn("RunFranka: While reversing, caught control exception: {}.",
+  //       momap::log()->error("RunFranka: While reversing, caught control exception: {}.",
   //                          ce.what());                                 
-  //       momap::log()->error("RunFranka: Error recovery did not work!");
   //       comm_interface_->PublishDriverStatus(false, ce.what());
   //       return false;
   //   }
@@ -542,20 +544,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
                         start_conf_franka_.transpose());
     momap::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_plan_.transpose());
-    if (!dru::VectorEpsEq(start_conf_plan_, start_conf_franka_,
-                          params_.kMediumJointDistance)) {
+    auto max_angular_distance = dru::max_angular_distance(start_conf_franka_, start_conf_plan_);
+    if (max_angular_distance > params_.kMediumJointDistance)
       momap::log()->error(
-          "JointPositionCallback: Discarding plan, mismatched start position.");
+          "JointPositionCallback: Discarding plan, mismatched start position. Max distance: {} > {}",
+          max_angular_distance, params_.kTightJointDistance);
       return franka::MotionFinished(output_to_franka);
-    }
-
-    double error_start = (start_conf_franka_ - start_conf_plan_).norm();
-    // TODO @rkk: move this print into another thread
-    if (error_start > allowable_error_) {
+    } else if (max_angular_distance > params_.kTightJointDistance)
       momap::log()->warn(
-          "JointPositionCallback: too large a difference between where we are "
-          "and where we think = {}",
-          error_start);
+          "JointPositionCallback: max angular distance large between franka and start of plan: {} > {}",
+          max_angular_distance, params_.kTightJointDistance);
     }
   }
 
@@ -587,7 +585,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if(status_ == RobotStatus::Reversing) {
     double error_reverse = (current_conf_franka - start_conf_franka_).norm();
     // reversing is complete once we have achieve a norm of 0.1: 
-    if( error_reverse > max_error_norm_reversing_) {
+    if( error_reverse < allowable_norm_error_) {
       plan_.release();
       return franka::MotionFinished(output_to_franka);
     }
@@ -595,16 +593,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (franka_time_ > plan_->end_time() && status_ != RobotStatus::Reversing ) {
     double error_final = (current_conf_franka - end_conf_franka_).norm();
 
-    // TODO @rkk: replace allowable_error_ with non arbitrary number
-    if (error_final < allowable_error_) {
+    if (error_final < allowable_norm_error_) {
       momap::log()->info(
           "JointPositionCallback: Finished plan {}, exiting controller",
           plan_utime_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
       momap::log()->warn(
-          "JointPositionCallback: Overtimed plan {}: robot diverged, error "
-          "distance: {}",
+          "JointPositionCallback: Overtimed plan {}: robot diverged, norm error: {}",
           plan_utime_, error_final);
       momap::log()->info("JointPositionCallback: current_conf_franka: {}",
                          current_conf_franka.transpose());
