@@ -77,7 +77,8 @@ void CommunicationInterface::StartInterface() {
   // Initialize data as empty for exchange with robot driver
   ResetData();
   // start LCM threads; independent of sim vs. real robot
-  momap::log()->info("CommunicationInterface::StartInterface: Start LCM threads");
+  momap::log()->info(
+      "CommunicationInterface::StartInterface: Start LCM threads");
   running_ = true;  // sets the lcm threads to active.
   lcm_publish_status_thread_ =
       std::thread(&CommunicationInterface::PublishLcmAndPauseStatus, this);
@@ -343,21 +344,21 @@ void CommunicationInterface::HandlePlan(
   // TODO @rkk: move this check to franka plan runner...
   Eigen::VectorXd q_eigen = dru::v_to_e(ArrayToVector(q));
 
-  auto max_angular_distance = dru::max_angular_distance(commanded_start, q_eigen);
-  if (max_angular_distance > params_.kMediumJointDistance)
-  {
-      // discard the plan if we are too far away from current robot start
-      Eigen::VectorXd joint_delta = q_eigen - commanded_start; 
-      momap::log()->error(
-          "CommunicationInterface::HandlePlan: "
-          "Discarding plan {}, mismatched start position with delta: {}.",
-          robot_spline->utime, joint_delta.transpose());
-      robot_plan_.has_plan_data_ = false;
-      robot_plan_.plan_.release();
-      lock.unlock();
-      PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
-          "mismatched_start_position");
-      return;
+  auto max_angular_distance =
+      dru::max_angular_distance(commanded_start, q_eigen);
+  if (max_angular_distance > params_.kMediumJointDistance) {
+    // discard the plan if we are too far away from current robot start
+    Eigen::VectorXd joint_delta = q_eigen - commanded_start;
+    momap::log()->error(
+        "CommunicationInterface::HandlePlan: "
+        "Discarding plan {}, mismatched start position with delta: {}.",
+        robot_spline->utime, joint_delta.transpose());
+    robot_plan_.has_plan_data_ = false;
+    robot_plan_.plan_.release();
+    lock.unlock();
+    PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
+                        "mismatched_start_position");
+    return;
   }
 
   // plan is valid, so release old one first

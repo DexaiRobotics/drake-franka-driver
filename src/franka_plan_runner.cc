@@ -53,10 +53,11 @@ FrankaPlanRunner::FrankaPlanRunner(const parameters::Parameters params)
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
 
   // define the joint_position_callback_ needed for the robot control loop:
-  joint_position_callback_ = [&, this](const franka::RobotState& robot_state,
-                      franka::Duration period) -> franka::JointPositions {
-      return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
-    };
+  joint_position_callback_ =
+      [&, this](const franka::RobotState& robot_state,
+                franka::Duration period) -> franka::JointPositions {
+    return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
+  };
 }
 
 int FrankaPlanRunner::Run() {
@@ -242,8 +243,9 @@ int FrankaPlanRunner::RunFranka() {
         momap::log()->warn("RunFranka: Caught control exception: {}.",
                            ce.what());
 
-        if(!RecoverFromControlException(robot)) {
-          momap::log()->error("RunFranka: RecoverFromControlException did not work!");
+        if (!RecoverFromControlException(robot)) {
+          momap::log()->error(
+              "RunFranka: RecoverFromControlException did not work!");
           comm_interface_->PublishDriverStatus(false, ce.what());
           return 1;
         }
@@ -269,15 +271,16 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   momap::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery!");
 
   /// TODO @rkk: add reverse capability if found to be needed in the next weeks,
-  /// uncomment the following to unleash the capabilitiy and add the proper 
+  /// uncomment the following to unleash the capabilitiy and add the proper
   ///  timing for reversing into the joint control loop
   // if(plan_) {
   //   momap::log()->info("RunFranka: Attaching callback to reverse!");
   //   try {
   //     robot.control(joint_position_callback_);
   //   } catch (const franka::ControlException& ce) {
-  //       momap::log()->error("RunFranka: While reversing, caught control exception: {}.",
-  //                          ce.what());                                 
+  //       momap::log()->error("RunFranka: While reversing, caught control
+  //       exception: {}.",
+  //                          ce.what());
   //       comm_interface_->PublishDriverStatus(false, ce.what());
   //       return false;
   //   }
@@ -288,14 +291,17 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   SetCollisionBehaviorSafetyOn(robot);
   momap::log()->info("RunFranka: Turned Safety on again!");
   status_ = RobotStatus::Running;
-  if(plan_) {
-    momap::log()->warn("RunFranka: Active plan at franka_time: {}"
+  if (plan_) {
+    momap::log()->warn(
+        "RunFranka: Active plan at franka_time: {}"
         " was not finished because of the caught control exception!",
         franka_time_);
-    momap::log()->info("RunFranka: PublishPlanComplete({},"
-        "false, 'control_exception')", franka_time_);
-    comm_interface_->PublishPlanComplete(plan_utime_, 
-        false, "control_exception");
+    momap::log()->info(
+        "RunFranka: PublishPlanComplete({},"
+        "false, 'control_exception')",
+        franka_time_);
+    comm_interface_->PublishPlanComplete(plan_utime_, false,
+                                         "control_exception");
     plan_.release();
     plan_utime_ = -1;  // reset plan utime to -1
   }
@@ -507,19 +513,22 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   static bool first_run = true;
 
-  if(first_run && status_ == RobotStatus::Reversing ) {
+  if (first_run && status_ == RobotStatus::Reversing) {
     start_reversing_conf_franka_ = current_conf_franka;
     first_run = false;
   }
-  
-  if (comm_interface_->HasNewPlan() && status_ != RobotStatus::Reversing ) {
+
+  if (comm_interface_->HasNewPlan() && status_ != RobotStatus::Reversing) {
     // get the current plan from the communication interface
     comm_interface_->TakePlan(plan_, plan_utime_);
-    
+
     // auto plan_received_time = std::chrono::high_resolution_clock::now();
-    // int64_t plan_received_utime = (std::chrono::time_point_cast< std::chrono::microseconds > (plan_received_time) ).time_since_epoch().count();
-    // auto plan_time_delta = plan_received_utime - plan_utime_;
-    // if(plan_time_delta )
+    // int64_t plan_received_utime = (std::chrono::time_point_cast<
+    // std::chrono::microseconds > (plan_received_time)
+    // ).time_since_epoch().count(); 
+    // auto plan_time_delta = plan_received_utime - plan_utime_; 
+    // if(plan_time_delta ) {}
+    
     // first time step of plan, reset time:
     franka_time_ = 0.0;
     start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
@@ -543,7 +552,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
                         start_conf_franka_.transpose());
     momap::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_plan_.transpose());
-    auto max_ang_distance = dru::max_angular_distance(start_conf_franka_, start_conf_plan_);
+    auto max_ang_distance =
+        dru::max_angular_distance(start_conf_franka_, start_conf_plan_);
     if (max_ang_distance > params_.kMediumJointDistance) {
       momap::log()->error(
           "JointPositionCallback: Discarding plan, mismatched start position."
@@ -583,16 +593,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   output_to_franka = EigenToArray(next_conf_franka);
 
   // Finish Checks:
-  if(status_ == RobotStatus::Reversing) {
+  if (status_ == RobotStatus::Reversing) {
     double error_reverse = (current_conf_franka - start_conf_franka_).norm();
-    // reversing is complete once we have achieve a norm of 0.1: 
-    if( error_reverse < allowable_norm_error_) {
+    // reversing is complete once we have achieve a norm of 0.1:
+    if (error_reverse < allowable_norm_error_) {
       plan_.release();
       output_to_franka = EigenToArray(current_conf_franka);
       return franka::MotionFinished(output_to_franka);
     }
   }
-  if (franka_time_ > plan_->end_time() && status_ != RobotStatus::Reversing ) {
+  if (franka_time_ > plan_->end_time() && status_ != RobotStatus::Reversing) {
     double error_final = (current_conf_franka - end_conf_franka_).norm();
 
     if (error_final < allowable_norm_error_) {
@@ -602,7 +612,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
       momap::log()->warn(
-          "JointPositionCallback: Overtimed plan {}: robot diverged, norm error: {}",
+          "JointPositionCallback: Overtimed plan {}: robot diverged, norm "
+          "error: {}",
           plan_utime_, error_final);
       momap::log()->info("JointPositionCallback: current_conf_franka: {}",
                          current_conf_franka.transpose());
