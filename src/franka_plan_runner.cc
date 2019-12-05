@@ -544,16 +544,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
                         start_conf_franka_.transpose());
     momap::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_plan_.transpose());
-    auto max_angular_distance = dru::max_angular_distance(start_conf_franka_, start_conf_plan_);
-    if (max_angular_distance > params_.kMediumJointDistance)
+    auto max_ang_distance = dru::max_angular_distance(start_conf_franka_, start_conf_plan_);
+    if (max_ang_distance > params_.kMediumJointDistance) {
       momap::log()->error(
           "JointPositionCallback: Discarding plan, mismatched start position. Max distance: {} > {}",
-          max_angular_distance, params_.kTightJointDistance);
+          max_ang_distance, params_.kTightJointDistance);
       return franka::MotionFinished(output_to_franka);
-    } else if (max_angular_distance > params_.kTightJointDistance)
+    } else if (max_ang_distance > params_.kTightJointDistance)
       momap::log()->warn(
           "JointPositionCallback: max angular distance large between franka and start of plan: {} > {}",
-          max_angular_distance, params_.kTightJointDistance);
+          max_ang_distance, params_.kTightJointDistance);
     }
   }
 
