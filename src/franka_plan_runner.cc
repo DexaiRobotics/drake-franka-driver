@@ -293,7 +293,7 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
         " was not finished because of the caught control exception!",
         franka_time_);
     momap::log()->info("RunFranka: PublishPlanComplete({},"
-        "false, 'control_exception')",franka_time_);
+        "false, 'control_exception')", franka_time_);
     comm_interface_->PublishPlanComplete(plan_utime_, 
         false, "control_exception");
     plan_.release();
@@ -304,8 +304,7 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
 
 int FrankaPlanRunner::RunSim() {
   momap::log()->info("Starting sim robot.");
-  // first, load some parameters
-  // dracula_->MutableViz()->loadRobot();
+  // first, set some parameters
   Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(dof_);  // output state
   next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542,
       -2.5114236381136448, 0.6720116891296624, 1.9928838396072361,
@@ -547,12 +546,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     auto max_ang_distance = dru::max_angular_distance(start_conf_franka_, start_conf_plan_);
     if (max_ang_distance > params_.kMediumJointDistance) {
       momap::log()->error(
-          "JointPositionCallback: Discarding plan, mismatched start position. Max distance: {} > {}",
+          "JointPositionCallback: Discarding plan, mismatched start position."
+          " Max distance: {} > {}",
           max_ang_distance, params_.kTightJointDistance);
       return franka::MotionFinished(output_to_franka);
     } else if (max_ang_distance > params_.kTightJointDistance) {
       momap::log()->warn(
-          "JointPositionCallback: max angular distance large between franka and start of plan: {} > {}",
+          "JointPositionCallback: max angular distance between franka and "
+          "start of plan is larger than 'kTightJointDistance': {} > {}",
           max_ang_distance, params_.kTightJointDistance);
     }
   }
@@ -587,6 +588,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // reversing is complete once we have achieve a norm of 0.1: 
     if( error_reverse < allowable_norm_error_) {
       plan_.release();
+      output_to_franka = EigenToArray(current_conf_franka);
       return franka::MotionFinished(output_to_franka);
     }
   }

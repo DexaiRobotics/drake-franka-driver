@@ -105,9 +105,13 @@ class FrankaPlanRunner {
   Eigen::MatrixXd joint_limits_;
   float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
 
+  // config of start of plan:
   Eigen::VectorXd start_conf_plan_;
+  // config of franka when plan starts:
   Eigen::VectorXd start_conf_franka_;
+  // config of robot when franka starts reversing:
   Eigen::VectorXd start_reversing_conf_franka_;
+  // config of franka when plan ends:
   Eigen::VectorXd end_conf_franka_;
 
   Eigen::VectorXd max_accels_;
