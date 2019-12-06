@@ -266,8 +266,14 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   momap::log()->warn("RunFranka: Turning Safety off!");
   SetCollisionBehaviorSafetyOff(robot);
   momap::log()->warn("RunFranka: Turned Safety off!");
-  momap::log()->warn("RunFranka: Running Franka's automaticErrorRecovery!");
-  robot.automaticErrorRecovery();
+  auto mode = GetRobotMode(robot);
+  if (mode == franka::RobotMode::kUserStopped) {
+    momap::log()->warn("RunFranka: Robot is {}, "
+        "can't run Franka's automaticErrorRecovery!", RobotModeToString(mode));
+  } else {
+    momap::log()->warn("RunFranka: Running Franka's automaticErrorRecovery!");
+    robot.automaticErrorRecovery();
+  }
   momap::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery!");
 
   /// TODO @rkk: add reverse capability if found to be needed in the next weeks,
@@ -490,9 +496,9 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     // robot is neither pausing, paused nor unpausing, just increase franka
     // time...
     franka_time_ += period_in_seconds;
-  } else if (status_ == RobotStatus::Reversing) {
-    // walk back in time
-    franka_time_ -= period_in_seconds;
+  // } else if (status_ == RobotStatus::Reversing) {
+  //   // walk back in time
+  //   franka_time_ -= period_in_seconds;
   } else if (status_ == RobotStatus::Paused) {
     // do nothing
   }
@@ -513,12 +519,12 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   static bool first_run = true;
 
-  if (first_run && status_ == RobotStatus::Reversing) {
-    start_reversing_conf_franka_ = current_conf_franka;
-    first_run = false;
-  }
+  // if (first_run && status_ == RobotStatus::Reversing) {
+  //   start_reversing_conf_franka_ = current_conf_franka;
+  //   first_run = false;
+  // }
 
-  if (comm_interface_->HasNewPlan() && status_ != RobotStatus::Reversing) {
+  if (comm_interface_->HasNewPlan()) { // && status_ != RobotStatus::Reversing) {
     // get the current plan from the communication interface
     comm_interface_->TakePlan(plan_, plan_utime_);
 
@@ -593,16 +599,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   output_to_franka = EigenToArray(next_conf_franka);
 
   // Finish Checks:
-  if (status_ == RobotStatus::Reversing) {
-    double error_reverse = (current_conf_franka - start_conf_franka_).norm();
-    // reversing is complete once we have achieve a norm of 0.1:
-    if (error_reverse < allowable_norm_error_) {
-      plan_.release();
-      output_to_franka = EigenToArray(current_conf_franka);
-      return franka::MotionFinished(output_to_franka);
-    }
-  }
-  if (franka_time_ > plan_->end_time() && status_ != RobotStatus::Reversing) {
+  // if (status_ == RobotStatus::Reversing) {
+  //   double error_reverse = (current_conf_franka - start_conf_franka_).norm();
+  //   // reversing is complete once we have achieve a norm of 0.1:
+  //   if (error_reverse < allowable_norm_error_) {
+  //     plan_.release();
+  //     output_to_franka = EigenToArray(current_conf_franka);
+  //     return franka::MotionFinished(output_to_franka);
+  //   }
+  // }
+  if (franka_time_ > plan_->end_time()) { //&& status_ != RobotStatus::Reversing) {
     double error_final = (current_conf_franka - end_conf_franka_).norm();
 
     if (error_final < allowable_norm_error_) {
