@@ -42,15 +42,15 @@ CommunicationInterface::CommunicationInterface(
   // with the robot status channel:
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
 
-  momap::log()->info("Plan channel: {}", params_.lcm_plan_channel);
-  momap::log()->info("Stop channel: {}", params_.lcm_stop_channel);
+  momap::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
+  momap::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
   momap::log()->info("Plan received channel: {}",
                      params_.lcm_plan_received_channel);
   momap::log()->info("Plan complete channel: {}",
                      params_.lcm_plan_complete_channel);
-  momap::log()->info("Status channel: {}", params_.lcm_status_channel);
+  momap::log()->info("Status channel:        {}", params_.lcm_status_channel);
   momap::log()->info("Driver status channel: {}", lcm_driver_status_channel_);
-  momap::log()->info("Pause status channel: {}", lcm_pause_status_channel_);
+  momap::log()->info("Pause status channel:  {}", lcm_pause_status_channel_);
 };
 
 void CommunicationInterface::ResetData() {
@@ -77,7 +77,8 @@ void CommunicationInterface::StartInterface() {
   // Initialize data as empty for exchange with robot driver
   ResetData();
   // start LCM threads; independent of sim vs. real robot
-  momap::log()->info("Start LCM threads");
+  momap::log()->info(
+      "CommunicationInterface::StartInterface: Start LCM threads");
   running_ = true;  // sets the lcm threads to active.
   lcm_publish_status_thread_ =
       std::thread(&CommunicationInterface::PublishLcmAndPauseStatus, this);
@@ -168,7 +169,7 @@ void CommunicationInterface::PublishDriverStatus(
 void CommunicationInterface::HandleLcm() {
   while (running_) {
     lcm_.handleTimeout(0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
   }
 }
 
@@ -341,18 +342,23 @@ void CommunicationInterface::HandlePlan(
 
   auto q = this->GetRobotState().q;
   // TODO @rkk: move this check to franka plan runner...
-  for (int joint = 0; joint < robot_spline->dof; joint++) {
-    if (!dru::EpsEq(commanded_start(joint), q[joint],
-                    params_.kMediumJointDistance)) {
-      momap::log()->error(
-          "CommunicationInterface::HandlePlan: "
-          "Discarding plan {}, mismatched start position.",
-          robot_spline->utime);
-      robot_plan_.has_plan_data_ = false;
-      robot_plan_.plan_.release();
-      lock.unlock();
-      return;
-    }
+  Eigen::VectorXd q_eigen = dru::v_to_e(ArrayToVector(q));
+
+  auto max_angular_distance =
+      dru::max_angular_distance(commanded_start, q_eigen);
+  if (max_angular_distance > params_.kMediumJointDistance) {
+    // discard the plan if we are too far away from current robot start
+    Eigen::VectorXd joint_delta = q_eigen - commanded_start;
+    momap::log()->error(
+        "CommunicationInterface::HandlePlan: "
+        "Discarding plan {}, mismatched start position with delta: {}.",
+        robot_spline->utime, joint_delta.transpose());
+    robot_plan_.has_plan_data_ = false;
+    robot_plan_.plan_.release();
+    lock.unlock();
+    PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
+                        "mismatched_start_position");
+    return;
   }
 
   // plan is valid, so release old one first

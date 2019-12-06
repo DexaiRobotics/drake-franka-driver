@@ -51,6 +51,8 @@ class FrankaPlanRunner {
 
   int RunFranka();
 
+  bool RecoverFromControlException(franka::Robot& robot);
+
   int RunSim();
 
   /// Check and limit conf according to provided parameters for joint limits
@@ -85,6 +87,10 @@ class FrankaPlanRunner {
   parameters::Parameters params_;
   std::string ip_addr_;
 
+  std::function<franka::JointPositions(const franka::RobotState&,
+                                       franka::Duration)>
+      joint_position_callback_;
+
   // keeping track of time along plan:
   double franka_time_;
   // pause related:
@@ -99,13 +105,17 @@ class FrankaPlanRunner {
   Eigen::MatrixXd joint_limits_;
   float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
 
+  // config of start of plan:
   Eigen::VectorXd start_conf_plan_;
+  // config of franka when plan starts:
   Eigen::VectorXd start_conf_franka_;
+  // config of robot when franka starts reversing:
+  Eigen::VectorXd start_reversing_conf_franka_;
+  // config of franka when plan ends:
   Eigen::VectorXd end_conf_franka_;
 
   Eigen::VectorXd max_accels_;
-  // TODO @rkk: replace allowable_error_ with non arbitrary number
-  double allowable_error_ = 0.007;
+  double allowable_norm_error_ = 0.007;  // empirically proven
 
 };  // FrankaPlanRunner
 
