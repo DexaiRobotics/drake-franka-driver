@@ -296,12 +296,12 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
         "RunFranka: Active plan at franka_time: {}"
         " was not finished because of the caught control exception!",
         franka_time_);
-    momap::log()->info(
-        "RunFranka: PublishPlanComplete({},"
-        "false, 'control_exception')",
-        franka_time_);
+    std::string msg = "control_exception," + std::to_string(franka_time_);
+    momap::log()->warn(
+        "RunFranka: PublishPlanComplete({}, false, '{}')",
+        franka_time_, msg);
     comm_interface_->PublishPlanComplete(plan_utime_, false,
-                                         "control_exception");
+                                         msg);
     plan_.release();
     plan_utime_ = -1;  // reset plan utime to -1
   }
