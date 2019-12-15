@@ -24,7 +24,9 @@ int do_main(std::string param_yaml = "franka_test.yaml") {
 int main(int argc, char** argv) {
   // Ensure app is singleton (added by 5yler):
   std::string pid_file = "/var/run/cobot_driver.pid";
-  if (!dru::lock_pid_file(pid_file)) {
+  bool kill_existing_process = true;
+  bool prompt_before_kill = false;
+  if (!dru::lock_pid_file(pid_file, kill_existing_process, prompt_before_kill)) {
     std::cerr << "Failed to set up singleton cobot driver app." << std::endl;
     return 1;
   }
