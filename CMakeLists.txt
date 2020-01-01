@@ -15,7 +15,7 @@ set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
 
 ## Removing Unnecessary Headers:
-# 1) Install: 
+# 1) Install:
 # $ sudo apt-get update -y && sudo apt-get install -y iwyu
 # 2) Comment out the following lines:
 # find_program(IWYU_PATH NAMES include-what-you-use iwyu)
@@ -24,7 +24,6 @@ set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
 # endif()
 # set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU_PATH})
 # set(CMAKE_C_INCLUDE_WHAT_YOU_USE ${IWYU_PATH})
-
 
 ## Set up environment
 message(STATUS "setting up environment!")
@@ -53,6 +52,8 @@ set(DRACULA_BUILD_PATH "${DRACULA_SOURCE_PATH}/build")
 message(STATUS "DRACULA_BUILD_PATH: ${DRACULA_BUILD_PATH}")
 set(DRACULA_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/dracula/include")
 message(STATUS "DRACULA_INCLUDE_DIR: ${DRACULA_INCLUDE_DIR}")
+set(FILESYSTEM_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/filesystem/include")
+set(JSON_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/json/include")
 
 # Set Dracula Libraries
 if (UNIX AND NOT APPLE)
@@ -108,11 +109,11 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 include_directories(
     include
     ${DRACULA_INCLUDE_DIR}
-    ${DRACULA_INCLUDE_DIR}/../tests
-    ${DRACULA_INCLUDE_DIR}/../../externals/json/include
+    ${FILESYSTEM_INCLUDE_DIR}
+    ${JSON_INCLUDE_DIR}
     ${Franka_INCLUDE_DIRS}
     ${Python3_INCLUDE_DIRS}
-    ${Python3_NumPy_INCLUDE_DIRS} 
+    ${Python3_NumPy_INCLUDE_DIRS}
     ${CTPL_INCLUDE_DIR}
 )
 
