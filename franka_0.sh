@@ -37,8 +37,6 @@ config=$HOME/catkin_ws/src/salad_bar_description/$name_of_file
 
 echo "choose config file: $config"
 
-# if another driver instance is still somehow running, kill it silently
-pkill -f franka_driver > /dev/null 2>&1
 echo "start franka_driver"
 if ./build/franka_driver $config ; then
     echo "franka_driver started successfully"

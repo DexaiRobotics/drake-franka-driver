@@ -197,7 +197,7 @@ private:
     };
 
     int do_main() {
-        create_momap_log("kuka_plan_runner");
+        momap::create_log("kuka_plan_runner");
         auto tree = std::make_unique<RigidBodyTree<double>>();
         auto urdf_path = std::getenv("DEFAULT_IIWA_URDF");
         if (urdf_path == nullptr) {

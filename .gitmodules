@@ -1,3 +1,6 @@
 [submodule "externals/libfranka"]
 	path = externals/libfranka
 	url = https://github.com/DexaiRobotics/libfranka.git
+[submodule "dexai_mailmap"]
+	path = dexai_mailmap
+	url = git@github.com:DexaiRobotics/dexai_mailmap.git

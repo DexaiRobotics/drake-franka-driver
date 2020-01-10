@@ -10,7 +10,7 @@ namespace dru = dracula_utils;
 namespace franka_driver {
 
 int do_main(std::string param_yaml = "franka_test.yaml") {
-  create_momap_log("franka_driver");
+  momap::create_log("franka_driver");
   int verbose = 0;
   momap::log()->info("Loading parameters: {}", param_yaml);
   parameters::Parameters params =
