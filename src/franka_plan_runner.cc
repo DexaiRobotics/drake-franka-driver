@@ -12,7 +12,8 @@
 
 #include "franka_plan_runner.h"
 
-#include "drake/lcmt_iiwa_status.hpp"
+#include "robot_msgs/robot_status.hpp"  // for robot_status
+
 #include "examples_common.h"   // for setDefaultBehavior
 #include "franka/exception.h"  // for Exception, ControlException
 #include "franka/robot.h"      // for Robot

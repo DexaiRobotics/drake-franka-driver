@@ -2,7 +2,7 @@
 
 #include "franka_driver_utils.h"
 
-#include "drake/lcmt_iiwa_status.hpp"  // for lcmt_iiwa_status
+#include "robot_msgs/robot_status.hpp"  // for robot_status
 
 #include <bits/types/struct_timeval.h>  // for timeval
 #include <cstddef>                      // for NULL
@@ -12,7 +12,7 @@ using namespace franka_driver;
 
 // TODO: @dmsj - make this call ConvertToLcmStatus()
 static void franka_driver::AssignToLcmStatus(
-    franka::RobotState& robot_state, drake::lcmt_iiwa_status& robot_status) {
+    franka::RobotState& robot_state, robot_msgs::robot_status& robot_status) {
   int num_joints = robot_state.q.size();
   struct timeval tv;
   gettimeofday(&tv, NULL);
@@ -39,9 +39,9 @@ static void franka_driver::AssignToLcmStatus(
   robot_status.joint_torque_external.resize(num_joints, 0);
 }
 
-drake::lcmt_iiwa_status franka_driver::ConvertToLcmStatus(
+robot_msgs::robot_status franka_driver::ConvertToLcmStatus(
     franka::RobotState& robot_state) {
-  drake::lcmt_iiwa_status robot_status{};
+  robot_msgs::robot_status robot_status{};
   int num_joints = robot_state.q.size();
   struct timeval tv;
   gettimeofday(&tv, NULL);

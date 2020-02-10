@@ -15,7 +15,7 @@
 #include "communication_interface.h"
 
 #include "drac_util_io.h"  // for get_current_utime
-#include "drake/lcmt_iiwa_status.hpp"
+#include "robot_msgs/robot_status.hpp"  // for robot_status
 #include "franka_driver_utils.h"     // ConvertToLcmStatus
 #include "robot_msgs/pause_cmd.hpp"  // for pause_cmd
 #include "robot_msgs/trigger_t.hpp"  // for trigger_t
@@ -202,7 +202,7 @@ void CommunicationInterface::PublishRobotStatus() {
   // Try to lock data to avoid read write collisions.
   std::unique_lock<std::mutex> lock(robot_data_mutex_);
   if (robot_data_.has_robot_data_) {
-    drake::lcmt_iiwa_status franka_status =
+    robot_msgs::robot_status franka_status =
         ConvertToLcmStatus(robot_data_.robot_state);
     // publish data over lcm
     robot_data_.has_robot_data_ = false;

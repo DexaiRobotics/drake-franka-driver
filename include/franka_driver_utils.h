@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "drake/lcmt_iiwa_status.hpp"  // for lcmt_iiwa_status
+#include "robot_msgs/robot_status.hpp"  // for robot_status
 #include "franka/robot_state.h"        // for RobotState, RobotMode
 
 #include <Eigen/Dense>         // for Eigen::VectorXd
@@ -38,11 +38,11 @@ void VectorToArray(const std::vector<T>& v, std::array<T, SIZE>& a) {
 
 // TODO: @dmsj - make this call ConvertToLcmStatus()
 static void AssignToLcmStatus(franka::RobotState& robot_state,
-                              drake::lcmt_iiwa_status& robot_status);
+                              robot_msgs::robot_status& robot_status);
 
-drake::lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState& robot_state);
+robot_msgs::robot_status ConvertToLcmStatus(franka::RobotState& robot_state);
 
-// void ResizeStatusMessage(drake::lcmt_iiwa_status& lcm_status, int dof);
+// void ResizeStatusMessage(robot_msgs::robot_status& lcm_status, int dof);
 
 std::string RobotModeToString(franka::RobotMode mode);
 
