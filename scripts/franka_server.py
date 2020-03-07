@@ -28,7 +28,7 @@ class FrankaDriverServer:
 
     def handle_start_driver_request(self, channel, req):
         print("Starting driver!")
-        cmd = 'cd /src/drake-franka-driver && ./franka_0.sh'
+        cmd = 'cd /src/drake-franka-driver && ./franka.sh'
         print(cmd)
         subprocess.Popen(cmd, stdout=subprocess.PIPE, shell=True)
 
