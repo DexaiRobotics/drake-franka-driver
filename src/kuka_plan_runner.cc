@@ -28,7 +28,7 @@
 #include "drake/multibody/rigid_body_tree.h"
 #include "trajectory_solver.h"
 #include "log_momap.h"
-#include <dracula_utils.h>
+#include <utils.h>
 
 using Eigen::MatrixXd;
 using Eigen::VectorXd;
@@ -36,8 +36,6 @@ using Eigen::VectorXi;
 using drake::Vector1d;
 using Eigen::Vector2d;
 using Eigen::Vector3d;
-
-namespace du = dracula_utils;
 
 namespace drake {
 namespace dynamap {
@@ -124,7 +122,7 @@ private:
             return;
         }
 
-        piecewise_polynomial = TrajectorySolver::RobotSplineTToPPType(*rst);
+        piecewise_polynomial = decodePiecewisePolynomial(rst->piecewise_polynomial);
         if (piecewise_polynomial.get_number_of_segments()<1)
         {
             momap::log()->info("Discarding plan, invalid piecewise polynomial.");

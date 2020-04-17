@@ -1,0 +1,17 @@
+package lcmtypes;
+
+struct plan_exec_opts_t
+{
+    const int16_t DEFAULT=0, MOVE_UNTIL_STOP=1, RETRACT_FROM_STOP=2;
+}
+
+struct robot_spline_t {
+  int64_t utime;
+  string robot_name;
+  int32_t num_states;
+  drake.lcmt_piecewise_polynomial piecewise_polynomial;
+  int32_t dof;
+  lcmtypes.robot_joint robot_joints[dof];
+  bot_core.position_3d_t cartesian_goal;
+  int16_t exec_opt;
+}

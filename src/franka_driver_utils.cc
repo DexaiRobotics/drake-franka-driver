@@ -1,4 +1,4 @@
-/// @file franka_driver_utilsils.cc
+/// @file franka_driver_utils.cc
 
 #include "franka_driver_utils.h"
 
@@ -6,40 +6,11 @@
 
 #include <bits/types/struct_timeval.h>  // for timeval
 #include <cstddef>                      // for NULL
-#include <sys/time.h>                   // gettimeofday()
+#include <sys/time.h>                   // for gettimeofday()
 
-using namespace franka_driver;
+namespace utils {
 
-// TODO: @dmsj - make this call ConvertToLcmStatus()
-static void franka_driver::AssignToLcmStatus(
-    franka::RobotState& robot_state, drake::lcmt_iiwa_status& robot_status) {
-  int num_joints = robot_state.q.size();
-  struct timeval tv;
-  gettimeofday(&tv, NULL);
-  // TODO: @dmsj store both timeofday and franka_time_
-  // int64_t(1000.0 * robot_state.time.toMSec()):
-  robot_status.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
-  robot_status.num_joints = num_joints;
-  // q:
-  robot_status.joint_position_measured.assign(std::begin(robot_state.q),
-                                              std::end(robot_state.q));
-  // q_d:
-  robot_status.joint_position_commanded.assign(std::begin(robot_state.q_d),
-                                               std::end(robot_state.q_d));
-  robot_status.joint_position_ipo.resize(num_joints, 0);
-  // dq:
-  robot_status.joint_velocity_estimated.assign(std::begin(robot_state.dq),
-                                               std::end(robot_state.dq));
-  // tau_J:
-  robot_status.joint_torque_measured.assign(std::begin(robot_state.tau_J),
-                                            std::end(robot_state.tau_J));
-  // tau_J_d:
-  robot_status.joint_torque_commanded.assign(std::begin(robot_state.tau_J_d),
-                                             std::end(robot_state.tau_J_d));
-  robot_status.joint_torque_external.resize(num_joints, 0);
-}
-
-drake::lcmt_iiwa_status franka_driver::ConvertToLcmStatus(
+drake::lcmt_iiwa_status ConvertToLcmStatus(
     franka::RobotState& robot_state) {
   drake::lcmt_iiwa_status robot_status{};
   int num_joints = robot_state.q.size();
@@ -61,7 +32,7 @@ drake::lcmt_iiwa_status franka_driver::ConvertToLcmStatus(
   return robot_status;
 }
 
-std::string franka_driver::RobotModeToString(franka::RobotMode mode) {
+std::string RobotModeToString(franka::RobotMode mode) {
   std::string mode_string;
   switch (mode) {
     case franka::RobotMode::kOther:
@@ -89,7 +60,7 @@ std::string franka_driver::RobotModeToString(franka::RobotMode mode) {
   return mode_string;
 }
 
-std::string franka_driver::RobotStatusToString(RobotStatus status) {
+std::string RobotStatusToString(RobotStatus status) {
   std::string status_string;
   switch (status) {
     case RobotStatus::Uninitialized:
@@ -114,9 +85,11 @@ std::string franka_driver::RobotStatusToString(RobotStatus status) {
   return status_string;
 }
 
-std::array<double, 7> franka_driver::EigenToArray(
+std::array<double, 7> EigenToArray(
     const Eigen::VectorXd& input) {
   std::array<double, 7> output = {
       {input[0], input[1], input[2], input[3], input[4], input[5], input[6]}};
   return output;
 }
+
+}  // namespace utils

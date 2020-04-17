@@ -1,13 +1,20 @@
 cmake_minimum_required(VERSION 3.14)
 project(drake-franka-driver)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Different compiler flags for Mac and Linux:
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-register -Wextra -Wreturn-type")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=1")
+endif()
+message("CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS})
+message("CMAKE_CXX_COMPILER: " ${CMAKE_CXX_COMPILER})
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-
-# SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 
@@ -35,35 +42,8 @@ message(STATUS "DRAKE_BUILD_DIR: ${DRAKE_BUILD_DIR}")
 set(FRANKA_BUILD_DIR "${CMAKE_SOURCE_DIR}/externals/libfranka/build")
 message(STATUS "FRANKA_BUILD_DIR: ${FRANKA_BUILD_DIR}")
 
-
-# Figure out where dracula can be found
-if (($ENV{CIRCLECI} MATCHES "true") )
-    get_filename_component(DEXAI_SRC_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
-    set(ENV{DEXAI_SRC} ${DEXAI_SRC_DIR})
-elseif(NOT DEFINED ENV{DEXAI_SRC})
-    message(STATUS "NOTE: The environment variable DEXAI_SRC is not defined")
-    message(STATUS "NOTE: setting DEXAI_SRC to /src")
-    set(ENV{DEXAI_SRC} /src)
-endif()
-message(STATUS "DEXAI_SRC: $ENV{DEXAI_SRC}")
-set(DRACULA_SOURCE_PATH "$ENV{DEXAI_SRC}/dracula")
-message(STATUS "DRACULA_SOURCE_PATH: ${DRACULA_SOURCE_PATH}")
-set(DRACULA_BUILD_PATH "${DRACULA_SOURCE_PATH}/build")
-message(STATUS "DRACULA_BUILD_PATH: ${DRACULA_BUILD_PATH}")
-set(DRACULA_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/dracula/include")
-message(STATUS "DRACULA_INCLUDE_DIR: ${DRACULA_INCLUDE_DIR}")
-set(FILESYSTEM_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/filesystem/include")
-set(JSON_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/json/include")
-
-# Set Dracula Libraries
-if (UNIX AND NOT APPLE)
-    set(DRACULA_LIBRARIES "${DRACULA_BUILD_PATH}/dracula/libdracula.so")
-elseif (APPLE)
-    message ("MAC OS X")
-    set(DRACULA_LIBRARIES "${DRACULA_BUILD_PATH}/dracula/libdracula.dylib")
-endif ()
-
-set(CTPL_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/CTPL")
+set(FILESYSTEM_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/externals/filesystem/include")
+message(STATUS "FILESYSTEM_INCLUDE_DIR: ${FILESYSTEM_INCLUDE_DIR}")
 
 #LOCAL_PYTHON=`which python`
 #export LOCAL_PYTHON_PATH=`dirname $LOCAL_PYTHON`
@@ -85,10 +65,10 @@ list(APPEND CMAKE_PREFIX_PATH ${FRANKA_BUILD_DIR})
 
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
+find_package(Yaml MODULE REQUIRED COMPONENTS shared)
 
 message(STATUS "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
 message(STATUS "Franka_LIBRARIES: ${Franka_LIBRARIES}")
-
 
 find_package(lcm REQUIRED)
 find_package(gflags MODULE REQUIRED COMPONENTS shared)
@@ -105,16 +85,26 @@ message(STATUS "Python3_NumPy_INCLUDE_DIRS: ${Python3_NumPy_INCLUDE_DIRS}")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
+# message("Setting SPDLOG_INCLUDE_DIR; environment:" $ENV{SPDLOG_INCLUDE_DIR})
+if (DEFINED ENV{SPDLOG_INCLUDE_DIR})
+    set(SPDLOG_INCLUDE_DIR $ENV{SPDLOG_INCLUDE_DIR})
+    message(STATUS "SPDLOG_INCLUDE_DIR variable taken from environment: " ${SPDLOG_INCLUDE_DIR})
+else()
+    set(SPDLOG_INCLUDE_DIR /opt/drake/include/spdlog)
+    message(STATUS "SPDLOG_INCLUDE_DIR variable defaulted in CMakeList: " ${SPDLOG_INCLUDE_DIR})
+endif()
+# message(STATUS "SPDLOG_INCLUDE_DIR variable used by cmake: " ${SPDLOG_INCLUDE_DIR})
+
+
 # add include dir for Franka headers
 include_directories(
     include
-    ${DRACULA_INCLUDE_DIR}
+    ${SPDLOG_INCLUDE_DIR}
+    ${YAML_INCLUDES}
     ${FILESYSTEM_INCLUDE_DIR}
-    ${JSON_INCLUDE_DIR}
     ${Franka_INCLUDE_DIRS}
     ${Python3_INCLUDE_DIRS}
     ${Python3_NumPy_INCLUDE_DIRS}
-    ${CTPL_INCLUDE_DIR}
 )
 
 
@@ -127,6 +117,15 @@ add_executable(${driver_name}
     src/communication_interface.cc
     src/franka_driver_utils.cc
     src/examples_common.cpp
+    src/util_conv.cc
+    src/util_io.cc
+    src/util_math.cc
+    src/util_std.cc
+    src/util_string.cc
+    src/robot_parameters.cc
+    src/constraint_solver.cc
+    src/momap_log.cc
+    src/polynomial_encode_decode.cc
 )
 
 set(test_name send_stop)
@@ -144,8 +143,8 @@ target_link_libraries(${driver_name}
     ${LCM_NAMESPACE}lcm
     gflags
     drake::drake
+    yaml-cpp
     Threads::Threads
-    ${DRACULA_LIBRARIES}
     ${Python3_LIBRARIES}
     fcl
 )

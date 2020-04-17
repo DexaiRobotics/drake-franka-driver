@@ -12,42 +12,40 @@
 #include <cstdint>             // for int64_t
 #include <string>              // for string
 
-namespace franka_driver {
+namespace utils {
 
-enum class RobotStatus {
-  Uninitialized,
-  Running,
-  Pausing,
-  Paused,
-  Unpausing,
-  Reversing
-};
+    // Enums for Defining Status
+    enum class RobotStatus {
+      Uninitialized,
+      Running,
+      Pausing,
+      Paused,
+      Unpausing,
+      Reversing
+    };
 
-template <typename T, std::size_t SIZE>
-std::vector<T> ArrayToVector(const std::array<T, SIZE>& a) {
-  std::vector<T> v(a.begin(), a.end());
-  return v;
-}
+    // Status Conversions
+    drake::lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState& robot_state);
 
-template <typename T, std::size_t SIZE>
-void VectorToArray(const std::vector<T>& v, std::array<T, SIZE>& a) {
-  for (int i = 0; i < SIZE; i++) {
-    a[i] = v[i];
-  }
-}
+    std::string RobotModeToString(franka::RobotMode mode);
 
-// TODO: @dmsj - make this call ConvertToLcmStatus()
-static void AssignToLcmStatus(franka::RobotState& robot_state,
-                              drake::lcmt_iiwa_status& robot_status);
+    std::string RobotStatusToString(RobotStatus status);
 
-drake::lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState& robot_state);
+    // Vector Conversions:
+    template <typename T, std::size_t SIZE>
+    std::vector<T> ArrayToVector(const std::array<T, SIZE>& a) {
+      std::vector<T> v(a.begin(), a.end());
+      return v;
+    }
 
-// void ResizeStatusMessage(drake::lcmt_iiwa_status& lcm_status, int dof);
+    template <typename T, std::size_t SIZE>
+    void VectorToArray(const std::vector<T>& v, std::array<T, SIZE>& a) {
+      for (int i = 0; i < SIZE; i++) {
+        a[i] = v[i];
+      }
+    }
 
-std::string RobotModeToString(franka::RobotMode mode);
+    std::array<double, 7> EigenToArray(const Eigen::VectorXd& input);
 
-std::string RobotStatusToString(RobotStatus status);
+}  // namespace utils
 
-std::array<double, 7> EigenToArray(const Eigen::VectorXd& input);
-
-}  // namespace franka_driver

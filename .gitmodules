@@ -4,3 +4,6 @@
 [submodule "dexai_mailmap"]
 	path = dexai_mailmap
 	url = git@github.com:DexaiRobotics/dexai_mailmap.git
+[submodule "externals/filesystem"]
+	path = externals/filesystem
+	url = https://github.com/gulrak/filesystem.git

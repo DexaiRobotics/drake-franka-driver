@@ -14,20 +14,20 @@
 
 #include "communication_interface.h"
 
-#include "drac_util_io.h"  // for get_current_utime
-#include "drake/lcmt_iiwa_status.hpp"
-#include "franka_driver_utils.h"     // ConvertToLcmStatus
-#include "robot_msgs/pause_cmd.hpp"  // for pause_cmd
-#include "robot_msgs/trigger_t.hpp"  // for trigger_t
-#include "trajectory_solver.h"       // for TrajectorySolver
+#include "util_io.h"                  // for get_current_utime
+// #include "drake/lcmt_iiwa_status.hpp"
+#include "franka_driver_utils.h"      // ConvertToLcmStatus
+#include "robot_msgs/pause_cmd.hpp"   // for pause_cmd
+#include "robot_msgs/trigger_t.hpp"   // for trigger_t
+// following is deprecated, see: https://github.com/DexaiRobotics/drake-franka-driver/issues/54
+#include "polynomial_encode_decode.h" // for decodePiecewisePolynomial
 
 #include <chrono>  // for steady_clock, for duration
 
 using namespace franka_driver;
-namespace dru = dracula_utils;
 
 CommunicationInterface::CommunicationInterface(
-    const parameters::Parameters params, double lcm_publish_rate)
+    const RobotParameters params, double lcm_publish_rate)
     : params_(params),
       lcm_(params_.lcm_url),
       lcm_publish_rate_(lcm_publish_rate) {
@@ -162,7 +162,7 @@ void CommunicationInterface::PublishPlanComplete(
 
 void CommunicationInterface::PublishDriverStatus(
     bool success, std::string driver_status_string) {
-  PublishTriggerToChannel(dru::get_current_utime(), lcm_driver_status_channel_,
+  PublishTriggerToChannel(utils::get_current_utime(), lcm_driver_status_channel_,
                           success, driver_status_string);
 }
 
@@ -203,7 +203,7 @@ void CommunicationInterface::PublishRobotStatus() {
   std::unique_lock<std::mutex> lock(robot_data_mutex_);
   if (robot_data_.has_robot_data_) {
     drake::lcmt_iiwa_status franka_status =
-        ConvertToLcmStatus(robot_data_.robot_state);
+        utils::ConvertToLcmStatus(robot_data_.robot_state);
     // publish data over lcm
     robot_data_.has_robot_data_ = false;
     lock.unlock();
@@ -215,7 +215,7 @@ void CommunicationInterface::PublishRobotStatus() {
 
 void CommunicationInterface::PublishPauseStatus() {
   robot_msgs::trigger_t msg;
-  msg.utime = dru::get_current_utime();
+  msg.utime = utils::get_current_utime();
   std::unique_lock<std::mutex> lock(pause_mutex_);
   msg.success = pause_data_.paused_;
   msg.message = "";
@@ -248,7 +248,7 @@ bool CommunicationInterface::CanReceiveCommands() {
   switch (current_mode) {
     case franka::RobotMode::kOther:
       momap::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          RobotModeToString(current_mode));
+                          utils::RobotModeToString(current_mode));
       return false;
     case franka::RobotMode::kIdle:
       return true;
@@ -257,7 +257,7 @@ bool CommunicationInterface::CanReceiveCommands() {
           "CanReceiveCommands: "
           "Allowing to receive commands while in {}"
           ", but this needs more testing!",
-          RobotModeToString(current_mode));
+          utils::RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kGuiding:
       momap::log()->error("CanReceiveCommands: Wrong mode!");
@@ -267,15 +267,15 @@ bool CommunicationInterface::CanReceiveCommands() {
           "CanReceiveCommands: "
           "Allowing to receive commands while in {},"
           " but this needs more testing!",
-          RobotModeToString(current_mode));
+          utils::RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kUserStopped:
       momap::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          RobotModeToString(current_mode));
+                          utils::RobotModeToString(current_mode));
       return false;
     case franka::RobotMode::kAutomaticErrorRecovery:
       momap::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          RobotModeToString(current_mode));
+                          utils::RobotModeToString(current_mode));
       return false;
     default:
       momap::log()->error("CanReceiveCommands: Mode unknown!");
@@ -318,7 +318,7 @@ void CommunicationInterface::HandlePlan(
       robot_spline->utime);
 
   PPType piecewise_polynomial =
-      TrajectorySolver::RobotSplineTToPPType(*robot_spline);
+    decodePiecewisePolynomial(robot_spline->piecewise_polynomial);
 
   if (piecewise_polynomial.get_number_of_segments() < 1) {
     momap::log()->error(
@@ -342,10 +342,10 @@ void CommunicationInterface::HandlePlan(
 
   auto q = this->GetRobotState().q;
   // TODO @rkk: move this check to franka plan runner...
-  Eigen::VectorXd q_eigen = dru::v_to_e(ArrayToVector(q));
+  Eigen::VectorXd q_eigen = utils::v_to_e(utils::ArrayToVector(q));
 
   auto max_angular_distance =
-      dru::max_angular_distance(commanded_start, q_eigen);
+      utils::max_angular_distance(commanded_start, q_eigen);
   if (max_angular_distance > params_.kMediumJointDistance) {
     // discard the plan if we are too far away from current robot start
     Eigen::VectorXd joint_delta = q_eigen - commanded_start;
