@@ -1,7 +1,7 @@
 #! /bin/bash
 #set -euxo
 
-config=$HOME/catkin_ws/src/salad_bar_description/franka.yaml
+config=franka.yaml
 
 echo "choose config file: $config"
 

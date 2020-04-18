@@ -1,0 +1,69 @@
+parameters:
+  kLooseJointDistance: 0.25
+  kMediumJointDistance: 0.125
+  kTightJointDistance: 0.01
+  lcm_url: udpm://239.255.76.67:7667?ttl=2
+  robot_ip: '172.16.0.2'
+  # limits taken from https://frankaemika.github.io/docs/control_parameters.html#constants
+  robot_high_joint_limits: # rad
+      - 2.8973
+      - 1.7628
+      - 2.8973
+      - -0.0698
+      - 2.8973
+      - 3.7525
+      - 2.8973
+  robot_low_joint_limits: # rad
+      - -2.8973
+      - -1.7628
+      - -2.8973
+      - -3.0718
+      - -2.8973
+      - -0.0175
+      - -2.8973
+  robot_max_velocities: # rad/s
+      - 2.1750
+      - 2.1750
+      - 2.1750
+      - 2.1750
+      - 2.6100
+      - 2.6100
+      - 2.6100
+  robot_max_accelerations: # rad/s^2
+      - 15
+      - 7.5
+      - 10
+      - 12.5
+      - 15
+      - 20
+      - 20
+  robot_max_jerks: # rad/s^3
+      - 7500
+      - 3750
+      - 5000
+      - 6250
+      - 7500
+      - 10000
+      - 10000
+  robot_max_torques: # N*m
+      - 87
+      - 87
+      - 87
+      - 87
+      - 12
+      - 12
+      - 12
+  robot_max_torques_dot: # N*m/s
+      - 1000
+      - 1000
+      - 1000
+      - 1000
+      - 1000
+      - 1000
+      - 1000
+  stop_epsilon: 0.015 # used to calculate when robot counts as "stopped"
+  stop_margin: 0.6    # how long robot sleeps before ready to recieve continue 
+  simulated: false
+  urdf: franka_robot_multibody_collision.urdf
+  urdf_dir: ''
+  world_frame: base_link

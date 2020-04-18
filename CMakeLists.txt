@@ -4,15 +4,6 @@ project(drake-franka-driver)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Different compiler flags for Mac and Linux:
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-register -Wextra -Wreturn-type")
-else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_GLIBCXX_USE_CXX11_ABI=1")
-endif()
-message("CMAKE_CXX_FLAGS: " ${CMAKE_CXX_FLAGS})
-message("CMAKE_CXX_COMPILER: " ${CMAKE_CXX_COMPILER})
-
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
@@ -115,12 +106,10 @@ add_executable(${driver_name}
     src/franka_driver.cc
     src/franka_plan_runner.cc
     src/communication_interface.cc
-    src/franka_driver_utils.cc
     src/examples_common.cpp
     src/util_conv.cc
     src/util_io.cc
     src/util_math.cc
-    src/util_std.cc
     src/util_string.cc
     src/robot_parameters.cc
     src/constraint_solver.cc
