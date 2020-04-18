@@ -29,6 +29,6 @@ jobs:
       - run:
           name: build and test
           command: |
-            echo "In build and test: build pre-reqs . . ."
+            echo "In build and test: building project . . ."
             cd ~/project
             ./setup.sh 2 1 1 0 ### 3 => make -j 2; 1 => build tests; 1 => run ctest; 0 => not debug
