@@ -2,7 +2,7 @@
 /// Namespaced utilities for file I/O and time (FIOT)
 #pragma once
 
-#include "momap_log.h"
+#include "dexai_log.h"
 
 #include <fstream>
 #include <iostream>
@@ -20,7 +20,7 @@ namespace fs = ghc::filesystem;
 
 namespace utils {
 
-    using momap::log;
+    using dexai::log;
 
     /// Three-valued answer logic.
     namespace yes_no_maybe {    // Is this the most idiomatic or "natural" order?
@@ -33,7 +33,7 @@ namespace utils {
 
     extern const char *TIMESTAMP_FORMAT;
 
-    /// Timestamp used in log_momap (momap::log) directory names,
+    /// Timestamp used in log_dexai (dexai::log) directory names,
     /// in SG:ActionIndex/IndexedAction result maps, and other places.
     /// Gets the current localtime and
     /// returns it as a datetime string with YYYYMMDDThhmmss format.

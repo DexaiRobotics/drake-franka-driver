@@ -2,12 +2,12 @@
 #include "util_conv.h"
 #include "util_math.h"
 
-#include "momap_log.h"
+#include "dexai_log.h"
 #include <sys/time.h>                   // for gettimeofday()
 
 namespace utils {
 
-    using momap::log;
+    using dexai::log;
 
     // Convenience Functions for converting between lcm, STL, and Eigen types
 
