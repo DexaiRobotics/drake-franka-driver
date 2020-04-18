@@ -18,8 +18,6 @@
 #include <ghc/filesystem.hpp>
 namespace fs = ghc::filesystem;
 
-namespace parameters { class Parameters; class WorkstationParameters; }
-
 namespace utils {
 
     using momap::log;

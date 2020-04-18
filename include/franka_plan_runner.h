@@ -18,7 +18,7 @@
 #include "franka/duration.h"       // for franka::Duration
 #include "franka/robot.h"          // for franka::Robot
 #include "franka/robot_state.h"    // for franka::RobotState
-#include "franka_driver_utils.h"   // for RobotStatus
+#include "util_conv.h"             // for RobotStatus
 #include "robot_parameters.h"      // for RobotParameters
 
 #include <Eigen/Dense>                  // for Eigen::VectorXd

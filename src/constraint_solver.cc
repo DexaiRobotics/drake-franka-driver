@@ -12,7 +12,6 @@
 #include <limits>
 
 using drake::manipulation::planner::DifferentialInverseKinematicsParameters;
-using drake::math::RotationMatrixd;
 using momap::log;
 
 using drake::geometry::GeometrySet;
@@ -206,10 +205,6 @@ namespace franka_driver {
             throw;
         }
 
-        // ToDo: remove this instance
-        ik_options_ = new IKoptions(GetRigidBodyTreePtr());
-        ik_options_->setMajorIterationsLimit(kDefaultMajorIterations);
-
         log()->trace("CS:ConstraintSolver: Number of positions: {}"
                         , GetRigidBodyTreeRef().get_num_positions());
         log()->trace("CS:ConstraintSolver: Number of bodies: {}"
@@ -237,7 +232,6 @@ namespace franka_driver {
     {
         log()->trace("~ConstraintSolver: BEG...");
         unlink("snopt.out");
-        delete ik_options_;
         log()->trace("~ConstraintSolver: ...END");
     }
 

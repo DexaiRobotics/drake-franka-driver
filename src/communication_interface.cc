@@ -16,7 +16,7 @@
 
 #include "util_io.h"                  // for get_current_utime
 // #include "drake/lcmt_iiwa_status.hpp"
-#include "franka_driver_utils.h"      // ConvertToLcmStatus
+#include "util_conv.h"                // ConvertToLcmStatus
 #include "robot_msgs/pause_cmd.hpp"   // for pause_cmd
 #include "robot_msgs/trigger_t.hpp"   // for trigger_t
 // following is deprecated, see: https://github.com/DexaiRobotics/drake-franka-driver/issues/54
