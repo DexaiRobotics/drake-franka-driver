@@ -10,9 +10,9 @@ namespace dru = utils;
 namespace franka_driver {
 
 int do_main(std::string param_yaml = "franka_test.yaml") {
-  momap::create_log("franka_driver");
+  dexai::create_log("franka_driver");
   int verbose = 0;
-  momap::log()->info("Loading parameters: {}", param_yaml);
+  dexai::log()->info("Loading parameters: {}", param_yaml);
   RobotParameters params =
       loadYamlParameters(param_yaml, verbose);
   FrankaPlanRunner frankaPlanRunner(params);
@@ -37,7 +37,7 @@ int main(int argc, char** argv) {
   }
 
   if (argc == 1) {
-    momap::log()->info(
+    dexai::log()->info(
         "Loading default parameters with sim robot: franka_test.yaml");
     return franka_driver::do_main();
   } else {

@@ -1,7 +1,7 @@
 /// @file: robot_parameters.h
 #pragma once
 
-#include "momap_log.h"
+#include "dexai_log.h"
 #include "util_io.h"
 #include "util_math.h"
 #include "util_string.h"
@@ -12,7 +12,7 @@
 
 namespace franka_driver {
 
-    using momap::log;
+    using dexai::log;
 
     /// Log a failure to obtain a value for the given key.
     /// Re-maps verbosity to log levels.

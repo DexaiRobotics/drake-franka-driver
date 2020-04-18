@@ -1,6 +1,6 @@
 ///@file: util_math.cc
 #include "util_math.h"
-#include "momap_log.h"
+#include "dexai_log.h"
 
 using drake::trajectories::PiecewisePolynomial;
 

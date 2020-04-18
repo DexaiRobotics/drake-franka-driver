@@ -1,6 +1,6 @@
 // @file: util_io.cc
 #include "util_io.h"
-#include "momap_log.h"
+#include "dexai_log.h"
 
 #include <cmath>
 #include <cstdint>
@@ -50,7 +50,7 @@ namespace utils {
         return false;
     }
 
-    // Timestamp used in log_momap (momap::log) directory names,
+    // Timestamp used in log_dexai (dexai::log) directory names,
     // in SG:ActionIndex/IndexedAction result maps, and other places.
     // The epoch_seconds argument is expected to ba a count of seconds since 1970 (Unix time).
     std::string date_time_string(time_t epoch_seconds)

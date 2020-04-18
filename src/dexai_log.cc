@@ -1,5 +1,5 @@
-// @file  momap/log_momap.cc
-#include "momap_log.h"
+// @file  dexai/log_dexai.cc
+#include "dexai_log.h"
 #include "utils.h"
 #include <iostream>
 
@@ -9,7 +9,7 @@ namespace {
   static slogger *d_logger = nullptr;
 }
 
-unsigned MomapLogger::log_id_size(spdlog::level::level_enum ll_enum)
+unsigned DexaiLogger::log_id_size(spdlog::level::level_enum ll_enum)
 {
     switch (ll_enum) {
         case spdlog::level::warn:
@@ -25,7 +25,7 @@ unsigned MomapLogger::log_id_size(spdlog::level::level_enum ll_enum)
 }
 
 
-namespace momap {
+namespace dexai {
 
     // Returns true IFF the logger object is NULL,
     // meaning that either is has not yet been created, or it was nullified.
@@ -35,40 +35,40 @@ namespace momap {
     {
         if (is_log_null()) {
             if (warn_if_null) {
-                std::cerr << "WARNING: Call to uninitialized momap::logging::logger log()" << std::endl;
-                std::cerr << "WARNING: Using all defaults in momap::logging::logger log()" << std::endl;
+                std::cerr << "WARNING: Call to uninitialized dexai::logging::logger log()" << std::endl;
+                std::cerr << "WARNING: Using all defaults in dexai::logging::logger log()" << std::endl;
             }
             create_log();
         }
-        assert(s_logger && "FATAL: s_logger still not set after calling momap::create_log()");
+        assert(s_logger && "FATAL: s_logger still not set after calling dexai::create_log()");
         return s_logger.get();
     }
 
-    /// Convenience function to get the "current" logger's log directory.  @see log_momap.h
+    /// Convenience function to get the "current" logger's log directory.  @see log_dexai.h
     std::string log_dir()
     {
         try {
-            MomapLogger *momap_logger = dynamic_cast<MomapLogger *>(momap::log());
-            return momap_logger == nullptr ? "" : momap_logger->log_dir();
+            DexaiLogger *dexai_logger = dynamic_cast<DexaiLogger *>(dexai::log());
+            return dexai_logger == nullptr ? "" : dexai_logger->log_dir();
         } catch(const std::exception& ex) {
-            momap::log()->warn("Error in momap::log_dir: {}", ex.what());
+            dexai::log()->warn("Error in dexai::log_dir: {}", ex.what());
         }
         return "";
     }
 
-    // Convenience function to get the "current" logger's log message ID size.  @see log_momap.h
+    // Convenience function to get the "current" logger's log message ID size.  @see log_dexai.h
     // Example usage:
-    // log()->error("This is a test of momap::MomapLogger::log_id_size:\n{:>{}}"
+    // log()->error("This is a test of dexai::DexaiLogger::log_id_size:\n{:>{}}"
     //              "This line shall line up with the line up one line.",
-    //              "", momap::log_id_size()
+    //              "", dexai::log_id_size()
     // );
     unsigned log_id_size(spdlog::level::level_enum ll_enum)
     {
         try {
-            MomapLogger *momap_logger = dynamic_cast<MomapLogger *>(momap::log(ll_enum));
-            return momap_logger == nullptr ? 42 : momap_logger->log_id_size();
+            DexaiLogger *dexai_logger = dynamic_cast<DexaiLogger *>(dexai::log(ll_enum));
+            return dexai_logger == nullptr ? 42 : dexai_logger->log_id_size();
         } catch(const std::exception& ex) {
-            momap::log()->debug("Error in momap::log_id_size({}): {}", (unsigned)ll_enum, ex.what());
+            dexai::log()->debug("Error in dexai::log_id_size({}): {}", (unsigned)ll_enum, ex.what());
         }
         return 42;
     }
@@ -81,7 +81,7 @@ namespace momap {
                    , bool create_once
     ) {
         if (s_logger != nullptr && create_once) {
-            s_logger->warn("momap::create_log: s_logger already created!");
+            s_logger->warn("dexai::create_log: s_logger already created!");
             return false;
         }
         std::string program = program_in;
@@ -103,13 +103,13 @@ namespace momap {
         std::string date_time_string = utils::date_time_string();
         got_base = utils::sub_dir_path(log_dir, log_dir, date_string);
         got_base = utils::sub_dir_path(log_dir, log_dir, date_time_string);
-        // NOTE: We cannot call drake::log or momap::log here; they're uninitialized.
+        // NOTE: We cannot call drake::log or dexai::log here; they're uninitialized.
         // TODO: avoid paths like "here/./now" ??
         // std::cerr << "::::::::::: sub_dir_path(log_dir, " << program << ") gave Log Base Dir (LBD): " << log_dir << std::endl;
         if (got_base) {
             // NOTE: Caution: Calling log here may stackoverflow.
         } else {
-            drake::log()->error("::::::::::: momap::create_log: fatal error -- no base directory for logs!");
+            drake::log()->error("::::::::::: dexai::create_log: fatal error -- no base directory for logs!");
             return false;
         }
 
@@ -123,15 +123,15 @@ namespace momap {
         std::string log_file_path = log_dir + "/" + log_file_name;
         sinks.push_back(std::make_shared<spdlog::sinks::basic_file_sink_mt>(log_file_path));
 
-        // NOTE: We don't necessarily need a MomapLogger; we could just use one spd::logger.
-        std::shared_ptr<MomapLogger> logger = std::make_shared<MomapLogger>(prefix, log_dir, begin(sinks), end(sinks));
+        // NOTE: We don't necessarily need a DexaiLogger; we could just use one spd::logger.
+        std::shared_ptr<DexaiLogger> logger = std::make_shared<DexaiLogger>(prefix, log_dir, begin(sinks), end(sinks));
         spdlog::register_logger(logger);   //register it if you need to access it globally
         logger->set_level(spdlog::level::info);
         s_logger = logger;
         return true;
     }
 
-}   // namespace momap
+}   // namespace dexai
 
 
 #if OVERRIDE_DRAKE_LOG
@@ -145,15 +145,15 @@ namespace drake {
 
         // TODO: Would prefer to assert rather than conpensate for failing
         // to initialize the logger, but then every executable that includes
-        // log_momap.h with OVERRIDE_DRAKE_LOG defined as truthy must either call
-        // momap::create_log or work around it.
-        // assert(s_logger && "s_logger not set; call momap::create_log() first!");
-        if (momap::is_log_null()) {
+        // log_dexai.h with OVERRIDE_DRAKE_LOG defined as truthy must either call
+        // dexai::create_log or work around it.
+        // assert(s_logger && "s_logger not set; call dexai::create_log() first!");
+        if (dexai::is_log_null()) {
             std::cerr << "WARNING: Call to uninitialized drake::logging::logger log()" << std::endl;
-            momap::create_log();
+            dexai::create_log();
             std::cerr << "WARNING: Used all defaults for drake::logging::logger log()" << std::endl;
         }
-        assert(s_logger && "FATAL: s_logger still not set after calling momap::create_log()");
+        assert(s_logger && "FATAL: s_logger still not set after calling dexai::create_log()");
         return s_logger.get();
     }
 }   // namespace drake

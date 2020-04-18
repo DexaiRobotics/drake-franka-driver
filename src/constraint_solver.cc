@@ -12,7 +12,7 @@
 #include <limits>
 
 using drake::manipulation::planner::DifferentialInverseKinematicsParameters;
-using momap::log;
+using dexai::log;
 
 using drake::geometry::GeometrySet;
 using drake::geometry::QueryObject;
@@ -58,14 +58,14 @@ namespace franka_driver {
         // attach plant as source for the scenegraph
         robots_plant_->RegisterAsSourceForSceneGraph(scene_graph_);
 
-        momap::log()->debug("CS::ConstraintSolver: "
+        dexai::log()->debug("CS::ConstraintSolver: "
                             "Creating robot model parser with URDF {} \n"
                             "using root link name in URDF: {}"
                         , robot_urdf_filepath, robot_root_link_in_urdf);
 
         parser_ = std::make_unique<Parser>(robots_plant_, scene_graph_);
 
-        momap::log()->info("Name of world frame before adding model: {}", robots_plant_->world_frame().name());
+        dexai::log()->info("Name of world frame before adding model: {}", robots_plant_->world_frame().name());
 
         try{
         // Parse the robot's urdf
@@ -73,7 +73,7 @@ namespace franka_driver {
             robot_urdf_filepath, "robot_arm");
         }
         catch(std::exception const & err) {
-        momap::log()->error("CS:ConstraintSolver: Error: Exception in CTOR: \n"
+        dexai::log()->error("CS:ConstraintSolver: Error: Exception in CTOR: \n"
                             "Problem parsing this robot's urdf file: {}\n"
                             "Exception message from Drake Multibody tree is: {}"
                             , robot_urdf_filepath,  err.what() );
@@ -90,7 +90,7 @@ namespace franka_driver {
         robot_bodies.push_back(&robots_plant_->get_body(robot_body_indices[k]));
         }
 
-        momap::log()->info("CS:ctor: Trying to weld robot frame: {} ... \n"
+        dexai::log()->info("CS:ctor: Trying to weld robot frame: {} ... \n"
                             "... to world frame: {}"
                         , robot_root_link_in_urdf, robots_plant_->world_frame().name());
         
@@ -105,7 +105,7 @@ namespace franka_driver {
         //   robots_plant_->WeldFrames(robots_plant_->world_frame(), child_frame, X_WorldToRobot2);
         }
         catch(std::exception const & err) {
-            momap::log()->error("CS:Error: Exception in dual robot collision ctor: \n"
+            dexai::log()->error("CS:Error: Exception in dual robot collision ctor: \n"
                                 "Problem parsing this robot's ROOT LINK named: {}\n"
                                 "Exception message from Drake Multibody tree is: {}"
                                 , robot_root_link_in_urdf,  err.what() );
@@ -124,7 +124,7 @@ namespace franka_driver {
         robots_plant_->Finalize();
         }
         catch(std::exception const & err) {
-        momap::log()->error("CS:Error: Exception in dual robot collision ctor: \n"
+        dexai::log()->error("CS:Error: Exception in dual robot collision ctor: \n"
                             "Problem finalizing this robot: {}\n"
                             "Exception message from Drake Multibody tree is: {}"
                             , err.what() );
@@ -134,7 +134,7 @@ namespace franka_driver {
         }
 
         robot_dof_ = robots_plant_->num_positions(robot_model_idx_);
-        momap::log()->info("CS::ConstraintSolver: robot_dof_: {}", robot_dof_);
+        dexai::log()->info("CS::ConstraintSolver: robot_dof_: {}", robot_dof_);
 
         // Register Geometry Sets for robot plants for the purpose of collision checking
         GeometrySet set_robot = robots_plant_->CollectRegisteredGeometries(
@@ -240,7 +240,7 @@ namespace franka_driver {
     try {
         robots_plant_->SetPositions(plant_context_, robot_model_idx_, pos_robot);
     } catch (std::exception const& err) {
-        momap::log()->error(
+        dexai::log()->error(
             "ConstraintSolver::UpdateModel: "
             "failed with error {}. Robot reports conf: {}",
             err.what(), pos_robot.transpose());

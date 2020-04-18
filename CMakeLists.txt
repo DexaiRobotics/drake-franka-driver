@@ -113,7 +113,7 @@ add_executable(${driver_name}
     src/util_string.cc
     src/robot_parameters.cc
     src/constraint_solver.cc
-    src/momap_log.cc
+    src/dexai_log.cc
     src/polynomial_encode_decode.cc
 )
 
