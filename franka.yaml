@@ -1,4 +1,4 @@
-parameters:
+robot_parameters:
   kLooseJointDistance: 0.25
   kMediumJointDistance: 0.125
   kTightJointDistance: 0.01
@@ -67,3 +67,7 @@ parameters:
   urdf: franka_robot_multibody_collision.urdf
   urdf_dir: ''
   world_frame: base_link
+  gravity_vector:
+      - 0.0
+      - 0.0
+      - -1.0

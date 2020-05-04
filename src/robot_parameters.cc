@@ -147,7 +147,7 @@ namespace franka_driver {
         RobotParameters p;   // to be returned
         struct stat result;
         if (! utils::file_stat(yaml_full_path, result)) {
-            std::string error_msg = "P:loadYamlParameters: Unable to find parameters YAML("
+            std::string error_msg = "P:loadYamlParameters: Unable to find robot_parameters YAML("
                                   + yaml_full_path + ")";
             log()->error(error_msg);
             throw std::runtime_error(error_msg);
@@ -155,16 +155,16 @@ namespace franka_driver {
         }
 
         YAML::Node config = YAML::LoadFile(yaml_full_path);
-        if ( ! config["parameters"]) {
-            std::string error_msg = "P:loadYamlParameters: No parameters found in ("
+        if ( ! config["robot_parameters"]) {
+            std::string error_msg = "P:loadYamlParameters: No robot_parameters found in ("
                                   + yaml_full_path + ")";
             logger->error(error_msg);
             throw std::runtime_error(error_msg);
         }
-        int config_length = static_cast<int>(config["parameters"].size());
-        logger->debug("P:loadYamlParameters: parameters length: {}", config_length);
+        int config_length = static_cast<int>(config["robot_parameters"].size());
+        logger->debug("P:loadYamlParameters: robot_parameters length: {}", config_length);
 
-        YAML::Node param = config["parameters"];
+        YAML::Node param = config["robot_parameters"];
 
         std::string home_dir = utils::get_home_dir() + "/";
 
@@ -174,6 +174,7 @@ namespace franka_driver {
         try {
 
             // World Configuration
+            get_yaml_val_or_die(param, "gravity_vector", p.gravity_vector, yaml_full_path, verbose, exit_code);
             get_yaml_val_or_die(param, "world_frame", p.world_frame, yaml_full_path, verbose, exit_code);
 
             //// Geometric Configuration

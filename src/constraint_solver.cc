@@ -93,11 +93,11 @@ namespace franka_driver {
         dexai::log()->info("CS:ctor: Trying to weld robot frame: {} ... \n"
                             "... to world frame: {}"
                         , robot_root_link_in_urdf, robots_plant_->world_frame().name());
-        
+
         // // use translation and orientation parameters to place in world frame
         // RigidTransform<double> X_WorldToRobot( drake::math::RollPitchYaw<double>(urdf_offset_rpy)
         //                                      , urdf_offset_xyz);
-        
+
         try{
             // get child frame of urdf that is used as root
             auto& child_frame = robots_plant_->GetFrameByName(robot_root_link_in_urdf, robot_model_idx_);
@@ -115,7 +115,7 @@ namespace franka_driver {
         }
         // ... collision checking setup is done in regards to this robot
 
-        // make a copy of model before finalizing, copy can then be used to 
+        // make a copy of model before finalizing, copy can then be used to
         // make changes to the model later
         robots_plant_non_final_ = robots_plant_;
 
@@ -138,7 +138,7 @@ namespace franka_driver {
 
         // Register Geometry Sets for robot plants for the purpose of collision checking
         GeometrySet set_robot = robots_plant_->CollectRegisteredGeometries(
-        const_cast<const std::vector<const Body<double>*> &>(robot_bodies));
+          const_cast<const std::vector<const Body<double>*> &>(robot_bodies));
         // ToDo: Check if Collision Filter Groups work...
         // remove collisions within each set - do not check for collisions against robot itself
         scene_graph_->ExcludeCollisionsWithin(set_robot);

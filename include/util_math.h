@@ -51,4 +51,23 @@ namespace utils
         return (std::abs(a - b) <= rel_epsilon * *std::max_element(value_range, value_range + 3));
     }
 
+    /// TODO: change to use iterators so can handle more than just Eigen types.
+    /// NOTE: Container of type ContainerT should contain values of type ValueT.
+    /// template<typename ContainerT, typename ValueT>
+    /// bool VectorEpsEq(ContainerT a, ContainerT b, ValueT relTol =
+    ///         std::numeric_limits<ValueT>::epsilon()) {
+    template<typename T>
+    bool VectorEpsEq(T a, T b, double relTol = std::numeric_limits<double>::epsilon())
+    {
+        if (a.size() != b.size()) {
+            return false;
+        }
+        for (int i = 0; i < a.size(); i++) {
+            if (! EpsEq(double(a(i)), double(b(i)), relTol)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
 }   // namespace utils

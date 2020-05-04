@@ -140,6 +140,7 @@ namespace franka_driver {
         std::string yaml_source_full_path;
 
         // World Configuration
+        Eigen::Vector3d gravity_vector;
         std::string world_frame;
 
         // Geometric Configuration

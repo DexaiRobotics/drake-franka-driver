@@ -104,6 +104,18 @@ namespace utils {
         const char *val = std::getenv("HOME");
         return *val ? val : getpwuid(getuid())->pw_dir;
     }
+    
+    std::string get_cwd()
+    {
+        char buff[FILENAME_MAX];
+        char *cwd = getcwd( buff, FILENAME_MAX );
+        if (! cwd) {
+            char *error = strerror(errno);
+            log()->error( "Error in get_cwd from getcwd(): {}", error);
+            return "";
+        }
+        return buff;    // auto-converted
+    }
 
     // makes dirs recursively using path_str; returns 0 on success, negative int on error.
     // If path_str identifies an existing directory or file, this function does not change it.
@@ -153,6 +165,16 @@ namespace utils {
             return true;
         }
         return false;
+    }
+
+    time_t file_mod_time(const std::string& path)
+    {
+        time_t file_mod_time = 0;
+        struct stat result;
+        if (stat(path.c_str(), &result) == 0) {
+            file_mod_time = result.st_mtime;
+        }
+        return file_mod_time;
     }
 
     // Return the file name, stripped of any directory-like prefix.

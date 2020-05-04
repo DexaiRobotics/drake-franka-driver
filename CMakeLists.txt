@@ -87,8 +87,7 @@ endif()
 # message(STATUS "SPDLOG_INCLUDE_DIR variable used by cmake: " ${SPDLOG_INCLUDE_DIR})
 
 
-# add include dir for Franka headers
-include_directories(
+set(INCLUDES 
     include
     ${SPDLOG_INCLUDE_DIR}
     ${YAML_INCLUDES}
@@ -96,13 +95,16 @@ include_directories(
     ${Franka_INCLUDE_DIRS}
     ${Python3_INCLUDE_DIRS}
     ${Python3_NumPy_INCLUDE_DIRS}
+    ${GTEST_INCLUDE_DIRS}
+) 
+
+# add include dir for Franka headers
+include_directories(
+    ${INCLUDES}
 )
 
 
-# build the lcm driver that uses Franka Robot Interface (FRI)
-# add_definitions(-std=c++14)
-set(driver_name franka_driver)
-add_executable(${driver_name}
+set(SOURCES 
     src/franka_driver.cc
     src/franka_plan_runner.cc
     src/communication_interface.cc
@@ -117,6 +119,12 @@ add_executable(${driver_name}
     src/polynomial_encode_decode.cc
 )
 
+# build the lcm driver that uses Franka Robot Interface (FRI)
+# add_definitions(-std=c++14)
+set(driver_name franka_driver)
+add_executable(${driver_name} ${SOURCES}
+)
+
 set(test_name send_stop)
 add_executable(${test_name}
     src/send_stop.cc
@@ -126,8 +134,7 @@ target_link_libraries(${test_name}
     ${LCM_NAMESPACE}lcm
 )
 
-
-target_link_libraries(${driver_name}
+set(LINK_LIBRARIES 
     ${Franka_LIBRARIES}
     ${LCM_NAMESPACE}lcm
     gflags
@@ -136,6 +143,10 @@ target_link_libraries(${driver_name}
     Threads::Threads
     ${Python3_LIBRARIES}
     fcl
+)
+
+target_link_libraries(${driver_name} 
+    ${LINK_LIBRARIES}
 )
 
 # install the lcm driver
@@ -148,17 +159,58 @@ target_link_libraries(${driver_name}
 #-------------------
 # Unit Testing
 #-------------------
+
 enable_testing()
 
 set(GTEST_SRC_FILES
-    tests/test_test.cc
+    tests/test_franka_driver.cc
+    tests/test_util_conv.cc
+    tests/test_util_io.cc
+    tests/test_util_math.cc
+    tests/test_util_string.cc
+    tests/test_robot_parameters.cc
+    tests/test_constraint_solver.cc
+)
+
+set(TEST_INCLUDES 
+    include
+    ${SPDLOG_INCLUDE_DIR}
+    ${YAML_INCLUDES}
+    ${FILESYSTEM_INCLUDE_DIR}
+    ${GTEST_INCLUDE_DIRS}
+) 
+
+set(TEST_SOURCES 
+    src/util_conv.cc
+    src/util_io.cc
+    src/util_math.cc
+    src/util_string.cc
+    src/robot_parameters.cc
+    src/constraint_solver.cc
+    src/dexai_log.cc
+)
+
+set(TEST_LINK_LIBRARIES 
+    gtest 
+    gtest_main 
+    ${GTEST_BOTH_LIBRARIES}
+    ${CMAKE_THREAD_LIBS_INIT} 
+    gflags
+    drake::drake
+    yaml-cpp
 )
 
 foreach(_file ${GTEST_SRC_FILES})
     get_filename_component(_name ${_file} NAME_WE)
-    add_executable(${_name} ${_file})
-    target_link_libraries(${_name}
-    gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
+    include_directories(${TEST_INCLUDES})
+    add_executable(${_name} 
+        ${_file} 
+        ${TEST_SOURCES}
+    )
+    target_link_libraries(${_name} 
+
+        ${TEST_LINK_LIBRARIES}
+    )
     add_test(${_name} ${_name})
     set_tests_properties(${_name} PROPERTIES TIMEOUT 270)
 endforeach()

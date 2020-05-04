@@ -93,6 +93,8 @@ namespace utils {
     /// Get the current user's home directory path; result does not include any trailing slash.
     std::string get_home_dir();
 
+    std::string get_cwd();
+    
     // makes dirs recursively using path_str; returns 0 on success, negative int on error.
     /// If path_str idenfies an existing directory or file, this function does not change it.
     int make_dirs(const std::string& path_str);
@@ -107,6 +109,26 @@ namespace utils {
     /// Return the file name, stripped of any directory-like prefix.
     /// Uses filesystem::path::filename.
     fs::path file_name(const std::string& full_path);
+
+    time_t file_mod_time(const std::string& path);
+
+    template<typename TimeT>
+    TimeT expect_file_mod(const std::string& temp_file_path, TimeT max_seconds)
+    {
+        TimeT time_mod = file_mod_time(temp_file_path);
+        TimeT time_dif = time(NULL) - time_mod;
+        #if defined(ASSERT_TRUE) || defined(assertTrue) // inside a test?
+        if (max_seconds > 0) {
+            EXPECT_LE(time_dif, max_seconds);
+        }
+        #endif
+        if (time_dif > max_seconds) {
+            std::cerr << "    Checked file: " << temp_file_path
+                      << "    Seconds since file mod exceeds limit: "
+                      << time_dif << " > " << max_seconds << std::endl;
+        }
+        return time_dif;
+    }
 
     int64_t get_current_utime();
 
