@@ -558,11 +558,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // the current (desired) position of franka is the starting position:
     start_conf_franka_ = current_conf_franka;
 
-    const auto plan_end_time = plan_->end_time();
-    const auto plan_completion_fraction = min(1.0, max(0.0, franka_time_/plan_end_time));
-
     Eigen::VectorXd delta_start_to_end_plan =
-        plan_->value(plan_end_time) - start_conf_plan_;
+        plan_->value(plan_->end_time()) - start_conf_plan_;
 
     end_conf_franka_ = start_conf_franka_ + delta_start_to_end_plan;
     // TODO @rkk: move this print into another thread
@@ -592,6 +589,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         "controller...");
     return franka::MotionFinished(output_to_franka);
   }
+
+  const auto plan_end_time = plan_->end_time();
+  const auto plan_completion_fraction = min(1.0, max(0.0, franka_time_/plan_end_time));
 
   // read out plan for current franka time from plan:
   Eigen::VectorXd next_conf_plan = plan_->value(franka_time_);
