@@ -12,8 +12,6 @@ namespace std {
 
 namespace utils
 {
-    // using dexai::log;
-
     // Vector Conversions:
     template <typename T, std::size_t SIZE>
     std::vector<T> ArrayToVector(const std::array<T, SIZE>& a) {
