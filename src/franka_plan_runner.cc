@@ -558,8 +558,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // the current (desired) position of franka is the starting position:
     start_conf_franka_ = current_conf_franka;
 
+    const auto plan_end_time = plan_->end_time();
+    const auto plan_completion_fraction = min(1.0, max(0.0, franka_time_/plan_end_time));
+
     Eigen::VectorXd delta_start_to_end_plan =
-        plan_->value(plan_->end_time()) - start_conf_plan_;
+        plan_->value(plan_end_time) - start_conf_plan_;
 
     end_conf_franka_ = start_conf_franka_ + delta_start_to_end_plan;
     // TODO @rkk: move this print into another thread
@@ -604,8 +607,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // add delta to current robot state to achieve a continuous motion:
   Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
 
+  Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan;
+
   // overwrite the output_to_franka of this callback:
-  output_to_franka = utils::EigenToArray(next_conf_franka);
+  output_to_franka = utils::EigenToArray(next_conf_combined);
 
   // Finish Checks:
   // if (status_ == RobotStatus::Reversing) {
