@@ -591,7 +591,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
 
   const auto plan_end_time = plan_->end_time();
-  const auto plan_completion_fraction = min(1.0, max(0.0, franka_time_/plan_end_time));
+  const auto plan_completion_fraction = std::min(1.0, std::max(0.0, franka_time_/plan_end_time));
 
   // read out plan for current franka time from plan:
   Eigen::VectorXd next_conf_plan = plan_->value(franka_time_);
