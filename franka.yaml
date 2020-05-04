@@ -2,8 +2,8 @@ robot_parameters:
   kLooseJointDistance: 0.25
   kMediumJointDistance: 0.125
   kTightJointDistance: 0.01
-  lcm_url: ''
-  robot_ip: '192.168.1.1' # sim
+  lcm_url: udpm://239.255.76.67:7667?ttl=2
+  robot_ip: '172.16.0.2'
   # limits taken from https://frankaemika.github.io/docs/control_parameters.html#constants
   robot_high_joint_limits: # rad
       - 2.8973
@@ -63,12 +63,11 @@ robot_parameters:
       - 1000
   stop_epsilon: 0.015 # used to calculate when robot counts as "stopped"
   stop_margin: 0.6    # how long robot sleeps before ready to recieve continue 
-  simulated: true
-  urdf: franka_test.urdf
+  simulated: false
+  urdf: franka_robot_multibody_collision.urdf
   urdf_dir: ''
   world_frame: base_link
   gravity_vector:
       - 0.0
       - 0.0
       - -1.0
-  yaml_test_dbl: 9.87654321

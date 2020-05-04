@@ -14,20 +14,20 @@
 
 #include "communication_interface.h"
 
-#include "drac_util_io.h"  // for get_current_utime
-#include "drake/lcmt_iiwa_status.hpp"
-#include "franka_driver_utils.h"     // ConvertToLcmStatus
-#include "robot_msgs/pause_cmd.hpp"  // for pause_cmd
-#include "robot_msgs/trigger_t.hpp"  // for trigger_t
-#include "trajectory_solver.h"       // for TrajectorySolver
+#include "util_io.h"                  // for get_current_utime
+// #include "drake/lcmt_iiwa_status.hpp"
+#include "util_conv.h"                // ConvertToLcmStatus
+#include "robot_msgs/pause_cmd.hpp"   // for pause_cmd
+#include "robot_msgs/trigger_t.hpp"   // for trigger_t
+// following is deprecated, see: https://github.com/DexaiRobotics/drake-franka-driver/issues/54
+#include "polynomial_encode_decode.h" // for decodePiecewisePolynomial
 
 #include <chrono>  // for steady_clock, for duration
 
 using namespace franka_driver;
-namespace dru = dracula_utils;
 
 CommunicationInterface::CommunicationInterface(
-    const parameters::Parameters params, double lcm_publish_rate)
+    const RobotParameters params, double lcm_publish_rate)
     : params_(params),
       lcm_(params_.lcm_url),
       lcm_publish_rate_(lcm_publish_rate) {
@@ -42,15 +42,15 @@ CommunicationInterface::CommunicationInterface(
   // with the robot status channel:
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
 
-  momap::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
-  momap::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
-  momap::log()->info("Plan received channel: {}",
+  dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
+  dexai::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
+  dexai::log()->info("Plan received channel: {}",
                      params_.lcm_plan_received_channel);
-  momap::log()->info("Plan complete channel: {}",
+  dexai::log()->info("Plan complete channel: {}",
                      params_.lcm_plan_complete_channel);
-  momap::log()->info("Status channel:        {}", params_.lcm_status_channel);
-  momap::log()->info("Driver status channel: {}", lcm_driver_status_channel_);
-  momap::log()->info("Pause status channel:  {}", lcm_pause_status_channel_);
+  dexai::log()->info("Status channel:        {}", params_.lcm_status_channel);
+  dexai::log()->info("Driver status channel: {}", lcm_driver_status_channel_);
+  dexai::log()->info("Pause status channel:  {}", lcm_pause_status_channel_);
 };
 
 void CommunicationInterface::ResetData() {
@@ -77,7 +77,7 @@ void CommunicationInterface::StartInterface() {
   // Initialize data as empty for exchange with robot driver
   ResetData();
   // start LCM threads; independent of sim vs. real robot
-  momap::log()->info(
+  dexai::log()->info(
       "CommunicationInterface::StartInterface: Start LCM threads");
   running_ = true;  // sets the lcm threads to active.
   lcm_publish_status_thread_ =
@@ -86,20 +86,20 @@ void CommunicationInterface::StartInterface() {
 };
 
 void CommunicationInterface::StopInterface() {
-  momap::log()->info(
+  dexai::log()->info(
       "CommunicationInterface::StopInterface: Before LCM threads join");
   // clean-up threads if they're still alive.
   running_ = false;  // sets the lcm threads to inactive.
   while (!lcm_handle_thread_.joinable() ||
          !lcm_publish_status_thread_.joinable()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    momap::log()->warn(
+    dexai::log()->warn(
         "CommunicationInterface::StopInterface: Waiting for LCM threads to be "
         "joinable...");
   }
   lcm_publish_status_thread_.join();
   lcm_handle_thread_.join();
-  momap::log()->info(
+  dexai::log()->info(
       "CommunicationInterface::StopInterface: After LCM thread join");
   ResetData();
 };
@@ -162,7 +162,7 @@ void CommunicationInterface::PublishPlanComplete(
 
 void CommunicationInterface::PublishDriverStatus(
     bool success, std::string driver_status_string) {
-  PublishTriggerToChannel(dru::get_current_utime(), lcm_driver_status_channel_,
+  PublishTriggerToChannel(utils::get_current_utime(), lcm_driver_status_channel_,
                           success, driver_status_string);
 }
 
@@ -189,7 +189,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
     if (remaining_wait < std::chrono::seconds(0)) {
       std::chrono::milliseconds time_elapsed_ms =
           std::chrono::duration_cast<std::chrono::milliseconds>(time_elapsed);
-      momap::log()->warn(
+      dexai::log()->warn(
           "CommunicationInterface::PublishLcmAndPauseStatus:"
           " publish took too long with {} ms > {} ms!",
           time_elapsed_ms.count(), 1000.0 / lcm_publish_rate_);
@@ -203,7 +203,7 @@ void CommunicationInterface::PublishRobotStatus() {
   std::unique_lock<std::mutex> lock(robot_data_mutex_);
   if (robot_data_.has_robot_data_) {
     drake::lcmt_iiwa_status franka_status =
-        ConvertToLcmStatus(robot_data_.robot_state);
+        utils::ConvertToLcmStatus(robot_data_.robot_state);
     // publish data over lcm
     robot_data_.has_robot_data_ = false;
     lock.unlock();
@@ -215,7 +215,7 @@ void CommunicationInterface::PublishRobotStatus() {
 
 void CommunicationInterface::PublishPauseStatus() {
   robot_msgs::trigger_t msg;
-  msg.utime = dru::get_current_utime();
+  msg.utime = utils::get_current_utime();
   std::unique_lock<std::mutex> lock(pause_mutex_);
   msg.success = pause_data_.paused_;
   msg.message = "";
@@ -247,38 +247,38 @@ bool CommunicationInterface::CanReceiveCommands() {
 
   switch (current_mode) {
     case franka::RobotMode::kOther:
-      momap::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          RobotModeToString(current_mode));
+      dexai::log()->error("CanReceiveCommands: Wrong mode: {}!",
+                          utils::RobotModeToString(current_mode));
       return false;
     case franka::RobotMode::kIdle:
       return true;
     case franka::RobotMode::kMove:
-      momap::log()->warn(
+      dexai::log()->warn(
           "CanReceiveCommands: "
           "Allowing to receive commands while in {}"
           ", but this needs more testing!",
-          RobotModeToString(current_mode));
+          utils::RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kGuiding:
-      momap::log()->error("CanReceiveCommands: Wrong mode!");
+      dexai::log()->error("CanReceiveCommands: Wrong mode!");
       return false;
     case franka::RobotMode::kReflex:
-      momap::log()->warn(
+      dexai::log()->warn(
           "CanReceiveCommands: "
           "Allowing to receive commands while in {},"
           " but this needs more testing!",
-          RobotModeToString(current_mode));
+          utils::RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kUserStopped:
-      momap::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          RobotModeToString(current_mode));
+      dexai::log()->error("CanReceiveCommands: Wrong mode: {}!",
+                          utils::RobotModeToString(current_mode));
       return false;
     case franka::RobotMode::kAutomaticErrorRecovery:
-      momap::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          RobotModeToString(current_mode));
+      dexai::log()->error("CanReceiveCommands: Wrong mode: {}!",
+                          utils::RobotModeToString(current_mode));
       return false;
     default:
-      momap::log()->error("CanReceiveCommands: Mode unknown!");
+      dexai::log()->error("CanReceiveCommands: Mode unknown!");
       return false;
   }
 }
@@ -286,12 +286,12 @@ bool CommunicationInterface::CanReceiveCommands() {
 void CommunicationInterface::HandlePlan(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const lcmtypes::robot_spline_t* robot_spline) {
-  momap::log()->info("CommunicationInterface::HandlePlan: Received new plan {}",
+  dexai::log()->info("CommunicationInterface::HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
   //$ check if in proper mode to receive commands
   if (!CanReceiveCommands()) {
-    momap::log()->error(
+    dexai::log()->error(
         "CommunicationInterface::HandlePlan: "
         "Discarding plan with utime: {},"
         " robot is in wrong mode!",
@@ -301,7 +301,7 @@ void CommunicationInterface::HandlePlan(
 
   std::unique_lock<std::mutex> lock(robot_plan_mutex_, std::defer_lock);
   while (!lock.try_lock()) {
-    momap::log()->warn(
+    dexai::log()->warn(
         "CommunicationInterface::HandlePlan: trying to get a lock on the "
         "robot_plan_mutex_. Sleeping 1 ms and trying again.");
     std::this_thread::sleep_for(
@@ -312,23 +312,23 @@ void CommunicationInterface::HandlePlan(
   //$ publish confirmation that plan was received with same utime
   // TODO @rkk: move this to later in the function...
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
-  momap::log()->info(
+  dexai::log()->info(
       "CommunicationInterface::HandlePlan: "
       "Published confirmation of received plan {}",
       robot_spline->utime);
 
   PPType piecewise_polynomial =
-      TrajectorySolver::RobotSplineTToPPType(*robot_spline);
+    decodePiecewisePolynomial(robot_spline->piecewise_polynomial);
 
   if (piecewise_polynomial.get_number_of_segments() < 1) {
-    momap::log()->error(
+    dexai::log()->error(
         "CommunicationInterface::HandlePlan: "
         "Discarding plan, invalid piecewise polynomial.");
     lock.unlock();
     return;
   }
 
-  momap::log()->info(
+  dexai::log()->info(
       "CommunicationInterface::HandlePlan: "
       "plan {}: start time: {}, end time: {}",
       robot_spline->utime, piecewise_polynomial.start_time(),
@@ -342,14 +342,14 @@ void CommunicationInterface::HandlePlan(
 
   auto q = this->GetRobotState().q;
   // TODO @rkk: move this check to franka plan runner...
-  Eigen::VectorXd q_eigen = dru::v_to_e(ArrayToVector(q));
+  Eigen::VectorXd q_eigen = utils::v_to_e(utils::ArrayToVector(q));
 
   auto max_angular_distance =
-      dru::max_angular_distance(commanded_start, q_eigen);
+      utils::max_angular_distance(commanded_start, q_eigen);
   if (max_angular_distance > params_.kMediumJointDistance) {
     // discard the plan if we are too far away from current robot start
     Eigen::VectorXd joint_delta = q_eigen - commanded_start;
-    momap::log()->error(
+    dexai::log()->error(
         "CommunicationInterface::HandlePlan: "
         "Discarding plan {}, mismatched start position with delta: {}.",
         robot_spline->utime, joint_delta.transpose());
@@ -369,7 +369,7 @@ void CommunicationInterface::HandlePlan(
   robot_plan_.has_plan_data_ = true;
   lock.unlock();
 
-  momap::log()->debug("CommunicationInterface::HandlePlan: Finished!");
+  dexai::log()->debug("CommunicationInterface::HandlePlan: Finished!");
 };
 
 void CommunicationInterface::HandlePause(
@@ -379,25 +379,25 @@ void CommunicationInterface::HandlePause(
   // check if paused = true or paused = false was received:
   bool paused = pause_cmd_msg->data;
   if (paused) {
-    momap::log()->warn(
+    dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received 'pause = true' from {}",
         pause_cmd_msg->source);
     if (pause_data_.pause_sources_set_.insert(pause_cmd_msg->source).second ==
         false) {
-      momap::log()->warn(
+      dexai::log()->warn(
           "CommunicationInterface::HandlePause: "
           "Already paused by source: {}",
           pause_cmd_msg->source);
     }
   } else {
-    momap::log()->warn(
+    dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received 'pause = false' from {}",
         pause_cmd_msg->source);
     if (pause_data_.pause_sources_set_.find(pause_cmd_msg->source) !=
         pause_data_.pause_sources_set_.end()) {
       pause_data_.pause_sources_set_.erase(pause_cmd_msg->source);
     } else {
-      momap::log()->warn(
+      dexai::log()->warn(
           "Unpausing command rejected: No matching "
           "pause command by source: {}'",
           pause_cmd_msg->source);

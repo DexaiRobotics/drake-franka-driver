@@ -1,5 +1,8 @@
-/// @file test_test.cc
+/// @file test_franka_driver.cc
 #include <gtest/gtest.h>
+
+
+// ToDo add unit tests for the franka driver functions here
 
 TEST(FrankaDriver, theTruth)
 {

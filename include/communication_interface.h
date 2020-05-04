@@ -13,10 +13,9 @@
 /// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
 
-#include "dracula.h"                                         // for Dracula
 #include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
 #include "franka/robot_state.h"                              // for RobotState
-#include "parameters.h"                                      // for Parameters
+#include "robot_parameters.h"                                // for RobotParameters
 
 #include <bits/stdint-intn.h>           // for int64_t
 #include <cstdint>                      // for int64_t
@@ -24,6 +23,7 @@
 #include <mutex>                        // for mutex
 #include <robot_msgs/pause_cmd.hpp>     // for pause_cmd
 #include <thread>                       // for thread
+#include <lcm/lcm-cpp.hpp>              // for lcm
 
 using drake::trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
@@ -49,7 +49,7 @@ struct RobotPiecewisePolynomial {
 
 class CommunicationInterface {
  public:
-  CommunicationInterface(const parameters::Parameters params,
+  CommunicationInterface(const RobotParameters params,
                          double lcm_publish_rate = 200.0 /* Hz */);
   ~CommunicationInterface(){};
   void StartInterface();
@@ -95,7 +95,7 @@ class CommunicationInterface {
                    const robot_msgs::pause_cmd* pause_cmd_msg);
 
  private:
-  parameters::Parameters params_;
+  RobotParameters params_;
   std::atomic_bool running_{false};
   ::lcm::LCM lcm_;
 

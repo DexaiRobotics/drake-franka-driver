@@ -1,0 +1,12 @@
+package lcmtypes;   //HACK
+
+struct robot_joint
+{
+    string joint_name;
+    double position_lower_limit;
+    double position_upper_limit;
+    double velocity_lower_limit;
+    double velocity_upper_limit;
+    double acceleration_lower_limit;
+    double acceleration_upper_limit;
+}

@@ -1,13 +1,11 @@
 cmake_minimum_required(VERSION 3.14)
 project(drake-franka-driver)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
-
-# SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 
@@ -35,35 +33,8 @@ message(STATUS "DRAKE_BUILD_DIR: ${DRAKE_BUILD_DIR}")
 set(FRANKA_BUILD_DIR "${CMAKE_SOURCE_DIR}/externals/libfranka/build")
 message(STATUS "FRANKA_BUILD_DIR: ${FRANKA_BUILD_DIR}")
 
-
-# Figure out where dracula can be found
-if (($ENV{CIRCLECI} MATCHES "true") )
-    get_filename_component(DEXAI_SRC_DIR ${CMAKE_SOURCE_DIR} DIRECTORY)
-    set(ENV{DEXAI_SRC} ${DEXAI_SRC_DIR})
-elseif(NOT DEFINED ENV{DEXAI_SRC})
-    message(STATUS "NOTE: The environment variable DEXAI_SRC is not defined")
-    message(STATUS "NOTE: setting DEXAI_SRC to /src")
-    set(ENV{DEXAI_SRC} /src)
-endif()
-message(STATUS "DEXAI_SRC: $ENV{DEXAI_SRC}")
-set(DRACULA_SOURCE_PATH "$ENV{DEXAI_SRC}/dracula")
-message(STATUS "DRACULA_SOURCE_PATH: ${DRACULA_SOURCE_PATH}")
-set(DRACULA_BUILD_PATH "${DRACULA_SOURCE_PATH}/build")
-message(STATUS "DRACULA_BUILD_PATH: ${DRACULA_BUILD_PATH}")
-set(DRACULA_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/dracula/include")
-message(STATUS "DRACULA_INCLUDE_DIR: ${DRACULA_INCLUDE_DIR}")
-set(FILESYSTEM_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/filesystem/include")
-set(JSON_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/json/include")
-
-# Set Dracula Libraries
-if (UNIX AND NOT APPLE)
-    set(DRACULA_LIBRARIES "${DRACULA_BUILD_PATH}/dracula/libdracula.so")
-elseif (APPLE)
-    message ("MAC OS X")
-    set(DRACULA_LIBRARIES "${DRACULA_BUILD_PATH}/dracula/libdracula.dylib")
-endif ()
-
-set(CTPL_INCLUDE_DIR "${DRACULA_SOURCE_PATH}/externals/CTPL")
+set(FILESYSTEM_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/externals/filesystem/include")
+message(STATUS "FILESYSTEM_INCLUDE_DIR: ${FILESYSTEM_INCLUDE_DIR}")
 
 #LOCAL_PYTHON=`which python`
 #export LOCAL_PYTHON_PATH=`dirname $LOCAL_PYTHON`
@@ -85,10 +56,10 @@ list(APPEND CMAKE_PREFIX_PATH ${FRANKA_BUILD_DIR})
 
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
+find_package(Yaml MODULE REQUIRED COMPONENTS shared)
 
 message(STATUS "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
 message(STATUS "Franka_LIBRARIES: ${Franka_LIBRARIES}")
-
 
 find_package(lcm REQUIRED)
 find_package(gflags MODULE REQUIRED COMPONENTS shared)
@@ -105,28 +76,53 @@ message(STATUS "Python3_NumPy_INCLUDE_DIRS: ${Python3_NumPy_INCLUDE_DIRS}")
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}")
 
-# add include dir for Franka headers
-include_directories(
+# message("Setting SPDLOG_INCLUDE_DIR; environment:" $ENV{SPDLOG_INCLUDE_DIR})
+if (DEFINED ENV{SPDLOG_INCLUDE_DIR})
+    set(SPDLOG_INCLUDE_DIR $ENV{SPDLOG_INCLUDE_DIR})
+    message(STATUS "SPDLOG_INCLUDE_DIR variable taken from environment: " ${SPDLOG_INCLUDE_DIR})
+else()
+    set(SPDLOG_INCLUDE_DIR /opt/drake/include/spdlog)
+    message(STATUS "SPDLOG_INCLUDE_DIR variable defaulted in CMakeList: " ${SPDLOG_INCLUDE_DIR})
+endif()
+# message(STATUS "SPDLOG_INCLUDE_DIR variable used by cmake: " ${SPDLOG_INCLUDE_DIR})
+
+
+set(INCLUDES 
     include
-    ${DRACULA_INCLUDE_DIR}
+    ${SPDLOG_INCLUDE_DIR}
+    ${YAML_INCLUDES}
     ${FILESYSTEM_INCLUDE_DIR}
-    ${JSON_INCLUDE_DIR}
     ${Franka_INCLUDE_DIRS}
     ${Python3_INCLUDE_DIRS}
     ${Python3_NumPy_INCLUDE_DIRS}
-    ${CTPL_INCLUDE_DIR}
+    ${GTEST_INCLUDE_DIRS}
+) 
+
+# add include dir for Franka headers
+include_directories(
+    ${INCLUDES}
 )
 
+
+set(SOURCES 
+    src/franka_driver.cc
+    src/franka_plan_runner.cc
+    src/communication_interface.cc
+    src/examples_common.cpp
+    src/util_conv.cc
+    src/util_io.cc
+    src/util_math.cc
+    src/util_string.cc
+    src/robot_parameters.cc
+    src/constraint_solver.cc
+    src/dexai_log.cc
+    src/polynomial_encode_decode.cc
+)
 
 # build the lcm driver that uses Franka Robot Interface (FRI)
 # add_definitions(-std=c++14)
 set(driver_name franka_driver)
-add_executable(${driver_name}
-    src/franka_driver.cc
-    src/franka_plan_runner.cc
-    src/communication_interface.cc
-    src/franka_driver_utils.cc
-    src/examples_common.cpp
+add_executable(${driver_name} ${SOURCES}
 )
 
 set(test_name send_stop)
@@ -138,16 +134,19 @@ target_link_libraries(${test_name}
     ${LCM_NAMESPACE}lcm
 )
 
-
-target_link_libraries(${driver_name}
+set(LINK_LIBRARIES 
     ${Franka_LIBRARIES}
     ${LCM_NAMESPACE}lcm
     gflags
     drake::drake
+    yaml-cpp
     Threads::Threads
-    ${DRACULA_LIBRARIES}
     ${Python3_LIBRARIES}
     fcl
+)
+
+target_link_libraries(${driver_name} 
+    ${LINK_LIBRARIES}
 )
 
 # install the lcm driver
@@ -160,17 +159,58 @@ target_link_libraries(${driver_name}
 #-------------------
 # Unit Testing
 #-------------------
+
 enable_testing()
 
 set(GTEST_SRC_FILES
-    tests/test_test.cc
+    tests/test_franka_driver.cc
+    tests/test_util_conv.cc
+    tests/test_util_io.cc
+    tests/test_util_math.cc
+    tests/test_util_string.cc
+    tests/test_robot_parameters.cc
+    tests/test_constraint_solver.cc
+)
+
+set(TEST_INCLUDES 
+    include
+    ${SPDLOG_INCLUDE_DIR}
+    ${YAML_INCLUDES}
+    ${FILESYSTEM_INCLUDE_DIR}
+    ${GTEST_INCLUDE_DIRS}
+) 
+
+set(TEST_SOURCES 
+    src/util_conv.cc
+    src/util_io.cc
+    src/util_math.cc
+    src/util_string.cc
+    src/robot_parameters.cc
+    src/constraint_solver.cc
+    src/dexai_log.cc
+)
+
+set(TEST_LINK_LIBRARIES 
+    gtest 
+    gtest_main 
+    ${GTEST_BOTH_LIBRARIES}
+    ${CMAKE_THREAD_LIBS_INIT} 
+    gflags
+    drake::drake
+    yaml-cpp
 )
 
 foreach(_file ${GTEST_SRC_FILES})
     get_filename_component(_name ${_file} NAME_WE)
-    add_executable(${_name} ${_file})
-    target_link_libraries(${_name}
-    gtest gtest_main ${CMAKE_THREAD_LIBS_INIT})
+    include_directories(${TEST_INCLUDES})
+    add_executable(${_name} 
+        ${_file} 
+        ${TEST_SOURCES}
+    )
+    target_link_libraries(${_name} 
+
+        ${TEST_LINK_LIBRARIES}
+    )
     add_test(${_name} ${_name})
     set_tests_properties(${_name} PROPERTIES TIMEOUT 270)
 endforeach()

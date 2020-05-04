@@ -12,14 +12,14 @@
 #pragma once
 
 #include "communication_interface.h"  // for CommunicationInterface
-#include "dracula.h"                  // for Dracula
+#include "constraint_solver.h"     // for ConstraintSolver
 #include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
 #include "franka/control_types.h"  // for franka::JointPositions
 #include "franka/duration.h"       // for franka::Duration
 #include "franka/robot.h"          // for franka::Robot
 #include "franka/robot_state.h"    // for franka::RobotState
-#include "franka_driver_utils.h"   // for RobotStatus
-#include "parameters.h"            // for Parameters
+#include "util_conv.h"             // for RobotStatus
+#include "robot_parameters.h"      // for RobotParameters
 
 #include <Eigen/Dense>                  // for Eigen::VectorXd
 #include <bits/stdint-intn.h>           // for int64_t
@@ -32,7 +32,7 @@ namespace franka_driver {
 
 class FrankaPlanRunner {
  public:
-  FrankaPlanRunner(const parameters::Parameters params);
+  FrankaPlanRunner(const RobotParameters params);
   ~FrankaPlanRunner(){};
 
   /// This starts the franka driver
@@ -83,8 +83,9 @@ class FrankaPlanRunner {
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
-  std::unique_ptr<Dracula> dracula_;
-  parameters::Parameters params_;
+  std::unique_ptr<ConstraintSolver>   constraint_solver_;
+  RobotParameters params_;
+
   std::string ip_addr_;
 
   std::function<franka::JointPositions(const franka::RobotState&,
@@ -94,7 +95,7 @@ class FrankaPlanRunner {
   // keeping track of time along plan:
   double franka_time_;
   // pause related:
-  RobotStatus status_;
+  utils::RobotStatus status_;
   long timestep_ = 1;
   float target_stop_time_;
   float stop_duration_;
