@@ -600,9 +600,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         franka_time_);
   }
 
+  auto robot_state_mutable = robot_state;
   auto next_conf_plan_vect = utils::e_to_v(next_conf_plan);
-  utils::VectorToArray(next_conf_plan_vect, robot_state.tau_ext_hat_filtered);
-  comm_interface_->TryToSetRobotState(robot_state);
+  utils::VectorToArray(next_conf_plan_vect, robot_state_mutable.tau_ext_hat_filtered);
+  comm_interface_->TryToSetRobotState(robot_state_mutable);
 
   // delta between conf at start of plan to conft at current time of plan:
   Eigen::VectorXd delta_conf_plan = next_conf_plan - start_conf_plan_;
