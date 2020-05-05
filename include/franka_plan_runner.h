@@ -116,7 +116,7 @@ class FrankaPlanRunner {
   Eigen::VectorXd end_conf_franka_;
 
   Eigen::VectorXd max_accels_;
-  double allowable_norm_error_ = 0.007;  // empirically proven
+  double allowable_max_angle_error_ = 0.001;  // empirically proven
 
 };  // FrankaPlanRunner
 

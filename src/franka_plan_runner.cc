@@ -623,9 +623,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   //   }
   // }
   if (franka_time_ > plan_->end_time()) { //&& status_ != RobotStatus::Reversing) {
-    double error_final = (current_conf_franka - end_conf_franka_).norm();
+    double error_final = utils::max_angular_distance(current_conf_franka - end_conf_franka_);
 
-    if (error_final < allowable_norm_error_) {
+    if (error_final < allowable_max_angle_error_) {
       dexai::log()->info(
           "JointPositionCallback: Finished plan {}, exiting controller",
           plan_utime_);
