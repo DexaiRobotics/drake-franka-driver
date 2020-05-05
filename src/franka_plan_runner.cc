@@ -600,7 +600,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         franka_time_);
   }
 
-  robot_state.tau_ext_hat_filtered = utils::VectorToArray(utils::e_to_v(next_conf_plan));
+  utils::VectorToArray(utils::e_to_v(next_conf_plan), robot_state.tau_ext_hat_filtered);
   comm_interface_->TryToSetRobotState(robot_state);
 
   // delta between conf at start of plan to conft at current time of plan:
