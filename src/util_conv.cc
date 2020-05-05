@@ -76,7 +76,8 @@ namespace utils {
         // q
         robot_status.joint_position_measured = ArrayToVector(robot_state.q);
         robot_status.joint_position_commanded = ArrayToVector(robot_state.q_d);
-        robot_status.joint_position_ipo.resize(num_joints, 0);
+        robot_status.joint_position_ipo = ArrayToVector(robot_state.tau_ext_hat_filtered);
+        // robot_status.joint_position_ipo.resize(num_joints, 0);
         robot_status.joint_velocity_estimated = ArrayToVector(robot_state.dq);
         robot_status.joint_torque_measured = ArrayToVector(robot_state.tau_J);
         robot_status.joint_torque_commanded = ArrayToVector(robot_state.tau_J_d);

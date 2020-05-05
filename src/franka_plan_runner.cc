@@ -524,7 +524,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   Eigen::VectorXd current_conf_franka = utils::v_to_e(q_d_v);
   // Set robot state for LCM publishing:
   // TODO @rkk: do not use franka robot state but use a generic Eigen instead
-  comm_interface_->TryToSetRobotState(robot_state);
 
   static bool first_run = true;
 
@@ -600,6 +599,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         "JointPositionCallback: plan at {}s is exceeding the joint limits!",
         franka_time_);
   }
+
+  robot_state.tau_ext_hat_filtered = utils::VectorToArray(utils::e_to_v(next_conf_plan));
+  comm_interface_->TryToSetRobotState(robot_state);
 
   // delta between conf at start of plan to conft at current time of plan:
   Eigen::VectorXd delta_conf_plan = next_conf_plan - start_conf_plan_;
