@@ -131,7 +131,19 @@ void CommunicationInterface::SetRobotState(
     const franka::RobotState& robot_state) {
   std::lock_guard<std::mutex> lock(robot_data_mutex_);
   robot_data_.has_robot_data_ = true;
+  auto tau_ext_hat_filtered = robot_data_.robot_state.tau_ext_hat_filtered;
   robot_data_.robot_state = robot_state;
+
+  bool all_zeros = true;
+  for ( const auto val : robot_state.tau_ext_hat_filtered ) {
+    if (val != 0) {
+      all_zeros = false;
+      break;
+    }
+  }
+  if (all_zeros) {
+    robot_data_.robot_state.tau_ext_hat_filtered = tau_ext_hat_filtered;
+  }
 }
 
 void CommunicationInterface::TryToSetRobotState(
@@ -139,7 +151,21 @@ void CommunicationInterface::TryToSetRobotState(
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
   if (lock.try_lock()) {
     robot_data_.has_robot_data_ = true;
+    auto tau_ext_hat_filtered = robot_data_.robot_state.tau_ext_hat_filtered;
+
     robot_data_.robot_state = robot_state;
+
+    bool all_zeros = true;
+    for ( const auto val : robot_state.tau_ext_hat_filtered ) {
+      if (val != 0) {
+        all_zeros = false;
+        break;
+      }
+    }
+    if (all_zeros) {
+      robot_data_.robot_state.tau_ext_hat_filtered = tau_ext_hat_filtered;
+    }
+
     lock.unlock();
   }
 }
