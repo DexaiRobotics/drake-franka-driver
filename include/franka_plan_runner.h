@@ -113,7 +113,7 @@ class FrankaPlanRunner {
   // config of robot when franka starts reversing:
   Eigen::VectorXd start_reversing_conf_franka_;
   // config of franka when plan ends:
-  Eigen::VectorXd end_conf_franka_;
+  Eigen::VectorXd end_conf_plan_;
 
   Eigen::VectorXd max_accels_;
   double allowable_max_angle_error_ = 0.001;  // empirically proven

@@ -562,7 +562,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     Eigen::VectorXd delta_start_to_end_plan =
         plan_->value(plan_->end_time()) - start_conf_plan_;
 
-    end_conf_franka_ = start_conf_franka_ + delta_start_to_end_plan;
+    end_conf_plan_ = plan_->value(plan_->end_time());
     // TODO @rkk: move this print into another thread
     dexai::log()->debug("JointPositionCallback: starting franka q = {}",
                         start_conf_franka_.transpose());
@@ -629,7 +629,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   //   }
   // }
   if (franka_time_ > plan_->end_time()) { //&& status_ != RobotStatus::Reversing) {
-    double error_final = utils::max_angular_distance(end_conf_franka_, current_conf_franka);
+    double error_final = utils::max_angular_distance(end_conf_plan_, current_conf_franka);
 
     if (error_final < allowable_max_angle_error_) {
       dexai::log()->info(
@@ -638,22 +638,22 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
 
-      auto error_eigen = (end_conf_franka_ - current_conf_franka).cwiseAbs();
+      auto error_eigen = (end_conf_plan_ - current_conf_franka).cwiseAbs();
       for (size_t joint_idx = 0; joint_idx < dof_; joint_idx++ ) {
         if (error_eigen(joint_idx) > allowable_max_angle_error_) {
           dexai::log()->warn(
               "JointPositionCallback: Overtimed plan {}: robot diverged, joint {} "
               "error: {} - {} = {} > max allowable: {}",
-              plan_utime_, joint_idx, end_conf_franka_(joint_idx),
+              plan_utime_, joint_idx, end_conf_plan_(joint_idx),
               current_conf_franka(joint_idx), error_eigen(joint_idx),
               allowable_max_angle_error_);
         }
       }
 
-      dexai::log()->warn(
-          "JointPositionCallback: Overtimed plan {}: robot diverged, norm "
-          "error: {}",
-          plan_utime_, error_final);
+      // dexai::log()->warn(
+      //     "JointPositionCallback: Overtimed plan {}: robot diverged, max "
+      //     "error: {}",
+      //     plan_utime_, error_final);
       dexai::log()->info("JointPositionCallback: current_conf_franka: {}",
                          current_conf_franka.transpose());
       dexai::log()->info("JointPositionCallback: next_conf_franka: {}",
