@@ -638,13 +638,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
 
-      auto error_eigen = end_conf_franka_ - current_conf_franka;
+      auto error_eigen = (end_conf_franka_ - current_conf_franka).cwiseAbs();
       for (size_t joint_idx = 0; joint_idx < dof_; joint_idx++ ) {
         if (error_eigen(joint_idx) > allowable_max_angle_error_) {
           dexai::log()->warn(
               "JointPositionCallback: Overtimed plan {}: robot diverged, joint {} "
-              "error: {} > max allowable: {}",
-              plan_utime_, joint_idx, error_eigen(joint_idx), allowable_max_angle_error_);
+              "error: {} - {} = {} > max allowable: {}",
+              plan_utime_, joint_idx, end_conf_franka_(joint_idx),
+              current_conf_franka(joint_idx), error_eigen(joint_idx),
+              allowable_max_angle_error_);
         }
       }
 
