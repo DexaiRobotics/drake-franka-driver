@@ -629,7 +629,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   //   }
   // }
   if (franka_time_ > plan_->end_time()) { //&& status_ != RobotStatus::Reversing) {
-    double error_final = utils::max_angular_distance(current_conf_franka, end_conf_franka_);
+    double error_final = utils::max_angular_distance(end_conf_franka_, current_conf_franka);
 
     if (error_final < allowable_max_angle_error_) {
       dexai::log()->info(
@@ -637,6 +637,17 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           plan_utime_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
+
+      auto error_eigen = end_conf_franka_ - current_conf_franka;
+      for (size_t joint_idx = 0; joint_idx < dof_; joint_idx++ ) {
+        if (error_eigen(joint_idx) > allowable_max_angle_error_) {
+          dexai::log()->warn(
+              "JointPositionCallback: Overtimed plan {}: robot diverged, joint {} "
+              "error: {} > max allowable: {}",
+              plan_utime_, joint_idx, error_eigen(joint_idx), allowable_max_angle_error_);
+        }
+      }
+
       dexai::log()->warn(
           "JointPositionCallback: Overtimed plan {}: robot diverged, norm "
           "error: {}",
