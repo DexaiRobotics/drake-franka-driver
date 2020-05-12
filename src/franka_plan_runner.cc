@@ -217,7 +217,7 @@ int FrankaPlanRunner::RunFranka() {
           status_has_changed = true;
           // joint_position_callback_ or impedance_control_callback_ can be used
           // here:
-          robot.setJointImpedance({{30000, 30000, 30000, 25000, 25000, 20000, 20000}});
+          robot.setJointImpedance({{60000, 60000, 60000, 50000, 50000, 40000, 40000}});
           robot.control(joint_position_callback_);
         } else {
           // no plan available or paused
