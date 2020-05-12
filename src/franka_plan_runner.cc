@@ -244,6 +244,9 @@ int FrankaPlanRunner::RunFranka() {
           // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
           robot.read([this](const franka::RobotState& robot_state) {
             auto mutable_robot_state = robot_state;
+
+            // No plan. Set to zeros. Comm interface will publish
+            // Last commanded position instead
             mutable_robot_state.tau_ext_hat_filtered = {0};
             comm_interface_->SetRobotState(mutable_robot_state);
             std::this_thread::sleep_for(std::chrono::milliseconds(

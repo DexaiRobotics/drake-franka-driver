@@ -131,6 +131,10 @@ void CommunicationInterface::SetRobotState(
     const franka::RobotState& robot_state) {
   std::lock_guard<std::mutex> lock(robot_data_mutex_);
   robot_data_.has_robot_data_ = true;
+
+  // Supposed to be external filtered torque we use to pass
+  // joint position the robot is supposed to be at according to plan
+  // to comm interface, since external filtered torque is currently unused
   auto tau_ext_hat_filtered = robot_data_.robot_state.tau_ext_hat_filtered;
   robot_data_.robot_state = robot_state;
 
@@ -141,6 +145,9 @@ void CommunicationInterface::SetRobotState(
       break;
     }
   }
+
+  // If each value if exactly equal to zero, it is probably because we don't currently
+  // have a plan. Set to previous value
   if (all_zeros) {
     robot_data_.robot_state.tau_ext_hat_filtered = tau_ext_hat_filtered;
   }
@@ -151,10 +158,12 @@ void CommunicationInterface::TryToSetRobotState(
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
   if (lock.try_lock()) {
     robot_data_.has_robot_data_ = true;
+
     auto tau_ext_hat_filtered = robot_data_.robot_state.tau_ext_hat_filtered;
 
     robot_data_.robot_state = robot_state;
 
+    // If all values are exactly equal to zero, it very likely means that we have no plan
     bool all_zeros = true;
     for ( const auto val : robot_state.tau_ext_hat_filtered ) {
       if (val != 0) {

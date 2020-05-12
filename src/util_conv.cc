@@ -76,6 +76,9 @@ namespace utils {
         // q
         robot_status.joint_position_measured = ArrayToVector(robot_state.q);
         robot_status.joint_position_commanded = ArrayToVector(robot_state.q_d);
+
+        // Supposed to be KUKA's motion interpolated joint positionm but we use to pass
+        // joint position the robot it supposed to be at according to plan
         robot_status.joint_position_ipo = ArrayToVector(robot_state.tau_ext_hat_filtered);
         // robot_status.joint_position_ipo.resize(num_joints, 0);
         robot_status.joint_velocity_estimated = ArrayToVector(robot_state.dq);
