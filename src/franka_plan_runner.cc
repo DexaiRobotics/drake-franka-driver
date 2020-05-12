@@ -617,6 +617,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // add delta to current robot state to achieve a continuous motion:
   Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
 
+  // Linear interpolation between next conf with offset and the actual next conf based on received plan
   Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan;
 
   // overwrite the output_to_franka of this callback:
