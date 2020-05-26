@@ -132,7 +132,7 @@ void CommunicationInterface::SetRobotState(
   std::lock_guard<std::mutex> lock(robot_data_mutex_);
   robot_data_.has_robot_data_ = true;
 
-  // Supposed to be external filtered torque we use to pass
+  // External filtered torque, but we use the field to pass
   // joint position the robot is supposed to be at according to plan
   // to comm interface, since external filtered torque is currently unused
   auto tau_ext_hat_filtered = robot_data_.robot_state.tau_ext_hat_filtered;
