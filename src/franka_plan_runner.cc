@@ -61,6 +61,7 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
 
   start_conf_franka_ = Eigen::VectorXd::Zero(dof_);
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
+  next_conf_plan_ = Eigen::VectorXd::Zero(dof_);
 
   // define the joint_position_callback_ needed for the robot control loop:
   joint_position_callback_ =
@@ -243,12 +244,7 @@ int FrankaPlanRunner::RunFranka() {
           // rate ...
           // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
           robot.read([this](const franka::RobotState& robot_state) {
-            auto mutable_robot_state = robot_state;
-
-            // No plan. Set to zeros. Comm interface will publish
-            // Last commanded position instead
-            mutable_robot_state.tau_ext_hat_filtered = {0};
-            comm_interface_->SetRobotState(mutable_robot_state);
+            comm_interface_->SetRobotState(robot_state, next_conf_plan_);
             std::this_thread::sleep_for(std::chrono::milliseconds(
                 static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
             return false;
@@ -599,26 +595,23 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   const auto plan_completion_fraction = std::min(1.0, std::max(0.0, franka_time_/plan_end_time));
 
   // read out plan for current franka time from plan:
-  Eigen::VectorXd next_conf_plan = plan_->value(franka_time_);
-  if (!LimitJoints(next_conf_plan)) {
+  next_conf_plan_ = plan_->value(franka_time_);
+  if (!LimitJoints(next_conf_plan_)) {
     dexai::log()->warn(
         "JointPositionCallback: plan at {}s is exceeding the joint limits!",
         franka_time_);
   }
 
-  auto robot_state_mutable = robot_state;
-  auto next_conf_plan_vect = utils::e_to_v(next_conf_plan);
-  utils::VectorToArray(next_conf_plan_vect, robot_state_mutable.tau_ext_hat_filtered);
-  comm_interface_->TryToSetRobotState(robot_state_mutable);
+  comm_interface_->TryToSetRobotState(robot_state, next_conf_plan_);
 
   // delta between conf at start of plan to conft at current time of plan:
-  Eigen::VectorXd delta_conf_plan = next_conf_plan - start_conf_plan_;
+  Eigen::VectorXd delta_conf_plan = next_conf_plan_ - start_conf_plan_;
 
   // add delta to current robot state to achieve a continuous motion:
   Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
 
   // Linear interpolation between next conf with offset and the actual next conf based on received plan
-  Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan;
+  Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan_;
 
   // overwrite the output_to_franka of this callback:
   output_to_franka = utils::EigenToArray(next_conf_combined);
@@ -664,7 +657,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       dexai::log()->info("JointPositionCallback: next_conf_franka: {}",
                          next_conf_franka.transpose());
       dexai::log()->info("JointPositionCallback: next_conf_plan: {}",
-                         next_conf_plan.transpose());
+                         next_conf_plan_.transpose());
       comm_interface_->PublishPlanComplete(plan_utime_, false /*  = failed*/,
                                            "diverged");
     }

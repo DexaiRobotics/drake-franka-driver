@@ -128,53 +128,22 @@ franka::RobotState CommunicationInterface::GetRobotState() {
 }
 
 void CommunicationInterface::SetRobotState(
-    const franka::RobotState& robot_state) {
+    const franka::RobotState& robot_state,
+    const Eigen::VectorXd& robot_plan_next_conf) {
   std::lock_guard<std::mutex> lock(robot_data_mutex_);
   robot_data_.has_robot_data_ = true;
-
-  // External filtered torque, but we use the field to pass
-  // joint position the robot is supposed to be at according to plan
-  // to comm interface, since external filtered torque is currently unused
-  auto tau_ext_hat_filtered = robot_data_.robot_state.tau_ext_hat_filtered;
   robot_data_.robot_state = robot_state;
-
-  bool all_zeros = true;
-  for ( const auto val : robot_state.tau_ext_hat_filtered ) {
-    if (val != 0) {
-      all_zeros = false;
-      break;
-    }
-  }
-
-  // If each value if exactly equal to zero, it is probably because we don't currently
-  // have a plan. Set to previous value
-  if (all_zeros) {
-    robot_data_.robot_state.tau_ext_hat_filtered = tau_ext_hat_filtered;
-  }
+  robot_data_.robot_plan_next_conf = robot_plan_next_conf;
 }
 
 void CommunicationInterface::TryToSetRobotState(
-    const franka::RobotState& robot_state) {
+    const franka::RobotState& robot_state,
+    const Eigen::VectorXd& robot_plan_next_conf) {
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
   if (lock.try_lock()) {
     robot_data_.has_robot_data_ = true;
-
-    auto tau_ext_hat_filtered = robot_data_.robot_state.tau_ext_hat_filtered;
-
     robot_data_.robot_state = robot_state;
-
-    // If all values are exactly equal to zero, it very likely means that we have no plan
-    bool all_zeros = true;
-    for ( const auto val : robot_state.tau_ext_hat_filtered ) {
-      if (val != 0) {
-        all_zeros = false;
-        break;
-      }
-    }
-    if (all_zeros) {
-      robot_data_.robot_state.tau_ext_hat_filtered = tau_ext_hat_filtered;
-    }
-
+    robot_data_.robot_plan_next_conf = robot_plan_next_conf;
     lock.unlock();
   }
 }
@@ -238,7 +207,7 @@ void CommunicationInterface::PublishRobotStatus() {
   std::unique_lock<std::mutex> lock(robot_data_mutex_);
   if (robot_data_.has_robot_data_) {
     drake::lcmt_iiwa_status franka_status =
-        utils::ConvertToLcmStatus(robot_data_.robot_state);
+        utils::ConvertToLcmStatus(robot_data_);
     // publish data over lcm
     robot_data_.has_robot_data_ = false;
     lock.unlock();

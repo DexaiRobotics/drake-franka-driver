@@ -108,6 +108,8 @@ class FrankaPlanRunner {
 
   // config of start of plan:
   Eigen::VectorXd start_conf_plan_;
+  // next config according to plan:
+  Eigen::VectorXd next_conf_plan_;
   // config of franka when plan starts:
   Eigen::VectorXd start_conf_franka_;
   // config of robot when franka starts reversing:
