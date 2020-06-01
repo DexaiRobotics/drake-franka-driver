@@ -650,10 +650,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         }
       }
 
-      // dexai::log()->warn(
-      //     "JointPositionCallback: Overtimed plan {}: robot diverged, max "
-      //     "error: {}",
-      //     plan_utime_, error_final);
       dexai::log()->info("JointPositionCallback: current_conf_franka: {}",
                          current_conf_franka.transpose());
       dexai::log()->info("JointPositionCallback: next_conf_franka: {}",
