@@ -568,6 +568,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
                         start_conf_franka_.transpose());
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_plan_.transpose());
+
+    // Maximum change in joint angle between two confs
     auto max_ang_distance =
         utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
     if (max_ang_distance > params_.kMediumJointDistance) {

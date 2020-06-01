@@ -26,7 +26,7 @@ namespace utils {
 
     std::string RobotStatusToString(RobotStatus status);
 
-    drake::lcmt_iiwa_status ConvertToLcmStatus(const franka_driver::RobotData& robot_data); // (franka::RobotState& robot_state);
+    drake::lcmt_iiwa_status ConvertToLcmStatus(const franka_driver::RobotData& robot_data);
 
     drake::lcmt_iiwa_status EigenToLcmStatus(Eigen::VectorXd robot_state);
 
