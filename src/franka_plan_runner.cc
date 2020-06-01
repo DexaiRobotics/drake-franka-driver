@@ -559,9 +559,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // the current (desired) position of franka is the starting position:
     start_conf_franka_ = current_conf_franka;
 
-    Eigen::VectorXd delta_start_to_end_plan =
-        plan_->value(plan_->end_time()) - start_conf_plan_;
-
     end_conf_plan_ = plan_->value(plan_->end_time());
     // TODO @rkk: move this print into another thread
     dexai::log()->debug("JointPositionCallback: starting franka q = {}",
