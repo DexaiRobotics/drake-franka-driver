@@ -614,17 +614,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // overwrite the output_to_franka of this callback:
   output_to_franka = utils::EigenToArray(next_conf_combined);
 
-  // Finish Checks:
-  // if (status_ == RobotStatus::Reversing) {
-  //   double error_reverse = (current_conf_franka - start_conf_franka_).norm();
-  //   // reversing is complete once we have achieve a norm of 0.1:
-  //   if (error_reverse < allowable_norm_error_) {
-  //     plan_.release();
-  //     output_to_franka = utils::EigenToArray(current_conf_franka);
-  //     return franka::MotionFinished(output_to_franka);
-  //   }
-  // }
-  if (franka_time_ > plan_->end_time()) { //&& status_ != RobotStatus::Reversing) {
+  if (franka_time_ > plan_->end_time()) {
+
+    // Maximum change in joint angle between two confs
     double error_final = utils::max_angular_distance(end_conf_plan_, current_conf_franka);
 
     if (error_final < allowable_max_angle_error_) {
