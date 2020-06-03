@@ -64,7 +64,10 @@ namespace utils {
         return status_string;
     }
 
-    drake::lcmt_iiwa_status ConvertToLcmStatus(franka::RobotState& robot_state) {
+    drake::lcmt_iiwa_status ConvertToLcmStatus(const franka_driver::RobotData& robot_data) { // franka::RobotState& robot_state) {
+        const auto& robot_state = robot_data.robot_state;
+        const auto& robot_plan_next_conf = robot_data.robot_plan_next_conf;
+
         drake::lcmt_iiwa_status robot_status{};
         int num_joints = robot_state.q.size();
         struct timeval tv;
@@ -76,7 +79,12 @@ namespace utils {
         // q
         robot_status.joint_position_measured = ArrayToVector(robot_state.q);
         robot_status.joint_position_commanded = ArrayToVector(robot_state.q_d);
-        robot_status.joint_position_ipo.resize(num_joints, 0);
+
+        // NOTE: joint_position_ipo is supposed to be KUKA's motion interpolated joint position
+        // but we use to pass via lcm the joint position the robot is supposed to be at
+        // according to its current plan
+        robot_status.joint_position_ipo = e_to_v(robot_plan_next_conf);
+
         robot_status.joint_velocity_estimated = ArrayToVector(robot_state.dq);
         robot_status.joint_torque_measured = ArrayToVector(robot_state.tau_J);
         robot_status.joint_torque_commanded = ArrayToVector(robot_state.tau_J_d);

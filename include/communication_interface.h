@@ -34,6 +34,7 @@ namespace franka_driver {
 struct RobotData {
   std::atomic<bool> has_robot_data_;
   franka::RobotState robot_state;
+  Eigen::VectorXd robot_plan_next_conf;
 };
 
 struct PauseData {
@@ -62,9 +63,11 @@ class CommunicationInterface {
   // and replace with std::array type:
   franka::RobotState GetRobotState();
   /// Blocking call that sets the robot state
-  void SetRobotState(const franka::RobotState& robot_state);
+  void SetRobotData(const franka::RobotState& robot_state,
+                    const Eigen::VectorXd& robot_plan_next_conf);
   /// Non-blocking call that sets the robot state if possible
-  void TryToSetRobotState(const franka::RobotState& robot_state);
+  void TryToSetRobotData(const franka::RobotState& robot_state,
+                         const Eigen::VectorXd& robot_plan_next_conf);
 
   bool GetPauseStatus();
   void SetPauseStatus(bool paused);

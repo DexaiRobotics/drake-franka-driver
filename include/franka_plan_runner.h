@@ -108,15 +108,17 @@ class FrankaPlanRunner {
 
   // config of start of plan:
   Eigen::VectorXd start_conf_plan_;
+  // next config according to plan:
+  Eigen::VectorXd next_conf_plan_;
   // config of franka when plan starts:
   Eigen::VectorXd start_conf_franka_;
   // config of robot when franka starts reversing:
   Eigen::VectorXd start_reversing_conf_franka_;
   // config of franka when plan ends:
-  Eigen::VectorXd end_conf_franka_;
+  Eigen::VectorXd end_conf_plan_;
 
   Eigen::VectorXd max_accels_;
-  double allowable_norm_error_ = 0.007;  // empirically proven
+  double allowable_max_angle_error_ = 0.001;  // empirically proven
 
 };  // FrankaPlanRunner
 

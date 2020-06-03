@@ -61,6 +61,7 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
 
   start_conf_franka_ = Eigen::VectorXd::Zero(dof_);
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
+  next_conf_plan_ = Eigen::VectorXd::Zero(dof_);
 
   // define the joint_position_callback_ needed for the robot control loop:
   joint_position_callback_ =
@@ -242,7 +243,7 @@ int FrankaPlanRunner::RunFranka() {
           // rate ...
           // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
           robot.read([this](const franka::RobotState& robot_state) {
-            comm_interface_->SetRobotState(robot_state);
+            comm_interface_->SetRobotData(robot_state, next_conf_plan_);
             std::this_thread::sleep_for(std::chrono::milliseconds(
                 static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
             return false;
@@ -524,7 +525,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   Eigen::VectorXd current_conf_franka = utils::v_to_e(q_d_v);
   // Set robot state for LCM publishing:
   // TODO @rkk: do not use franka robot state but use a generic Eigen instead
-  comm_interface_->TryToSetRobotState(robot_state);
 
   static bool first_run = true;
 
@@ -558,15 +558,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // the current (desired) position of franka is the starting position:
     start_conf_franka_ = current_conf_franka;
 
-    Eigen::VectorXd delta_start_to_end_plan =
-        plan_->value(plan_->end_time()) - start_conf_plan_;
-
-    end_conf_franka_ = start_conf_franka_ + delta_start_to_end_plan;
+    end_conf_plan_ = plan_->value(plan_->end_time());
     // TODO @rkk: move this print into another thread
     dexai::log()->debug("JointPositionCallback: starting franka q = {}",
                         start_conf_franka_.transpose());
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_plan_.transpose());
+
+    // Maximum change in joint angle between two confs
     auto max_ang_distance =
         utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
     if (max_ang_distance > params_.kMediumJointDistance) {
@@ -590,52 +589,61 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     return franka::MotionFinished(output_to_franka);
   }
 
+  const auto plan_end_time = plan_->end_time();
+  const auto plan_completion_fraction = std::min(1.0, std::max(0.0, franka_time_/plan_end_time));
+
   // read out plan for current franka time from plan:
-  Eigen::VectorXd next_conf_plan = plan_->value(franka_time_);
-  if (!LimitJoints(next_conf_plan)) {
+  next_conf_plan_ = plan_->value(franka_time_);
+  if (!LimitJoints(next_conf_plan_)) {
     dexai::log()->warn(
         "JointPositionCallback: plan at {}s is exceeding the joint limits!",
         franka_time_);
   }
 
+  comm_interface_->TryToSetRobotData(robot_state, next_conf_plan_);
+
   // delta between conf at start of plan to conft at current time of plan:
-  Eigen::VectorXd delta_conf_plan = next_conf_plan - start_conf_plan_;
+  Eigen::VectorXd delta_conf_plan = next_conf_plan_ - start_conf_plan_;
 
   // add delta to current robot state to achieve a continuous motion:
   Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
 
+  // Linear interpolation between next conf with offset and the actual next conf based on received plan
+  Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan_;
+
   // overwrite the output_to_franka of this callback:
-  output_to_franka = utils::EigenToArray(next_conf_franka);
+  output_to_franka = utils::EigenToArray(next_conf_combined);
 
-  // Finish Checks:
-  // if (status_ == RobotStatus::Reversing) {
-  //   double error_reverse = (current_conf_franka - start_conf_franka_).norm();
-  //   // reversing is complete once we have achieve a norm of 0.1:
-  //   if (error_reverse < allowable_norm_error_) {
-  //     plan_.release();
-  //     output_to_franka = utils::EigenToArray(current_conf_franka);
-  //     return franka::MotionFinished(output_to_franka);
-  //   }
-  // }
-  if (franka_time_ > plan_->end_time()) { //&& status_ != RobotStatus::Reversing) {
-    double error_final = (current_conf_franka - end_conf_franka_).norm();
+  if (franka_time_ > plan_->end_time()) {
 
-    if (error_final < allowable_norm_error_) {
+    // Maximum change in joint angle between two confs
+    double error_final = utils::max_angular_distance(end_conf_plan_, current_conf_franka);
+
+    if (error_final < allowable_max_angle_error_) {
       dexai::log()->info(
           "JointPositionCallback: Finished plan {}, exiting controller",
           plan_utime_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
-      dexai::log()->warn(
-          "JointPositionCallback: Overtimed plan {}: robot diverged, norm "
-          "error: {}",
-          plan_utime_, error_final);
+
+      auto error_eigen = (end_conf_plan_ - current_conf_franka).cwiseAbs();
+      for (size_t joint_idx = 0; joint_idx < dof_; joint_idx++ ) {
+        if (error_eigen(joint_idx) > allowable_max_angle_error_) {
+          dexai::log()->warn(
+              "JointPositionCallback: Overtimed plan {}: robot diverged, joint {} "
+              "error: {} - {} = {} > max allowable: {}",
+              plan_utime_, joint_idx, end_conf_plan_(joint_idx),
+              current_conf_franka(joint_idx), error_eigen(joint_idx),
+              allowable_max_angle_error_);
+        }
+      }
+
       dexai::log()->info("JointPositionCallback: current_conf_franka: {}",
                          current_conf_franka.transpose());
       dexai::log()->info("JointPositionCallback: next_conf_franka: {}",
                          next_conf_franka.transpose());
       dexai::log()->info("JointPositionCallback: next_conf_plan: {}",
-                         next_conf_plan.transpose());
+                         next_conf_plan_.transpose());
       comm_interface_->PublishPlanComplete(plan_utime_, false /*  = failed*/,
                                            "diverged");
     }

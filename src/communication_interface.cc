@@ -127,19 +127,23 @@ franka::RobotState CommunicationInterface::GetRobotState() {
   return robot_data_.robot_state;
 }
 
-void CommunicationInterface::SetRobotState(
-    const franka::RobotState& robot_state) {
+void CommunicationInterface::SetRobotData(
+    const franka::RobotState& robot_state,
+    const Eigen::VectorXd& robot_plan_next_conf) {
   std::lock_guard<std::mutex> lock(robot_data_mutex_);
   robot_data_.has_robot_data_ = true;
   robot_data_.robot_state = robot_state;
+  robot_data_.robot_plan_next_conf = robot_plan_next_conf;
 }
 
-void CommunicationInterface::TryToSetRobotState(
-    const franka::RobotState& robot_state) {
+void CommunicationInterface::TryToSetRobotData(
+    const franka::RobotState& robot_state,
+    const Eigen::VectorXd& robot_plan_next_conf) {
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
   if (lock.try_lock()) {
     robot_data_.has_robot_data_ = true;
     robot_data_.robot_state = robot_state;
+    robot_data_.robot_plan_next_conf = robot_plan_next_conf;
     lock.unlock();
   }
 }
@@ -203,7 +207,7 @@ void CommunicationInterface::PublishRobotStatus() {
   std::unique_lock<std::mutex> lock(robot_data_mutex_);
   if (robot_data_.has_robot_data_) {
     drake::lcmt_iiwa_status franka_status =
-        utils::ConvertToLcmStatus(robot_data_.robot_state);
+        utils::ConvertToLcmStatus(robot_data_);
     // publish data over lcm
     robot_data_.has_robot_data_ = false;
     lock.unlock();
