@@ -243,7 +243,7 @@ int FrankaPlanRunner::RunFranka() {
           // rate ...
           // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
           robot.read([this](const franka::RobotState& robot_state) {
-            comm_interface_->SetRobotState(robot_state, next_conf_plan_);
+            comm_interface_->SetRobotData(robot_state, next_conf_plan_);
             std::this_thread::sleep_for(std::chrono::milliseconds(
                 static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
             return false;
@@ -600,7 +600,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         franka_time_);
   }
 
-  comm_interface_->TryToSetRobotState(robot_state, next_conf_plan_);
+  comm_interface_->TryToSetRobotData(robot_state, next_conf_plan_);
 
   // delta between conf at start of plan to conft at current time of plan:
   Eigen::VectorXd delta_conf_plan = next_conf_plan_ - start_conf_plan_;

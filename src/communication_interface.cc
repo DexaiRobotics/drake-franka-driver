@@ -127,7 +127,7 @@ franka::RobotState CommunicationInterface::GetRobotState() {
   return robot_data_.robot_state;
 }
 
-void CommunicationInterface::SetRobotState(
+void CommunicationInterface::SetRobotData(
     const franka::RobotState& robot_state,
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::lock_guard<std::mutex> lock(robot_data_mutex_);
@@ -136,7 +136,7 @@ void CommunicationInterface::SetRobotState(
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
 }
 
-void CommunicationInterface::TryToSetRobotState(
+void CommunicationInterface::TryToSetRobotData(
     const franka::RobotState& robot_state,
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
