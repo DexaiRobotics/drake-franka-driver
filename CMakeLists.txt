@@ -143,6 +143,7 @@ set(LINK_LIBRARIES
     Threads::Threads
     ${Python3_LIBRARIES}
     fcl
+    cnpy
 )
 
 target_link_libraries(${driver_name} 

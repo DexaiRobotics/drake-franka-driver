@@ -26,7 +26,7 @@ using namespace franka_driver;
 using namespace utils;
 
 FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
-    : dof_(7),
+    : dof_(FRANKA_DOF),
       home_addr_("192.168.1.1"),
       params_(params),
       ip_addr_(params.robot_ip) {
@@ -62,7 +62,21 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
   start_conf_franka_ = Eigen::VectorXd::Zero(dof_);
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
   next_conf_plan_ = Eigen::VectorXd::Zero(dof_);
+  joint_pos_offset_ = Eigen::VectorXd::Zero(dof_);
 
+  try {
+    cnpy::NpyArray joint_pos_offset_data = cnpy::npy_load("joint_pos_offset.npy");
+    const std::array<double, FRANKA_DOF>& joint_pos_offset_array = *(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>());
+    const auto joint_pos_offset_v = ArrayToVector(joint_pos_offset_array);
+    Eigen::VectorXd joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
+    is_joint_pos_offset_available_ = true;
+  } catch (const std::runtime_error& error)
+  {
+    log()->error("FrankaPlanRunner: Caught runtime_error. Could not load joint position offset from file. Setting offsets to zero...");
+    is_joint_pos_offset_available_ = false;
+  }
+
+  
   // define the joint_position_callback_ needed for the robot control loop:
   joint_position_callback_ =
       [&, this](const franka::RobotState& robot_state,
@@ -527,7 +541,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // read out robot state
   franka::JointPositions output_to_franka = robot_state.q_d;
   auto q_d_v = ArrayToVector(robot_state.q_d);
-  Eigen::VectorXd current_conf_franka = utils::v_to_e(q_d_v);
+  Eigen::VectorXd current_conf_franka_uncorrected = utils::v_to_e(q_d_v);
+
+  Eigen::VectorXd current_conf_franka;
+  if (is_joint_pos_offset_available_) {
+    current_conf_franka = current_conf_franka_uncorrected - joint_pos_offset_;
+  } else {
+    current_conf_franka = current_conf_franka_uncorrected;
+  }
+
   // Set robot state for LCM publishing:
   // TODO @rkk: do not use franka robot state but use a generic Eigen instead
 
@@ -606,16 +628,23 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         franka_time_);
   }
 
-  comm_interface_->TryToSetRobotData(robot_state, next_conf_plan_);
+  Eigen::VectorXd next_conf_plan_corrected;
+  if (is_joint_pos_offset_available_) {
+    next_conf_plan_corrected = next_conf_plan_ + joint_pos_offset_;
+  } else {
+    next_conf_plan_corrected = next_conf_plan_;
+  }
+
+  comm_interface_->TryToSetRobotData(robot_state, next_conf_plan_corrected);
 
   // delta between conf at start of plan to conft at current time of plan:
-  Eigen::VectorXd delta_conf_plan = next_conf_plan_ - start_conf_plan_;
+  Eigen::VectorXd delta_conf_plan = next_conf_plan_corrected - start_conf_plan_;
 
   // add delta to current robot state to achieve a continuous motion:
   Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
 
   // Linear interpolation between next conf with offset and the actual next conf based on received plan
-  Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan_;
+  Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan_corrected;
 
   // overwrite the output_to_franka of this callback:
   output_to_franka = utils::EigenToArray(next_conf_combined);
@@ -650,6 +679,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
                          next_conf_franka.transpose());
       dexai::log()->info("JointPositionCallback: next_conf_plan: {}",
                          next_conf_plan_.transpose());
+      dexai::log()->info("JointPositionCallback: next_conf_plan_corrected: {}",
+                         next_conf_plan_corrected.transpose());
       comm_interface_->PublishPlanComplete(plan_utime_, false /*  = failed*/,
                                            "diverged");
     }

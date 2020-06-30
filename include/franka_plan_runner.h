@@ -27,6 +27,9 @@
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
 #include <mutex>                        // for mutex
 #include <thread>                       // for thread
+#include <cnpy.h>                       // to read joint position offsets
+
+#define FRANKA_DOF 7
 
 namespace franka_driver {
 
@@ -116,6 +119,9 @@ class FrankaPlanRunner {
   Eigen::VectorXd start_reversing_conf_franka_;
   // config of franka when plan ends:
   Eigen::VectorXd end_conf_plan_;
+
+  bool is_joint_pos_offset_available_ = false;
+  Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
   double allowable_max_angle_error_ = 0.001;  // empirically proven
