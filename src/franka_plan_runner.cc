@@ -336,6 +336,8 @@ int FrankaPlanRunner::RunSim() {
   Eigen::VectorXd prev_conf;
   std::vector<double> vel(7, 1);
   franka::RobotState robot_state;  // internal state; mapping to franka state
+  robot_state.robot_mode = franka::RobotMode::kIdle;
+
   franka::Duration period;
   std::chrono::milliseconds last_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -344,6 +346,7 @@ int FrankaPlanRunner::RunSim() {
   status_ = RobotStatus::Running;  // define robot as running at start
 
   while (1) {
+  
     std::this_thread::sleep_for(std::chrono::milliseconds(
         static_cast<int>(1000.0 / lcm_publish_rate_)));
 
@@ -583,9 +586,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
 
   if (!plan_) {
-    dexai::log()->info(
+    dexai::log()->debug(
         "JointPositionCallback: No plan exists (anymore), exiting "
         "controller...");
+    comm_interface_->TryToSetRobotData(robot_state, start_conf_franka_);
     return franka::MotionFinished(output_to_franka);
   }
 
