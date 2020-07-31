@@ -1,6 +1,3 @@
-[submodule "externals/libfranka"]
-	path = externals/libfranka
-	url = https://github.com/DexaiRobotics/libfranka.git
 [submodule "externals/filesystem"]
 	path = externals/filesystem
 	url = https://github.com/gulrak/filesystem.git
