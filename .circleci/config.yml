@@ -5,7 +5,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: dexai2/drake-torch:bionic_latest
+      - image: dexai2/drake-torch:cpu_latest
 
     steps:
       - run:
