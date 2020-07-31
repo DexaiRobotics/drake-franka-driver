@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euxo pipefail
+
 # Positional Parameters for specifying different behavior via the command line.
 # see http://linuxcommand.org/lc3_wss0120.php
 # Example CircleCI usage (from .circleci/config.yml): ./setup.sh 4 1 1
@@ -20,9 +22,11 @@ echo "####### make will use $num_threads jobs to build target: $target #######"
 
 echo "update libfranka and build if not done yet..."
 cd externals
-git submodule update --init --recursive
 cd libfranka
-if [ ! -d "build" ]; then
+if [ ! -f "build/libfranka.so" ]; then
+    if [ -d "build" ]; then
+        rm -rf build
+    fi
     echo "build libfranka..."
     mkdir build && cd build
     if (( $build_debug > 0 )); then
