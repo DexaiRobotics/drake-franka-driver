@@ -23,12 +23,17 @@ echo "####### make will use $num_threads jobs to build target: $target #######"
 echo "update libfranka and build if not done yet..."
 cd externals
 cd libfranka
-if [ ! -f "build/libfranka.so" ]; then
+
+if (( $clean_build > 0 )); then
     if [ -d "build" ]; then
         rm -rf build
     fi
+fi
+
+if [ ! -f "build/libfranka.so" ]; then
+
     echo "build libfranka..."
-    mkdir build && cd build
+    mkdir -p build && cd build
     if (( $build_debug > 0 )); then
         echo "Build libfranka in Debug mode!"
         cmake .. -DCMAKE_BUILD_TYPE=Debug \ 
