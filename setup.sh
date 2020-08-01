@@ -31,9 +31,13 @@ if [ ! -f "build/libfranka.so" ]; then
     mkdir build && cd build
     if (( $build_debug > 0 )); then
         echo "Build libfranka in Debug mode!"
-        cmake .. -DCMAKE_BUILD_TYPE=Debug
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \ 
+                 -DCMAKE_C_COMPILER=gcc-7 \
+                 -DCMAKE_CXX_COMPILER=g++-7
     else
-        cmake .. -DCMAKE_BUILD_TYPE=Release
+        cmake .. -DCMAKE_BUILD_TYPE=Release \
+                 -DCMAKE_C_COMPILER=gcc-7 \
+                 -DCMAKE_CXX_COMPILER=g++-7
     fi
     cmake --build . -j $num_threads --target franka
     cd ..
@@ -58,16 +62,19 @@ mkdir -p build; cd build
 echo "build_debug = $build_debug"
 if (( $build_debug > 0 )); then
     echo "Build in Debug mode!"
-    cmake .. -DCMAKE_BUILD_TYPE=Debug || exit 4   # Build for debugging
+    cmake .. -DCMAKE_BUILD_TYPE=Debug \
+             -DCMAKE_C_COMPILER=gcc-7 \
+             -DCMAKE_CXX_COMPILER=g++-7 || exit 4   # Build for debugging
 else
-    cmake ..                          || exit 5
+    cmake .. -DCMAKE_C_COMPILER=gcc-7 \
+             -DCMAKE_CXX_COMPILER=g++-7 || exit 5
 fi
 
-make  -j $num_threads $target         || exit 6
+make  -j $num_threads $target           || exit 6
 if (( $exec_ctests > 0 )); then
     if (( $skip_slower )); then
-        ctest -E $exclude_pat         || exit 7   # exclude tests matching the regex
+        ctest -E $exclude_pat           || exit 7   # exclude tests matching the regex
     else
-        ctest                         || exit 8   # run all unit tests
+        ctest                           || exit 8   # run all unit tests
     fi
 fi
