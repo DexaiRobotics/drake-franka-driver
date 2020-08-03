@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -euxo pipefail
+
 # Positional Parameters for specifying different behavior via the command line.
 # see http://linuxcommand.org/lc3_wss0120.php
 # Example CircleCI usage (from .circleci/config.yml): ./setup.sh 4 1 1
@@ -20,16 +22,27 @@ echo "####### make will use $num_threads jobs to build target: $target #######"
 
 echo "update libfranka and build if not done yet..."
 cd externals
-git submodule update --init --recursive
 cd libfranka
-if [ ! -d "build" ]; then
+
+if (( $clean_build > 0 )); then
+    if [ -d "build" ]; then
+        rm -rf build
+    fi
+fi
+
+if [ ! -f "build/libfranka.so" ]; then
+
     echo "build libfranka..."
-    mkdir build && cd build
+    mkdir -p build && cd build
     if (( $build_debug > 0 )); then
         echo "Build libfranka in Debug mode!"
-        cmake .. -DCMAKE_BUILD_TYPE=Debug
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \ 
+                 -DCMAKE_C_COMPILER=gcc-7 \
+                 -DCMAKE_CXX_COMPILER=g++-7
     else
-        cmake .. -DCMAKE_BUILD_TYPE=Release
+        cmake .. -DCMAKE_BUILD_TYPE=Release \
+                 -DCMAKE_C_COMPILER=gcc-7 \
+                 -DCMAKE_CXX_COMPILER=g++-7
     fi
     cmake --build . -j $num_threads --target franka
     cd ..
@@ -54,16 +67,19 @@ mkdir -p build; cd build
 echo "build_debug = $build_debug"
 if (( $build_debug > 0 )); then
     echo "Build in Debug mode!"
-    cmake .. -DCMAKE_BUILD_TYPE=Debug || exit 4   # Build for debugging
+    cmake .. -DCMAKE_BUILD_TYPE=Debug \
+             -DCMAKE_C_COMPILER=gcc-7 \
+             -DCMAKE_CXX_COMPILER=g++-7 || exit 4   # Build for debugging
 else
-    cmake ..                          || exit 5
+    cmake .. -DCMAKE_C_COMPILER=gcc-7 \
+             -DCMAKE_CXX_COMPILER=g++-7 || exit 5
 fi
 
-make  -j $num_threads $target         || exit 6
+make  -j $num_threads $target           || exit 6
 if (( $exec_ctests > 0 )); then
     if (( $skip_slower )); then
-        ctest -E $exclude_pat         || exit 7   # exclude tests matching the regex
+        ctest -E $exclude_pat           || exit 7   # exclude tests matching the regex
     else
-        ctest                         || exit 8   # run all unit tests
+        ctest                           || exit 8   # run all unit tests
     fi
 fi

@@ -5,7 +5,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: dexai2/drake-torch:bionic_latest
+      - image: dexai2/drake-torch:cpu_latest
 
     steps:
       - run:
@@ -31,4 +31,5 @@ jobs:
           command: |
             echo "In build and test: building project . . ."
             cd ~/project
+            git submodule update --init --recursive
             ./setup.sh 2 1 1 0 ### 3 => make -j 2; 1 => build tests; 1 => run ctest; 0 => not debug
