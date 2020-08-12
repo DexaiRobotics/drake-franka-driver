@@ -385,9 +385,9 @@ bool FrankaPlanRunner::IsContinuous(PPType old_plan, PPType new_plan){
     return false;
   }
   else if (old_plan.derivative(2).value(frank_time_) != new_plan.derivative(2).value(frank_time_)){
-    return false
+    return false;
   }
-  return true
+  return true;
 }
 
 /// Check and limit conf according to provided parameters for joint limits
@@ -550,6 +550,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   if (comm_interface_->HasNewPlan()) { // && status_ != RobotStatus::Reversing) {
     // get the current plan from the communication interface
+    
     comm_interface_->TakePlan(plan_, plan_utime_);
 
     // auto plan_received_time = std::chrono::high_resolution_clock::now();
@@ -568,7 +569,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "is exceeding the joint limits!",
           plan_utime_, franka_time_);
     }
+    
+    if (!IsContinuous(old_plan, plan_)){
+        dexai::log()->warn(
+          "JointPositionCallback: plan {} at franka_time_: {} seconds "
+          "is not continuous with old plan, continuing with old plan.",
+          plan_utime_, franka_time_);
 
+    }
 
     // the current (desired) position of franka is the starting position:
     start_conf_franka_ = current_conf_franka;
@@ -580,8 +588,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_plan_.transpose());
 
-
-    // instead check continuity 
     
     // Maximum change in joint angle between two confs
     auto max_ang_distance =
