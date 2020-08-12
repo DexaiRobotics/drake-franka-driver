@@ -378,6 +378,18 @@ int FrankaPlanRunner::RunSim() {
   return 0;
 }
 
+bool FrankaPlanRunner::IsContinuous(PPType old_plan, PPType new_plan){
+  if (old_plan.value(franka_time_) != new_plan.value(franka_time_){
+    return false;
+  } else if (old_plan.derivative(1).value(franka_time_) != new_plan.derivative(1).value(franka_time_){
+    return false;
+  }
+  else if (old_plan.derivative(2).value(frank_time_) != new_plan.derivative(2).value(frank_time_)){
+    return false
+  }
+  return true
+}
+
 /// Check and limit conf according to provided parameters for joint limits
 bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
   // TODO @rkk: get limits from urdf (instead of parameter file)
@@ -548,7 +560,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // if(plan_time_delta ) {}
     
     // first time step of plan, reset time:
-    franka_time_ = 0.0;
     start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
 
     if (!LimitJoints(start_conf_plan_)) {
@@ -557,6 +568,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "is exceeding the joint limits!",
           plan_utime_, franka_time_);
     }
+
 
     // the current (desired) position of franka is the starting position:
     start_conf_franka_ = current_conf_franka;
@@ -568,6 +580,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_plan_.transpose());
 
+
+    // instead check continuity 
+    
     // Maximum change in joint angle between two confs
     auto max_ang_distance =
         utils::max_angular_distance(start_conf_franka_, start_conf_plan_);

@@ -55,6 +55,7 @@ class FrankaPlanRunner {
 
   int RunSim();
 
+  bool IsContinuous(PPType old_plan, PPType new_plan);
   /// Check and limit conf according to provided parameters for joint limits
   bool LimitJoints(Eigen::VectorXd& conf);
 
