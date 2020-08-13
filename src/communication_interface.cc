@@ -108,6 +108,41 @@ bool CommunicationInterface::HasNewPlan() {
   return robot_plan_.has_plan_data_;  // is atomic
 }
 
+bool CommunicationInterface::IsContinuous(std::unique_ptr<PPType>& plan, int franka_time){
+  //checks if new plan is continuous with old plan
+  if(!plan){
+    return true;
+  }
+  if (!HasNewPlan()){
+    throw std::runtime_error("CommunicationInterface::IsContinuous: No new plan to check for continuity!");
+  }
+  const Eigen::VectorXd pos_tolerance = (params_.robot_high_joint_limits - params_.robot_low_joint_limits)*1e-5;
+  const Eigen::VectorXd vel_tolerance = (params_.robot_max_velocities)*1e-5;
+  const Eigen::VectorXd acc_tolerance = (params_.robot_max_accelerations)*1e-5; 
+
+  std::function is_tolerated = [&, this](int d, Eigen::VectorXd tolerance)-> bool {
+    Eigen::VectorXd err = (this->robot_plan_.plan_->derivative(d).value(franka_time) - plan->derivative(d).value(franka_time)).cwiseAbs();
+    return (err - tolerance).sum() > 0;
+  };
+
+  if(!is_tolerated(0, pos_tolerance)){
+    dexai::log()->error("CommunicationInterface::IsContinuous: New plan proposed but not continuous"
+    "with position of old plan at franka time {}. Continuing old plan!", franka_time);
+    return false;
+  } else if(!is_tolerated(1, vel_tolerance)){
+    dexai::log()->error("CommunicationInterface::IsContinuous: New plan proposed but not continuous" 
+    "with velocity of old plan at franka time {}. Continuing old plan!", franka_time);
+    return false;
+  } else if(!is_tolerated(2, acc_tolerance)){
+    dexai::log()->error("CommunicationInterface::IsContinuous: New plan proposed but not continuous"
+    "with acceleration of old plan at franka time {} . Continuing old plan!", franka_time);
+    return false;
+  }
+  dexai::log()->error("Plan: {}", robot_plan_.utime);
+
+  return true;
+}
+
 void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
                                       int64_t& plan_utime) {
   std::lock_guard<std::mutex> lock(robot_plan_mutex_);
@@ -115,7 +150,7 @@ void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
     throw std::runtime_error("TakePlan: No plan to take over!");
   }
   robot_plan_.has_plan_data_ = false;
-  plan = std::move(robot_plan_.plan_);
+  plan = std::move(robot_plan_.plan_); //old plan is let go of, set plan to new plan object
   if (!plan) {
     throw std::runtime_error("TakePlan: Failed to take plan!");
   }
@@ -351,7 +386,7 @@ void CommunicationInterface::HandlePlan(
   auto max_angular_distance =
       utils::max_angular_distance(commanded_start, q_eigen);
   if (max_angular_distance > params_.kMediumJointDistance) {
-    // discard the plan if we are too far away from current robot start
+    // discard the plan if we are too far away from current robot start CHANGE to too far from end robot state 
     Eigen::VectorXd joint_delta = q_eigen - commanded_start;
     dexai::log()->error(
         "CommunicationInterface::HandlePlan: "

@@ -378,18 +378,6 @@ int FrankaPlanRunner::RunSim() {
   return 0;
 }
 
-bool FrankaPlanRunner::IsContinuous(PPType old_plan, PPType new_plan){
-  if (old_plan.value(franka_time_) != new_plan.value(franka_time_){
-    return false;
-  } else if (old_plan.derivative(1).value(franka_time_) != new_plan.derivative(1).value(franka_time_){
-    return false;
-  }
-  else if (old_plan.derivative(2).value(frank_time_) != new_plan.derivative(2).value(frank_time_)){
-    return false;
-  }
-  return true;
-}
-
 /// Check and limit conf according to provided parameters for joint limits
 bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
   // TODO @rkk: get limits from urdf (instead of parameter file)
@@ -548,7 +536,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   //   first_run = false;
   // }
 
-  if (comm_interface_->HasNewPlan()) { // && status_ != RobotStatus::Reversing) {
+  if (comm_interface_->HasNewPlan()){ //&& comm_interface_->IsContinuous(plan_, franka_time_)) { // && status_ != RobotStatus::Reversing) {
     // get the current plan from the communication interface
     
     comm_interface_->TakePlan(plan_, plan_utime_);
@@ -560,7 +548,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // auto plan_time_delta = plan_received_utime - plan_utime_; 
     // if(plan_time_delta ) {}
     
-    // first time step of plan, reset time:
+    // first time step of plan
     start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
 
     if (!LimitJoints(start_conf_plan_)) {
@@ -570,14 +558,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           plan_utime_, franka_time_);
     }
     
-    if (!IsContinuous(old_plan, plan_)){
-        dexai::log()->warn(
-          "JointPositionCallback: plan {} at franka_time_: {} seconds "
-          "is not continuous with old plan, continuing with old plan.",
-          plan_utime_, franka_time_);
-
-    }
-
     // the current (desired) position of franka is the starting position:
     start_conf_franka_ = current_conf_franka;
 
