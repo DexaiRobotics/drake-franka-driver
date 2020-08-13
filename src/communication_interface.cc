@@ -108,7 +108,7 @@ bool CommunicationInterface::HasNewPlan() {
   return robot_plan_.has_plan_data_;  // is atomic
 }
 
-bool CommunicationInterface::IsContinuous(std::unique_ptr<PPType>& plan, int franka_time){
+bool CommunicationInterface::IsContinuous(std::unique_ptr<PPType>& plan, double franka_time){
   //checks if new plan is continuous with old plan
   if(!plan){
     return true;
@@ -138,8 +138,7 @@ bool CommunicationInterface::IsContinuous(std::unique_ptr<PPType>& plan, int fra
     "with acceleration of old plan at franka time {} . Continuing old plan!", franka_time);
     return false;
   }
-  dexai::log()->error("Plan: {}", robot_plan_.utime);
-
+  dexai::log()->info("CommunicationInterface::IsContinuous: New plan is continuous. Switching to new plan!");
   return true;
 }
 

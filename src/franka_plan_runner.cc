@@ -536,9 +536,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   //   first_run = false;
   // }
 
-  if (comm_interface_->HasNewPlan()){ //&& comm_interface_->IsContinuous(plan_, franka_time_)) { // && status_ != RobotStatus::Reversing) {
+  if (comm_interface_->HasNewPlan() && comm_interface_->IsContinuous(plan_, franka_time_)) { // && status_ != RobotStatus::Reversing) {
     // get the current plan from the communication interface
-    
     comm_interface_->TakePlan(plan_, plan_utime_);
 
     // auto plan_received_time = std::chrono::high_resolution_clock::now();
@@ -549,6 +548,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // if(plan_time_delta ) {}
     
     // first time step of plan
+    franka_time_ = 0.0;
     start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
 
     if (!LimitJoints(start_conf_plan_)) {
@@ -619,7 +619,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // overwrite the output_to_franka of this callback:
   output_to_franka = utils::EigenToArray(next_conf_combined);
 
-  if (franka_time_ > plan_->end_time()) {
+  if (franka_time_ >= plan_->end_time()) {
 
     // Maximum change in joint angle between two confs
     double error_final = utils::max_angular_distance(end_conf_plan_, current_conf_franka);
@@ -628,6 +628,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       dexai::log()->info(
           "JointPositionCallback: Finished plan {}, exiting controller",
           plan_utime_);
+        franka_time_ = 0.0; //new plan should now start at 0
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
 
