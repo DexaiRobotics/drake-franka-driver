@@ -58,7 +58,7 @@ bool is_continuous(std::unique_ptr<PPType>& old_plan,
 {
     std::function is_tolerated = [&](int d, Eigen::VectorXd tolerance)-> bool {
         Eigen::VectorXd err = (old_plan->derivative(d).value(franka_time) - new_plan->derivative(d).value(franka_time)).cwiseAbs();
-        return (err - tolerance).sum() <= 0.0;
+        return (tolerance - err).sum() >= 0.0;
     };
 
     return (is_tolerated(0, pos_tolerance) && is_tolerated(1, vel_tolerance) && is_tolerated(2, acc_tolerance));

@@ -35,8 +35,8 @@ TEST(UtilMath, is_pos_continuous)
     }
     std::unique_ptr<PPType> abs = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples2));
 
-    EXPECT_TRUE(utils::is_continuous(square, abs, 1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
-    EXPECT_FALSE(!utils::is_continuous(square, abs, 0.25, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    EXPECT_FALSE(utils::is_continuous(square, abs, 1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    EXPECT_FALSE(utils::is_continuous(square, abs, 0.25, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
 }
 
 TEST(UtilMath, is_vel_continuous)
@@ -56,8 +56,8 @@ TEST(UtilMath, is_vel_continuous)
     }
     std::unique_ptr<PPType> square_shifted_h = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples_h));
 
-    EXPECT_TRUE(!utils::is_continuous(square, square_shifted_h, 0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
-    EXPECT_TRUE(!utils::is_continuous(square, square_shifted_h, 0.67, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    EXPECT_FALSE(utils::is_continuous(square, square_shifted_h, 0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    EXPECT_FALSE(utils::is_continuous(square, square_shifted_h, 0.67, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
 }
 
 TEST(UtilMath, is_acc_continuous)
@@ -77,8 +77,7 @@ TEST(UtilMath, is_acc_continuous)
     }
     std::unique_ptr<PPType> line = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples_h));
 
-    EXPECT_TRUE(!utils::is_continuous(square, line, -0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
-    //EXPECT_TRUE(!utils::is_continuous(square, line, 0.67, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    EXPECT_FALSE(utils::is_continuous(square, line, -0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
 }
 
 TEST(UtilMath, is_not_continuous)
@@ -91,12 +90,13 @@ TEST(UtilMath, is_not_continuous)
     }
     std::unique_ptr<PPType> square = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples));
     
+    const std::vector<double> breaks_h = {1.0, 2.0, 3.0 };
     std::vector<Eigen::MatrixXd> samples_h(3);
-    for (int i = 0; i < static_cast<int>(breaks.size()); ++i) {
+    for (int i = 0; i < static_cast<int>(breaks_h.size()); ++i) {
         samples_h[i].resize(1, 1);
-        samples_h[i](0, 0) = breaks[i];
+        samples_h[i](0, 0) = std::cbrt(breaks_h[i]);
     }
-    std::unique_ptr<PPType> line = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples_h));
+    std::unique_ptr<PPType> line = std::make_unique<PPType>(PPType::FirstOrderHold(breaks_h, samples_h));
 
-    EXPECT_TRUE(!utils::is_continuous(square, line, -0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    EXPECT_FALSE(utils::is_continuous(square, line, -0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
 }
