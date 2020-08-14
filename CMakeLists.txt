@@ -168,6 +168,7 @@ set(GTEST_SRC_FILES
     tests/test_util_io.cc
     tests/test_util_math.cc
     tests/test_util_string.cc
+    tests/test_continuity.cc
     tests/test_robot_parameters.cc
     tests/test_constraint_solver.cc
 )

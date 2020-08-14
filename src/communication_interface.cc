@@ -108,6 +108,8 @@ bool CommunicationInterface::HasNewPlan() {
   return robot_plan_.has_plan_data_;  // is atomic
 }
 
+
+
 bool CommunicationInterface::IsContinuous(std::unique_ptr<PPType>& plan, double franka_time){
   //checks if new plan is continuous with old plan
   if(!plan){
@@ -116,29 +118,17 @@ bool CommunicationInterface::IsContinuous(std::unique_ptr<PPType>& plan, double 
   if (!HasNewPlan()){
     throw std::runtime_error("CommunicationInterface::IsContinuous: No new plan to check for continuity!");
   }
-  const Eigen::VectorXd pos_tolerance = (params_.robot_high_joint_limits - params_.robot_low_joint_limits)*1e-5;
-  const Eigen::VectorXd vel_tolerance = (params_.robot_max_velocities)*1e-5;
-  const Eigen::VectorXd acc_tolerance = (params_.robot_max_accelerations)*1e-5; 
 
-  std::function is_tolerated = [&, this](int d, Eigen::VectorXd tolerance)-> bool {
-    Eigen::VectorXd err = (this->robot_plan_.plan_->derivative(d).value(franka_time) - plan->derivative(d).value(franka_time)).cwiseAbs();
-    return (err - tolerance).sum() > 0;
-  };
+  const Eigen::VectorXd pos_tolerance = (params_.robot_high_joint_limits - params_.robot_low_joint_limits)*1e5;
+  const Eigen::VectorXd vel_tolerance = (params_.robot_max_velocities)*1e5;
+  const Eigen::VectorXd acc_tolerance = (params_.robot_max_accelerations)*1e5; 
 
-  if(!is_tolerated(0, pos_tolerance)){
-    dexai::log()->error("CommunicationInterface::IsContinuous: New plan proposed but not continuous"
-    "with position of old plan at franka time {}. Continuing old plan!", franka_time);
-    return false;
-  } else if(!is_tolerated(1, vel_tolerance)){
-    dexai::log()->error("CommunicationInterface::IsContinuous: New plan proposed but not continuous" 
-    "with velocity of old plan at franka time {}. Continuing old plan!", franka_time);
-    return false;
-  } else if(!is_tolerated(2, acc_tolerance)){
-    dexai::log()->error("CommunicationInterface::IsContinuous: New plan proposed but not continuous"
-    "with acceleration of old plan at franka time {} . Continuing old plan!", franka_time);
-    return false;
-  }
-  dexai::log()->info("CommunicationInterface::IsContinuous: New plan is continuous. Switching to new plan!");
+  if (!utils::is_continuous(robot_plan_.plan_, plan, franka_time, pos_tolerance, vel_tolerance, acc_tolerance)){
+    dexai::log()->error("CommunicationInterface::IsContinuous: New plan not continuous"
+     " with pos, vel or acc of old plan at franka time {}. Continuing old plan!", franka_time);
+     return false;
+  } 
+  dexai::log()->info("CommunicationInterface::IsContinuous: New plan is continuous with old plan. Switching to new plan!");
   return true;
 }
 

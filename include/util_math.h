@@ -68,4 +68,11 @@ namespace utils
         return true;
     }
 
+    bool is_continuous(std::unique_ptr<PPType>& old_plan,
+                       std::unique_ptr<PPType>& new_plan,
+                       double franka_time, 
+                       Eigen::VectorXd pos_tolerance,
+                       Eigen::VectorXd vel_tolerance,
+                       Eigen::VectorXd acc_tolerance);
+
 }   // namespace utils
