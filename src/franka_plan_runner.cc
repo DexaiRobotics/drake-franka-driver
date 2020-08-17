@@ -548,7 +548,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // if(plan_time_delta ) {}
     
     // first time step of plan
-    franka_time_ = 0.0;
     start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
 
     if (!LimitJoints(start_conf_plan_)) {
