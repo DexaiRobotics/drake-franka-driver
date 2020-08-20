@@ -119,9 +119,9 @@ bool CommunicationInterface::IsContinuous(std::unique_ptr<PPType>& plan, double 
     throw std::runtime_error("CommunicationInterface::IsContinuous: No new plan to check for continuity!");
   }
 
-  const Eigen::VectorXd pos_tolerance = (params_.robot_high_joint_limits - params_.robot_low_joint_limits)*1e5;
-  const Eigen::VectorXd vel_tolerance = (params_.robot_max_velocities)*1e5;
-  const Eigen::VectorXd acc_tolerance = (params_.robot_max_accelerations)*1e5; 
+  const Eigen::VectorXd pos_tolerance = (params_.robot_high_joint_limits - params_.robot_low_joint_limits)*1e-5;
+  const Eigen::VectorXd vel_tolerance = (params_.robot_max_velocities)*1e-5;
+  const Eigen::VectorXd acc_tolerance = (params_.robot_max_accelerations)*1e-5; 
 
   if (!utils::is_continuous(robot_plan_.plan_, plan, franka_time, pos_tolerance, vel_tolerance, acc_tolerance)){
     dexai::log()->error("CommunicationInterface::IsContinuous: New plan not continuous"

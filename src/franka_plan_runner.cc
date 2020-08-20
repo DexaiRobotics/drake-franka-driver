@@ -38,7 +38,6 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
       std::make_unique<CommunicationInterface>(params_, lcm_publish_rate_);
 
   // for pause logic:
-  franka_time_ = 0.0;
   max_accels_ = params.robot_max_accelerations;
 
   assert(! params_.urdf_filepath.empty() && "FrankaPlanRunner ctor: bad params_.urdf_filepath");
@@ -538,6 +537,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   if (comm_interface_->HasNewPlan() && comm_interface_->IsContinuous(plan_, franka_time_)) { // && status_ != RobotStatus::Reversing) {
     // get the current plan from the communication interface
+    dexai::log()->error("here");
     comm_interface_->TakePlan(plan_, plan_utime_);
 
     // auto plan_received_time = std::chrono::high_resolution_clock::now();
