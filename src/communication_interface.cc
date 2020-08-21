@@ -374,18 +374,21 @@ void CommunicationInterface::HandlePlan(
 
   auto max_angular_distance =
       utils::max_angular_distance(commanded_start, q_eigen);
-  if (max_angular_distance > params_.kMediumJointDistance) {
-    // discard the plan if we are too far away from current robot start CHANGE to too far from end robot state 
-    Eigen::VectorXd joint_delta = q_eigen - commanded_start;
-    dexai::log()->error(
-        "CommunicationInterface::HandlePlan: "
-        "Discarding plan {}, mismatched start position with delta: {}.",
-        robot_spline->utime, joint_delta.transpose());
-    robot_plan_.has_plan_data_ = false;
-    robot_plan_.plan_.release();
-    lock.unlock();
-    PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
-                        "mismatched_start_position");
+
+  if(!robot_data_.has_robot_data_){
+    if (max_angular_distance > params_.kMediumJointDistance) {
+      // discard the plan if we are too far away from current robot start  
+      Eigen::VectorXd joint_delta = q_eigen - commanded_start;
+      dexai::log()->error(
+          "CommunicationInterface::HandlePlan: "
+          "Discarding plan {}, mismatched start position with delta: {}.",
+          robot_spline->utime, joint_delta.transpose());
+      robot_plan_.has_plan_data_ = false;
+      robot_plan_.plan_.release();
+      lock.unlock();
+      PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
+                          "mismatched_start_position");
+    }
     return;
   }
 

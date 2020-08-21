@@ -56,7 +56,7 @@ class FrankaPlanRunner {
   int RunSim();
 
   /// Check and limit conf according to provided parameters for joint limits
-  bool LimitJoints(Eigen::VectorXd& conf);
+  bool IsWithinJointLimits(Eigen::VectorXd& conf);
 
   /// Calculate the time to advance while pausing or unpausing
   /// Inputs to method have seconds as their unit.
@@ -118,7 +118,7 @@ class FrankaPlanRunner {
   Eigen::VectorXd end_conf_plan_;
 
   Eigen::VectorXd max_accels_;
-  double allowable_max_angle_error_ = 0.001;  // empirically proven
+  double allowable_max_angle_error_ = 0.001;  // empirically proven, increased to work w/ sim robot
 
 };  // FrankaPlanRunner
 
