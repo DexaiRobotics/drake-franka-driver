@@ -113,4 +113,15 @@ namespace utils {
         return robot_status;
     }
 
+    bool ApplyOffsets(std::array<double, 7>& input, const Eigen::VectorXd& offsets) {
+        if(input.size() != offsets.size()) {
+            dexai::log()->error("utils:ApplyOffsets input.size({}) != offsets.size({})", input.size(), offsets.size());
+            return false;
+        }
+        for (size_t i=0; i<input.size(); i++) {
+            input[i] += offsets[i];
+        }
+        return true;
+    }
+
 }   // namespace utils

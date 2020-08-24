@@ -25,6 +25,10 @@ std::array<double, 7> EigenToArray(const Eigen::VectorXd& input) {
   return output;
 }
 
+Eigen::VectorXd ArrayToEigen(const std::array<double, 7>& input) {
+  return Eigen::Map<Eigen::VectorXd, Eigen::Unaligned>((double *)input.data(), input.size());
+}
+
 std::vector<double> e_to_v(Eigen::VectorXd e) {
     std::vector<double> v;
     v.resize(e.size());

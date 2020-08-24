@@ -257,7 +257,19 @@ int FrankaPlanRunner::RunFranka() {
           // rate ...
           // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
           robot.read([this](const franka::RobotState& robot_state) {
-            comm_interface_->SetRobotData(robot_state, next_conf_plan_);
+            if (!is_joint_pos_offset_available_) 
+            {
+              comm_interface_->SetRobotData(robot_state, next_conf_plan_);
+            } else {
+              franka::RobotState robot_state_mutable = robot_state;
+              if (is_joint_pos_offset_available_) {
+                utils::ApplyOffsets(robot_state_mutable.q, joint_pos_offset_);
+                utils::ApplyOffsets(robot_state_mutable.q_d, joint_pos_offset_);
+              } else {
+                // do nothing
+              }
+              comm_interface_->SetRobotData(robot_state, next_conf_plan_);
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(
                 static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
             return false;
@@ -538,17 +550,18 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // check pause status and update franka_time_:
   IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec());
 
-  // read out robot state
-  franka::JointPositions output_to_franka = robot_state.q_d;
-  auto q_d_v = ArrayToVector(robot_state.q_d);
-  Eigen::VectorXd current_conf_franka_uncorrected = utils::v_to_e(q_d_v);
-
-  Eigen::VectorXd current_conf_franka;
+  franka::RobotState robot_state_mutable = robot_state;
   if (is_joint_pos_offset_available_) {
-    current_conf_franka = current_conf_franka_uncorrected - joint_pos_offset_;
+    utils::ApplyOffsets(robot_state_mutable.q, joint_pos_offset_);
+    utils::ApplyOffsets(robot_state_mutable.q_d, joint_pos_offset_);
   } else {
-    current_conf_franka = current_conf_franka_uncorrected;
+    // do nothing
   }
+
+  // read out robot state
+  franka::JointPositions output_to_franka = robot_state_mutable.q;
+  auto q_v = ArrayToVector(robot_state_mutable.q);
+  Eigen::VectorXd current_conf_franka = utils::v_to_e(q_v);
 
   // Set robot state for LCM publishing:
   // TODO @rkk: do not use franka robot state but use a generic Eigen instead
@@ -630,12 +643,13 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   Eigen::VectorXd next_conf_plan_corrected;
   if (is_joint_pos_offset_available_) {
-    next_conf_plan_corrected = next_conf_plan_ + joint_pos_offset_;
+    next_conf_plan_corrected = next_conf_plan_ - joint_pos_offset_;
   } else {
     next_conf_plan_corrected = next_conf_plan_;
   }
 
-  comm_interface_->TryToSetRobotData(robot_state, next_conf_plan_corrected);
+
+  comm_interface_->TryToSetRobotData(robot_state_mutable, next_conf_plan_);
 
   // delta between conf at start of plan to conft at current time of plan:
   Eigen::VectorXd delta_conf_plan = next_conf_plan_corrected - start_conf_plan_;
