@@ -68,8 +68,10 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
     cnpy::NpyArray joint_pos_offset_data = cnpy::npy_load("joint_pos_offset.npy");
     const std::array<double, FRANKA_DOF>& joint_pos_offset_array = *(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>());
     const auto joint_pos_offset_v = ArrayToVector(joint_pos_offset_array);
-    Eigen::VectorXd joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
+    joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
     is_joint_pos_offset_available_ = true;
+    dexai::log()->info("Loaded joint position offsets: {}",
+                     joint_pos_offset_.transpose());
   } catch (const std::runtime_error& error)
   {
     log()->error("FrankaPlanRunner: Caught runtime_error. Could not load joint position offset from file. Setting offsets to zero...");
