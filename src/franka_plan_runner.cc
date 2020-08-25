@@ -628,7 +628,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     dexai::log()->debug(
         "JointPositionCallback: No plan exists (anymore), exiting "
         "controller...");
-    comm_interface_->TryToSetRobotData(robot_state, start_conf_franka_);
+    comm_interface_->TryToSetRobotData(robot_state_mutable, start_conf_franka_);
     return franka::MotionFinished(output_to_franka);
   }
 
