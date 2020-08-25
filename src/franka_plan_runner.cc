@@ -270,7 +270,7 @@ int FrankaPlanRunner::RunFranka() {
               } else {
                 // do nothing
               }
-              comm_interface_->SetRobotData(robot_state, next_conf_plan_);
+              comm_interface_->SetRobotData(robot_state_mutable, next_conf_plan_);
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(
                 static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
