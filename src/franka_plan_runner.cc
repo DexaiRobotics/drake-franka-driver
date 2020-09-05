@@ -327,6 +327,8 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
 
 int FrankaPlanRunner::RunSim() {
   dexai::log()->info("Starting sim robot.");
+  comm_interface_->PublishDriverStatus(true);
+
   // first, set some parameters
   Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(dof_);  // output state
   next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542,
