@@ -120,7 +120,7 @@ class FrankaPlanRunner {
   // config of franka when plan ends:
   Eigen::VectorXd end_conf_plan_;
 
-  bool is_joint_pos_offset_available_ = false;
+  bool is_joint_pos_offset_available_{false};
   Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;

@@ -66,8 +66,8 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
 
   try {
     cnpy::NpyArray joint_pos_offset_data = cnpy::npy_load("joint_pos_offset.npy");
-    const std::array<double, FRANKA_DOF>& joint_pos_offset_array = *(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>());
-    const auto joint_pos_offset_v = ArrayToVector(joint_pos_offset_array);
+    const std::array<double, FRANKA_DOF>& joint_pos_offset_array{*(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>())};
+    const auto joint_pos_offset_v{ArrayToVector(joint_pos_offset_array)};
     joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
     is_joint_pos_offset_available_ = true;
     dexai::log()->info("Loaded joint position offsets: {}",
