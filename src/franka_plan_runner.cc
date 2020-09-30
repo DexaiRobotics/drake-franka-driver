@@ -598,15 +598,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     end_conf_plan_ = plan_->value(plan_->end_time());
     // TODO @rkk: move this print into another thread
     dexai::log()->debug("JointPositionCallback: starting franka q = {}",
-                        start_conf_franka_.transpose());
+                        utils::v_to_e(q_vec).transpose());
     dexai::log()->debug("JointPositionCallback: starting franka q_d = {}",
-                        current_commanded_cannonical_conf_franka.transpose());
+                        utils::v_to_e(q_d_vec).transpose());
     dexai::log()->debug("JointPositionCallback: starting plan q_d = {}",
                         start_conf_plan_.transpose());
 
     // Maximum change in joint angle between two confs
     auto max_ang_distance =
-        utils::max_angular_distance(current_commanded_cannonical_conf_franka, start_conf_plan_);
+        utils::max_angular_distance(utils::v_to_e(q_d_vec), start_conf_plan_);
     if (max_ang_distance > params_.kMediumJointDistance) {
       dexai::log()->error(
           "JointPositionCallback: Discarding plan, mismatched start position."
@@ -661,7 +661,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "is exceeding the joint limits!",
           plan_utime_, franka_time_);
   }
-  if(plan_completion_fraction < 0.1) {
+  if(plan_completion_fraction < 0.0s1) {
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_franka_.transpose());
     dexai::log()->debug("JointPositionCallback: next_conf_combined = {}",
