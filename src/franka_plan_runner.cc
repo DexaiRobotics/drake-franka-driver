@@ -656,6 +656,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: Finished plan {}, exiting controller @ err={} &, dq={}",
           plan_utime_, error_final, current_dq.transpose());
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
+      // releasing finished plan:
+      plan_.release();
+      plan_utime_ = -1;  // reset plan to -1
+      return franka::MotionFinished(output_to_franka);
     } else {
 
       auto error_eigen = (end_conf_plan_ - current_conf_franka).cwiseAbs();
@@ -669,20 +673,21 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
               allowable_max_angle_error_);
         }
       }
-
-      dexai::log()->info("JointPositionCallback: current_conf_franka: {}",
-                         current_conf_franka.transpose());
-      dexai::log()->info("JointPositionCallback: next_conf_franka: {}",
-                         next_conf_franka.transpose());
-      dexai::log()->info("JointPositionCallback: next_conf_plan: {}",
-                         next_conf_plan_.transpose());
-      comm_interface_->PublishPlanComplete(plan_utime_, false /*  = failed*/,
-                                           "diverged");
+      if(franka_time_ > (plan_->end_time()+0.5) ) { // 500ms additional time
+        dexai::log()->info("t overtime: {}, JointPositionCallback: current_conf_franka: {}",
+                         franka_time_ - (plan_->end_time()+0.5), current_conf_franka.transpose());
+        dexai::log()->info("t overtime: {}, JointPositionCallback: next_conf_franka: {}",
+                          franka_time_ - (plan_->end_time()+0.5), next_conf_franka.transpose());
+        dexai::log()->info("t overtime: {}, JointPositionCallback: next_conf_plan: {}",
+                          franka_time_ - (plan_->end_time()+0.5), next_conf_plan_.transpose());
+        comm_interface_->PublishPlanComplete(plan_utime_, false /*  = failed*/,
+                                            "diverged");
+        // releasing finished plan:
+        plan_.release();
+        plan_utime_ = -1;  // reset plan to -1
+        return franka::MotionFinished(output_to_franka);
+      }
     }
-    // releasing finished plan:
-    plan_.release();
-    plan_utime_ = -1;  // reset plan to -1
-    return franka::MotionFinished(output_to_franka);
   }
   return output_to_franka;
 }
