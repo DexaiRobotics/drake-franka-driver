@@ -656,15 +656,26 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // Linear interpolation between next conf with offset and the actual next conf based on received plan
   Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan_;
+  
+
+  // overwrite the output_to_franka of this callback:
+  Eigen::VectorXd next_conf_combined_corrected = next_conf_combined - joint_pos_offset_;
+  if (!LimitJoints(next_conf_combined_corrected)) {
+      dexai::log()->warn(
+          "JointPositionCallback: plan {} at franka_time_: {} seconds "
+          "is exceeding the joint limits!",
+          plan_utime_, franka_time_);
+  }
   if(plan_completion_fraction < 0.01) {
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_franka_.transpose());
     dexai::log()->debug("JointPositionCallback: next_conf_combined q_d = {}",
                         next_conf_combined.transpose());
+    dexai::log()->debug("JointPositionCallback: next_conf_combined_corrected q_d = {}",
+                        next_conf_combined_corrected.transpose());
+    dexai::log()->debug("JointPositionCallback: current q_d = {}",
+                        ArrayToVector(robot_state.q_d).transpose());
   }
-
-  // overwrite the output_to_franka of this callback:
-  Eigen::VectorXd next_conf_combined_corrected = next_conf_combined - joint_pos_offset_;
   output_to_franka = utils::EigenToArray(next_conf_combined_corrected);
 
   if (franka_time_ > plan_->end_time()) {
