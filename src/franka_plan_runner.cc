@@ -620,12 +620,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // read out plan for current franka time from plan:
   next_conf_plan_ = plan_->value(franka_time_);
-  if (!LimitJoints(next_conf_plan_)) {
-    dexai::log()->warn(
-        "JointPositionCallback: plan at {}s is exceeding the joint limits!",
-        franka_time_);
-  }
-
   comm_interface_->TryToSetRobotData(cannonical_robot_state, next_conf_plan_);
 
   // delta between conf at start of plan to conft at current time of plan:
@@ -643,14 +637,21 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
 
   // overwrite the output_to_franka of this callback:
-  output_to_franka = utils::EigenToArray(next_conf_combined - joint_pos_offset_);
+  Eigen::VectorXd output_to_franka_eigen = next_conf_combined - joint_pos_offset_;
+  if (!LimitJoints(output_to_franka_eigen)) {
+    dexai::log()->warn(
+        "JointPositionCallback: next_conf_combined - joint_pos_offset_ at {}s is exceeding the joint limits!",
+        franka_time_);
+  }
+  output_to_franka = utils::EigenToArray(output_to_franka_eigen);
 
   if (franka_time_ > plan_->end_time()) {
 
     // Maximum change in joint angle between two confs
     double error_final = utils::max_angular_distance(end_conf_plan_, current_conf_franka);
+    auto current_qdot = utils::v_to_e(ArrayToVector(cannonical_robot_state.qdot));
 
-    if (error_final < allowable_max_angle_error_) {
+    if (error_final < allowable_max_angle_error_ && current_qdot.maxCoeff() > 0.002) {
       dexai::log()->info(
           "JointPositionCallback: Finished plan {}, exiting controller",
           plan_utime_);
