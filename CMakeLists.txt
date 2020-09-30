@@ -199,6 +199,7 @@ set(TEST_LINK_LIBRARIES
     gflags
     drake::drake
     yaml-cpp
+    ${Franka_LIBRARIES}
 )
 
 foreach(_file ${GTEST_SRC_FILES})
