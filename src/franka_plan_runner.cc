@@ -64,19 +64,19 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
   next_conf_plan_ = Eigen::VectorXd::Zero(dof_);
   joint_pos_offset_ = Eigen::VectorXd::Zero(dof_);
 
-  // try {
-  //   cnpy::NpyArray joint_pos_offset_data = cnpy::npy_load("joint_pos_offset.npy");
-  //   const std::array<double, FRANKA_DOF>& joint_pos_offset_array{*(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>())};
-  //   const auto joint_pos_offset_v{ArrayToVector(joint_pos_offset_array)};
-  //   joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
-  //   is_joint_pos_offset_available_ = true;
-  //   dexai::log()->info("Loaded joint position offsets: {}",
-  //                    joint_pos_offset_.transpose());
-  // } catch (const std::runtime_error& error)
-  // {
-  //   log()->error("FrankaPlanRunner: Caught runtime_error. Could not load joint position offset from file. Setting offsets to zero...");
-  //   is_joint_pos_offset_available_ = false;
-  // }
+  try {
+    cnpy::NpyArray joint_pos_offset_data = cnpy::npy_load("joint_pos_offset.npy");
+    const std::array<double, FRANKA_DOF>& joint_pos_offset_array{*(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>())};
+    const auto joint_pos_offset_v{ArrayToVector(joint_pos_offset_array)};
+    joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
+    is_joint_pos_offset_available_ = true;
+    dexai::log()->info("Loaded joint position offsets: {}",
+                     joint_pos_offset_.transpose());
+  } catch (const std::runtime_error& error)
+  {
+    log()->error("FrankaPlanRunner: Caught runtime_error. Could not load joint position offset from file. Setting offsets to zero...");
+    is_joint_pos_offset_available_ = false;
+  }
 
   
   // define the joint_position_callback_ needed for the robot control loop:
@@ -546,9 +546,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   franka::RobotState robot_state_mutable = robot_state; // as reported by Franka
 
-    // auto canonical_robot_state = ApplyJointOffsets(robot_state, joint_pos_offset_); 
-    utils::ApplyOffsets(robot_state_mutable.q, joint_pos_offset_); // adds --> now cannonical
-    utils::ApplyOffsets(robot_state_mutable.q_d, joint_pos_offset_); // q_desired
+  // auto canonical_robot_state = ApplyJointOffsets(robot_state, joint_pos_offset_); 
+  utils::ApplyOffsets(robot_state_mutable.q, joint_pos_offset_); // adds --> now cannonical
+  utils::ApplyOffsets(robot_state_mutable.q_d, joint_pos_offset_); // q_desired
 
   // read out robot state
   franka::JointPositions output_to_franka = robot_state_mutable.q_d;
@@ -557,7 +557,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // the current (desired) position of franka is the starting position:
   auto q_vec = ArrayToVector(robot_state_mutable.q);
-  Eigen::VectorXd start_conf_franka_ = utils::v_to_e(q_vec);
+  
 
   // Set robot state for LCM publishing:
   // TODO @rkk: do not use franka robot state but use a generic Eigen instead
@@ -579,6 +579,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // ).time_since_epoch().count(); 
     // auto plan_time_delta = plan_received_utime - plan_utime_; 
     // if(plan_time_delta ) {}
+
+    start_conf_franka_ = utils::v_to_e(q_vec);
     
     // first time step of plan, reset time:
     franka_time_ = 0.0;
@@ -659,12 +661,12 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "is exceeding the joint limits!",
           plan_utime_, franka_time_);
   }
-  if(plan_completion_fraction < 0.01) {
+  if(plan_completion_fraction < 0.1) {
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_franka_.transpose());
-    dexai::log()->debug("JointPositionCallback: next_conf_combined q_d = {}",
+    dexai::log()->debug("JointPositionCallback: next_conf_combined = {}",
                         next_conf_combined.transpose());
-    dexai::log()->debug("JointPositionCallback: next_conf_combined_corrected q_d = {}",
+    dexai::log()->debug("JointPositionCallback: next_conf_combined_corrected = {}",
                         next_conf_combined_corrected.transpose());
     dexai::log()->debug("JointPositionCallback: current q_d = {}",
                         utils::v_to_e(ArrayToVector(robot_state.q_d)).transpose());
