@@ -674,7 +674,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     dexai::log()->debug("JointPositionCallback: next_conf_combined_corrected q_d = {}",
                         next_conf_combined_corrected.transpose());
     dexai::log()->debug("JointPositionCallback: current q_d = {}",
-                        ArrayToVector(robot_state.q_d).transpose());
+                        utils::v_to_e(ArrayToVector(robot_state.q_d)).transpose());
   }
   output_to_franka = utils::EigenToArray(next_conf_combined_corrected);
 
