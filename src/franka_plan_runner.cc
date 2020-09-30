@@ -651,10 +651,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     double error_final = utils::max_angular_distance(end_conf_plan_, current_conf_franka);
     auto current_dq = utils::v_to_e(ArrayToVector(cannonical_robot_state.dq));
 
-    if (error_final < allowable_max_angle_error_ && current_dq.maxCoeff() < allowable_max_angle_error_) {
+    if (error_final < allowable_max_angle_error_ && current_dq.norm() < allowable_max_angle_error_) {
       dexai::log()->info(
-          "JointPositionCallback: Finished plan {}, exiting controller",
-          plan_utime_);
+          "JointPositionCallback: Finished plan {}, exiting controller @ err={} &, dq={}",
+          plan_utime_, error_final, current_dq.transpose());
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
     } else {
 
