@@ -562,6 +562,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   auto q_d_vec = ArrayToVector(robot_state_mutable.q_d);
   Eigen::VectorXd current_commanded_cannonical_conf_franka = utils::v_to_e(q_d_vec);
 
+  // the current (desired) position of franka is the starting position:
+  auto q_vec = ArrayToVector(robot_state_mutable.q);
+  Eigen::VectorXd start_conf_franka_ = utils::v_to_e(q_vec);
+
   // Set robot state for LCM publishing:
   // TODO @rkk: do not use franka robot state but use a generic Eigen instead
 
@@ -594,20 +598,20 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           plan_utime_, franka_time_);
     }
 
-    // the current (desired) position of franka is the starting position:
-    start_conf_franka_ = current_commanded_cannonical_conf_franka;
-    // need to adjust the franka reported position for the joint offsets.
+    
 
     end_conf_plan_ = plan_->value(plan_->end_time());
     // TODO @rkk: move this print into another thread
-    dexai::log()->debug("JointPositionCallback: starting franka q_d = {}",
+    dexai::log()->debug("JointPositionCallback: starting franka q = {}",
                         start_conf_franka_.transpose());
+    dexai::log()->debug("JointPositionCallback: starting franka q_d = {}",
+                        current_commanded_cannonical_conf_franka.transpose());
     dexai::log()->debug("JointPositionCallback: starting plan q_d = {}",
                         start_conf_plan_.transpose());
 
     // Maximum change in joint angle between two confs
     auto max_ang_distance =
-        utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
+        utils::max_angular_distance(current_commanded_cannonical_conf_franka, start_conf_plan_);
     if (max_ang_distance > params_.kMediumJointDistance) {
       dexai::log()->error(
           "JointPositionCallback: Discarding plan, mismatched start position."
@@ -647,10 +651,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   Eigen::VectorXd delta_conf_plan = next_conf_plan_ - start_conf_plan_;
 
   // add delta to current robot state to achieve a continuous motion:
-  Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
+  // Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
+  Eigen::VectorXd next_conf_franka = current_commanded_cannonical_conf_franka + delta_conf_plan;
 
   // Linear interpolation between next conf with offset and the actual next conf based on received plan
-  Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan_corrected;
+  Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan_;
 
   // overwrite the output_to_franka of this callback:
   Eigen::VectorXd next_conf_combined_corrected = next_conf_combined - joint_pos_offset_;
