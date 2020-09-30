@@ -267,8 +267,6 @@ int FrankaPlanRunner::RunFranka() {
               if (is_joint_pos_offset_available_) {
                 utils::ApplyOffsets(robot_state_mutable.q, joint_pos_offset_);
                 utils::ApplyOffsets(robot_state_mutable.q_d, joint_pos_offset_);
-              } else {
-                // do nothing
               }
               comm_interface_->SetRobotData(robot_state_mutable, next_conf_plan_);
             }
