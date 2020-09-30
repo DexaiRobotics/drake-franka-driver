@@ -64,19 +64,19 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
   next_conf_plan_ = Eigen::VectorXd::Zero(dof_);
   joint_pos_offset_ = Eigen::VectorXd::Zero(dof_);
 
-  try {
-    cnpy::NpyArray joint_pos_offset_data = cnpy::npy_load("joint_pos_offset.npy");
-    const std::array<double, FRANKA_DOF>& joint_pos_offset_array{*(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>())};
-    const auto joint_pos_offset_v{ArrayToVector(joint_pos_offset_array)};
-    joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
-    is_joint_pos_offset_available_ = true;
-    dexai::log()->info("Loaded joint position offsets: {}",
-                     joint_pos_offset_.transpose());
-  } catch (const std::runtime_error& error)
-  {
-    log()->error("FrankaPlanRunner: Caught runtime_error. Could not load joint position offset from file. Setting offsets to zero...");
-    is_joint_pos_offset_available_ = false;
-  }
+  // try {
+  //   cnpy::NpyArray joint_pos_offset_data = cnpy::npy_load("joint_pos_offset.npy");
+  //   const std::array<double, FRANKA_DOF>& joint_pos_offset_array{*(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>())};
+  //   const auto joint_pos_offset_v{ArrayToVector(joint_pos_offset_array)};
+  //   joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
+  //   is_joint_pos_offset_available_ = true;
+  //   dexai::log()->info("Loaded joint position offsets: {}",
+  //                    joint_pos_offset_.transpose());
+  // } catch (const std::runtime_error& error)
+  // {
+  //   log()->error("FrankaPlanRunner: Caught runtime_error. Could not load joint position offset from file. Setting offsets to zero...");
+  //   is_joint_pos_offset_available_ = false;
+  // }
 
   
   // define the joint_position_callback_ needed for the robot control loop:
@@ -259,18 +259,11 @@ int FrankaPlanRunner::RunFranka() {
           // rate ...
           // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
           robot.read([this](const franka::RobotState& robot_state) {
-            if (!is_joint_pos_offset_available_) 
-            {
-              comm_interface_->SetRobotData(robot_state, next_conf_plan_);
-            } else {
-              franka::RobotState robot_state_mutable = robot_state; // measured value from robot
-              if (is_joint_pos_offset_available_) {
-                // publishing cannonical values over lcm
-                utils::ApplyOffsets(robot_state_mutable.q, joint_pos_offset_);
-                utils::ApplyOffsets(robot_state_mutable.q_d, joint_pos_offset_);
-              }
-              comm_interface_->SetRobotData(robot_state_mutable, next_conf_plan_);
-            }
+            franka::RobotState robot_state_mutable = robot_state; // measured value from robot
+            // publishing cannonical values over lcm
+            utils::ApplyOffsets(robot_state_mutable.q, joint_pos_offset_);
+            utils::ApplyOffsets(robot_state_mutable.q_d, joint_pos_offset_);
+            comm_interface_->SetRobotData(robot_state_mutable, next_conf_plan_);
             std::this_thread::sleep_for(std::chrono::milliseconds(
                 static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
             return false;
