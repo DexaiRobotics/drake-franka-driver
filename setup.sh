@@ -21,6 +21,7 @@ fi
 echo "####### make will use $num_threads jobs to build target: $target #######"
 
 echo "update libfranka and build if not done yet..."
+pushd "$(dirname $(realpath $0))"
 cd externals
 cd libfranka
 
@@ -83,3 +84,4 @@ if (( $exec_ctests > 0 )); then
         ctest                           || exit 8   # run all unit tests
     fi
 fi
+popd

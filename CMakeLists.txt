@@ -56,7 +56,7 @@ list(APPEND CMAKE_PREFIX_PATH ${FRANKA_BUILD_DIR})
 
 find_package(drake REQUIRED)
 find_package(Franka REQUIRED)
-find_package(Yaml MODULE REQUIRED COMPONENTS shared)
+find_package(yaml-cpp REQUIRED COMPONENTS shared)
 
 message(STATUS "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
 message(STATUS "Franka_LIBRARIES: ${Franka_LIBRARIES}")
