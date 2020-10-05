@@ -30,4 +30,6 @@ namespace utils {
 
     drake::lcmt_iiwa_status EigenToLcmStatus(Eigen::VectorXd robot_state);
 
+    franka::RobotState ConvertToCannonical(const franka::RobotState& robot_state, const Eigen::VectorXd& offsets);
+
 }   //  namespace utils

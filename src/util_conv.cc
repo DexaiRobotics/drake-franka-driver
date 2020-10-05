@@ -113,4 +113,19 @@ namespace utils {
         return robot_status;
     }
 
+    franka::RobotState ConvertToCannonical(const franka::RobotState& robot_state, const Eigen::VectorXd& offsets) {
+        if(robot_state.q.size() != offsets.size()) {
+            std::string err_msg = fmt::format("utils:ConvertToCannonical robot_state.q.size({}) != offsets.size({})",
+                                            robot_state.q.size(), offsets.size());
+            dexai::log()->error(err_msg); 
+            throw std::runtime_error(err_msg);
+        }
+        franka::RobotState cannonical_robot_state = robot_state;
+        for (size_t i=0; i<offsets.size(); i++) {
+            cannonical_robot_state.q[i] += offsets[i]; // actual
+            cannonical_robot_state.q_d[i] += offsets[i]; // desired
+        }
+        return cannonical_robot_state;
+    }
+
 }   // namespace utils

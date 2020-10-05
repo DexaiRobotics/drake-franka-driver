@@ -26,7 +26,7 @@ using namespace franka_driver;
 using namespace utils;
 
 FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
-    : dof_(FRANKA_DOF),
+    : dof_(7),
       home_addr_("192.168.1.1"),
       params_(params),
       ip_addr_(params.robot_ip) {
@@ -62,23 +62,7 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
   start_conf_franka_ = Eigen::VectorXd::Zero(dof_);
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
   next_conf_plan_ = Eigen::VectorXd::Zero(dof_);
-  joint_pos_offset_ = Eigen::VectorXd::Zero(dof_);
 
-  try {
-    cnpy::NpyArray joint_pos_offset_data = cnpy::npy_load("joint_pos_offset.npy");
-    const std::array<double, FRANKA_DOF>& joint_pos_offset_array{*(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>())};
-    const auto joint_pos_offset_v{ArrayToVector(joint_pos_offset_array)};
-    joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
-    is_joint_pos_offset_available_ = true;
-    dexai::log()->info("Loaded joint position offsets: {}",
-                     joint_pos_offset_.transpose());
-  } catch (const std::runtime_error& error)
-  {
-    log()->error("FrankaPlanRunner: Caught runtime_error. Could not load joint position offset from file. Setting offsets to zero...");
-    is_joint_pos_offset_available_ = false;
-  }
-
-  
   // define the joint_position_callback_ needed for the robot control loop:
   joint_position_callback_ =
       [&, this](const franka::RobotState& robot_state,
@@ -259,9 +243,7 @@ int FrankaPlanRunner::RunFranka() {
           // rate ...
           // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
           robot.read([this](const franka::RobotState& robot_state) {
-            auto cannonical_robot_state = ConvertToCannonical(robot_state, joint_pos_offset_); 
-            // publishing cannonical values over lcm
-            comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_);
+            comm_interface_->SetRobotData(robot_state, next_conf_plan_);
             std::this_thread::sleep_for(std::chrono::milliseconds(
                 static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
             return false;
@@ -539,15 +521,13 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
 
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const franka::RobotState& robot_state, franka::Duration period) {
-// check pause status and update franka_time_:
+  // check pause status and update franka_time_:
   IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec());
 
   // read out robot state
   franka::JointPositions output_to_franka = robot_state.q_d;
-  // scale to cannonical robot state
-  auto cannonical_robot_state = ConvertToCannonical(robot_state, joint_pos_offset_); 
-  // set current_conf
-  Eigen::VectorXd current_conf_franka = utils::v_to_e(ArrayToVector(cannonical_robot_state.q_d));
+  auto q_d_v = ArrayToVector(robot_state.q_d);
+  Eigen::VectorXd current_conf_franka = utils::v_to_e(q_d_v);
   // Set robot state for LCM publishing:
   // TODO @rkk: do not use franka robot state but use a generic Eigen instead
 
@@ -611,7 +591,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     dexai::log()->debug(
         "JointPositionCallback: No plan exists (anymore), exiting "
         "controller...");
-    comm_interface_->TryToSetRobotData(cannonical_robot_state, start_conf_franka_);
+    comm_interface_->TryToSetRobotData(robot_state, start_conf_franka_);
     return franka::MotionFinished(output_to_franka);
   }
 
@@ -620,7 +600,13 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   // read out plan for current franka time from plan:
   next_conf_plan_ = plan_->value(franka_time_);
-  comm_interface_->TryToSetRobotData(cannonical_robot_state, next_conf_plan_);
+  if (!LimitJoints(next_conf_plan_)) {
+    dexai::log()->warn(
+        "JointPositionCallback: plan at {}s is exceeding the joint limits!",
+        franka_time_);
+  }
+
+  comm_interface_->TryToSetRobotData(robot_state, next_conf_plan_);
 
   // delta between conf at start of plan to conft at current time of plan:
   Eigen::VectorXd delta_conf_plan = next_conf_plan_ - start_conf_plan_;
@@ -631,35 +617,19 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // Linear interpolation between next conf with offset and the actual next conf based on received plan
   Eigen::VectorXd next_conf_combined = (1.0 - plan_completion_fraction) * next_conf_franka + plan_completion_fraction * next_conf_plan_;
 
-  for (size_t i = 0; i < 7; i++) {
-    next_conf_combined[i] =
-        franka::lowpassFilter(period.toSec(), next_conf_combined[i], cannonical_robot_state.q_d[i], 30.0);
-  }
-
   // overwrite the output_to_franka of this callback:
-  Eigen::VectorXd output_to_franka_eigen = next_conf_combined - joint_pos_offset_;
-  if (!LimitJoints(output_to_franka_eigen)) {
-    dexai::log()->warn(
-        "JointPositionCallback: next_conf_combined - joint_pos_offset_ at {}s is exceeding the joint limits!",
-        franka_time_);
-  }
-  output_to_franka = utils::EigenToArray(output_to_franka_eigen);
+  output_to_franka = utils::EigenToArray(next_conf_combined);
 
   if (franka_time_ > plan_->end_time()) {
 
     // Maximum change in joint angle between two confs
     double error_final = utils::max_angular_distance(end_conf_plan_, current_conf_franka);
-    auto current_dq = utils::v_to_e(ArrayToVector(cannonical_robot_state.dq));
 
-    if (error_final < allowable_max_angle_error_ && current_dq.norm() < allowable_max_angle_error_) {
+    if (error_final < allowable_max_angle_error_) {
       dexai::log()->info(
-          "JointPositionCallback: Finished plan {}, exiting controller @ err={} &, dq={}",
-          plan_utime_, error_final, current_dq.transpose());
+          "JointPositionCallback: Finished plan {}, exiting controller",
+          plan_utime_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
-      // releasing finished plan:
-      plan_.release();
-      plan_utime_ = -1;  // reset plan to -1
-      return franka::MotionFinished(output_to_franka);
     } else {
 
       auto error_eigen = (end_conf_plan_ - current_conf_franka).cwiseAbs();
@@ -673,21 +643,20 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
               allowable_max_angle_error_);
         }
       }
-      if(franka_time_ > (plan_->end_time()+0.5) ) { // 500ms additional time
-        dexai::log()->info("t overtime: {}, JointPositionCallback: current_conf_franka: {}",
-                         franka_time_ - (plan_->end_time()+0.5), current_conf_franka.transpose());
-        dexai::log()->info("t overtime: {}, JointPositionCallback: next_conf_franka: {}",
-                          franka_time_ - (plan_->end_time()+0.5), next_conf_franka.transpose());
-        dexai::log()->info("t overtime: {}, JointPositionCallback: next_conf_plan: {}",
-                          franka_time_ - (plan_->end_time()+0.5), next_conf_plan_.transpose());
-        comm_interface_->PublishPlanComplete(plan_utime_, false /*  = failed*/,
-                                            "diverged");
-        // releasing finished plan:
-        plan_.release();
-        plan_utime_ = -1;  // reset plan to -1
-        return franka::MotionFinished(output_to_franka);
-      }
+
+      dexai::log()->info("JointPositionCallback: current_conf_franka: {}",
+                         current_conf_franka.transpose());
+      dexai::log()->info("JointPositionCallback: next_conf_franka: {}",
+                         next_conf_franka.transpose());
+      dexai::log()->info("JointPositionCallback: next_conf_plan: {}",
+                         next_conf_plan_.transpose());
+      comm_interface_->PublishPlanComplete(plan_utime_, false /*  = failed*/,
+                                           "diverged");
     }
+    // releasing finished plan:
+    plan_.release();
+    plan_utime_ = -1;  // reset plan to -1
+    return franka::MotionFinished(output_to_franka);
   }
   return output_to_franka;
 }
