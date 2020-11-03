@@ -22,7 +22,7 @@ Edit this description and all other fields in square brackets. When you see ✅�
 ### Quality
 3. ✅❌ New code is written in pure C++17 to the best of my knowledge.
 4. ✅❌ New code follows established C++17 best practices ([C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/CppCoreGuidelines)).
-5. ✅❌ New code passed `clang-format` and `cpplint` (installed as part of `dig` develop setup).
+5. ✅❌ New code passed `clang-format` and `cpplint` (installed as part of `dig` developer setup).
 6. ✅❌ I have included Doxygen-style documentation in the new C++ code.
 
 ### Note to reviewers
