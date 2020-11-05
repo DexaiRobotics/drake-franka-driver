@@ -205,7 +205,7 @@ int FrankaPlanRunner::RunFranka() {
     // Set additional parameters always before the control loop, NEVER in the
     // control loop!
     // Set collision behavior:
-    SetCollisionBehaviorSafetyOn(robot);
+    SetCollisionBehaviorSafetyOff(robot);
 
     // Initilization is done, define robot as running:
     status_ = RobotStatus::Running;
@@ -323,7 +323,7 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   // }
 
   dexai::log()->info("RunFranka: Turning Safety on again!");
-  SetCollisionBehaviorSafetyOn(robot);
+  SetCollisionBehaviorSafetyOff(robot);
   dexai::log()->info("RunFranka: Turned Safety on again!");
   status_ = RobotStatus::Running;
   if (plan_) {
