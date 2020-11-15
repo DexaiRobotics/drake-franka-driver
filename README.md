@@ -2,31 +2,51 @@
 
 [![CircleCI](https://circleci.com/gh/DexaiRobotics/drake-franka-driver.svg?style=shield&circle-token=a122ea0349f6e79f84f549e6155bbbfcf923d7d4)](https://circleci.com/gh/DexaiRobotics/drake-franka-driver)
 
-Drake-compatible LCM driver for the Franka PANDA research robot. This driver uses the [Franka Control Interface](https://frankaemika.github.io/docs/) and is designed for use with the [Drake](https://drake.mit.edu/) planning and control toolbox. 
-# c++ driver
-## cmake build process for Ubuntu and macOS
-Note: the c++ drake-franka-driver depends on `drake` and `drake-lcmtypes` so it must be compiled as a `drake` cmake-external project - see [drake-shambhala](https://github.com/RobotLocomotion/drake-shambhala) for more information. 
-### pre-requisites
-1. Install `lcm` system-wide. We recommend `brew install lcm`
-2. Install [Drake](https://drake.mit.edu/) to `/opt/drake/` as is standard 
-*NOTE* ignore steps 1 and 2 if running inside docker
-In order to build the driver, use the following steps:
+Drake-compatible LCM driver for the Franka PANDA research robot. This driver uses the [Franka Control Interface](https://frankaemika.github.io/docs/) and is designed for use with the [Drake](https://drake.mit.edu/) planning and control toolbox (currently up to the 2020/05/30 build).
 
-3. `git clone https://github.com/DexaiRobotics/drake-franka-driver.git`
-4. `cd drake-franka-driver && git submodule update --init`
-5. `cd externals/libfranka && git submodule update --init`
-6. `cd .. && ../setup.sh` (if using docker, run inside docker image)
+## Prerequisites
 
-When running `setup.sh` if you get an error that the cmake for Franka cannot be found, try removing `libfranka/build` and rerunning setup
+This C++ driver depends on `drake` and `drake-lcmtypes`. You may use our [`drake-torch` images](https://github.com/DexaiRobotics/drake-torch) or install `drake` with the following.
 
-## running the driver
+```bash
+curl -SL https://drake-packages.csail.mit.edu/drake/nightly/drake-20200530-bionic.tar.gz | tar -xzC /opt
+cd /opt/drake/share/drake/setup && yes | ./install_prereqs
+```
+
+See [drake-shambhala](https://github.com/RobotLocomotion/drake-shambhala) for more examples. 
+
+You also need the LCM library.
+```bash
+git clone https://github.com/lcm-proj/lcm
+cd lcm && mkdir -p build && cd build && cmake ..
+make install -j 12
+```
+
+## Builidng the driver
+
+```bash
+git clone --recursive https://github.com/DexaiRobotics/drake-franka-driver.git`
+drake-franka-driver/setup.sh
+```
+
+See the beginning of `setuo.sh` for more flags.
+
+## Running the driver
+
 Once built, the executable `drake-franka-driver` can be found in the `build/` directory. In order to run the driver, execute:
-`./drake-franka-driver <robot_name> <robot_ip_address>` 
-where the default robot_name is `franka_0` and the default ip is `192.168.200.0` which enables multiple robots to be run on the same network. 
-## communicating with the robot
-### sending commands to the robot from a drake program
-The `drake-franka-driver` listens for commands on the `<robot_name>_cmd` lcm channel. By default this is set to `franka_0_cmd`.
+```bash
+drake-franka-driver <robot_name> <robot_ip_address>
+```
+where the default robot_name is `franka_0` and the default IP is `192.168.200.0`. This enables multiple robots to be run on the same network. 
+
+## Communicating with the robot
+
+### Sending commands to the robot from a drake program
+
+The driver listens for commands on the `<robot_name>_cmd` LCM channel. By default this is `franka_0_cmd`.
+
 ### listening to the robot response
+
 The `drake-franka-driver` reports the robot status on the `<robot_name>_status` lcm channel. By default this is set to `franka_0_status`. Status is reported in a `franka_status` struct.
 
 ## Starting driver on NUC remotely
