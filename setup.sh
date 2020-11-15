@@ -22,8 +22,7 @@ echo "####### make will use $num_threads jobs to build target: $target #######"
 
 echo "update libfranka and build if not done yet..."
 pushd "$(dirname $(realpath $0))"
-cd externals
-cd libfranka
+
 
 if (( $clean_build > 0 )); then
     if [ -d "build" ]; then
@@ -32,7 +31,7 @@ if (( $clean_build > 0 )); then
 fi
 
 if [ ! -f "build/libfranka.so" ]; then
-
+    pushd externals/libfranka
     echo "build libfranka..."
     mkdir -p build && cd build
     if (( $build_debug > 0 )); then
@@ -46,9 +45,9 @@ if [ ! -f "build/libfranka.so" ]; then
                  -DCMAKE_CXX_COMPILER=g++-7
     fi
     cmake --build . -j $num_threads --target franka
-    cd ..
+    popd
 fi
-cd ../..
+
 
 echo "clean_build = $clean_build"
 if (( $clean_build > 0 )); then
