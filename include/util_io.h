@@ -5,18 +5,16 @@
 #include "dexai_log.h"
 
 #include <fstream>
+#include <experimental/filesystem>
 #include <iostream>
 #include <sstream>
-#include <sys/stat.h>               // mkdir(2), stat
+#include <sys/stat.h>
 #include <time.h>
 #include <vector>
 #include <sys/time.h>
 #include <thread>
 
-// #include <experimental/filesystem>
-// namespace fs = std::experimental::filesystem;
-#include <ghc/filesystem.hpp>
-namespace fs = ghc::filesystem;
+namespace fs = std::experimental::filesystem;
 
 namespace utils {
 
