@@ -104,8 +104,6 @@ namespace dexai {
         got_base = utils::sub_dir_path(log_dir, log_dir, date_string);
         got_base = utils::sub_dir_path(log_dir, log_dir, date_time_string);
         // NOTE: We cannot call drake::log or dexai::log here; they're uninitialized.
-        // TODO: avoid paths like "here/./now" ??
-        // std::cerr << "::::::::::: sub_dir_path(log_dir, " << program << ") gave Log Base Dir (LBD): " << log_dir << std::endl;
         if (got_base) {
             // NOTE: Caution: Calling log here may stackoverflow.
         } else {

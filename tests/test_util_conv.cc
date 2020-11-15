@@ -5,7 +5,6 @@
 // #include "util_math.h"
 // #include "util_io.h"
 // #include "robot_parameters.h"
-using namespace std;
 
 // ToDO: Implement unit tests for all util conv functions!
 

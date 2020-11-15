@@ -305,7 +305,7 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   }
   dexai::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery!");
 
-  /// TODO @rkk: add reverse capability if found to be needed in the next weeks,
+  /// TODO: add reverse capability if needed
   /// uncomment the following to unleash the capabilitiy and add the proper
   ///  timing for reversing into the joint control loop
   // if(plan_) {
@@ -400,8 +400,8 @@ int FrankaPlanRunner::RunSim() {
 
 /// Check and limit conf according to provided parameters for joint limits
 bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
-  // TODO @rkk: get limits from urdf (instead of parameter file)
-  // TODO @rkk: use eigen operator to do these operations
+  // TODO: get limits from urdf (instead of parameter file)
+  // TODO: use eigen operator to do these operations
   bool within_limits = true;
   for (int j = 0; j < conf.size(); j++) {
     if (conf(j) > joint_limits_(j, 1)) {
@@ -548,30 +548,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   auto cannonical_robot_state = ConvertToCannonical(robot_state, joint_pos_offset_); 
   // set current_conf
   Eigen::VectorXd current_conf_franka = utils::v_to_e(ArrayToVector(cannonical_robot_state.q_d));
-  // Set robot state for LCM publishing:
-  // TODO @rkk: do not use franka robot state but use a generic Eigen instead
 
   static bool first_run = true;
 
-  // if (first_run && status_ == RobotStatus::Reversing) {
-  //   start_reversing_conf_franka_ = current_conf_franka;
-  //   first_run = false;
-  // }
-
-  if (comm_interface_->HasNewPlan()) { // && status_ != RobotStatus::Reversing) {
+  if (comm_interface_->HasNewPlan()) {
     // get the current plan from the communication interface
     comm_interface_->TakePlan(plan_, plan_utime_);
 
-    // auto plan_received_time = std::chrono::high_resolution_clock::now();
-    // int64_t plan_received_utime = (std::chrono::time_point_cast<
-    // std::chrono::microseconds > (plan_received_time)
-    // ).time_since_epoch().count(); 
-    // auto plan_time_delta = plan_received_utime - plan_utime_; 
-    // if(plan_time_delta ) {}
-    
     // first time step of plan, reset time:
     franka_time_ = 0.0;
-    start_conf_plan_ = plan_->value(franka_time_);  // TODO @rkk: fails
+    start_conf_plan_ = plan_->value(franka_time_);
 
     if (!LimitJoints(start_conf_plan_)) {
       dexai::log()->warn(
@@ -584,7 +570,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     start_conf_franka_ = current_conf_franka;
 
     end_conf_plan_ = plan_->value(plan_->end_time());
-    // TODO @rkk: move this print into another thread
+    // TODO: move this print into another thread
     dexai::log()->debug("JointPositionCallback: starting franka q = {}",
                         start_conf_franka_.transpose());
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",

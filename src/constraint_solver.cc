@@ -41,14 +41,13 @@ namespace franka_driver {
             throw std::runtime_error(error_msg);
         }
 
-        // auto robot_urdf_filepath = params->urdf_robot_only_filepath; // todo: change to:
         auto robot_urdf_filepath = urdf_path_;
         auto robot_root_link_in_urdf = params->world_frame;
         // create a scene graph that contains all the geometry of the system.
         scene_graph_ = builder_.AddSystem<SceneGraph>();
         scene_graph_->set_name("scene_graph");
 
-        // TODO @rkk: investigate difference of a discrete system
+        // TODO: investigate difference of a discrete system
         // (0.1) vs a continuous system (0) in performance
         // Can't use continuous b/c: "Currently MultibodyPlant does not handle
         // joint limits for continuous models. However a limit was specified for joint ``franka_joint1`."
@@ -170,7 +169,7 @@ namespace franka_driver {
         // plant_context_ = &diagram_->GetMutableSubsystemContext(
         //   *robots_plant_, context_.get());
 
-        // TODO @rkk:: simulator and derived plant_context_ from simulator is
+        // TODO: simulator and derived plant_context_ from simulator is
         // only needed so that something gets published to the drake visualizer.
         // If we don't care about drake visualizing (which is not expensive),
         // then we replace the three commands below with the command above this comment
@@ -182,16 +181,12 @@ namespace franka_driver {
         Eigen::VectorXd pos_robot = Eigen::VectorXd::Zero(robot_dof_);
         this->UpdateModel(pos_robot);
 
-        // ToDo: remove this instance
+        // TODO: remove this instance
         rigid_body_tree_ = std::make_unique<RigidBodyTree<double>>();
         // TODO: make this into a list of SDF files or a single SDF with <include>
         // robot + end-effector created in software
         // environment as list of objects with free-floating joints? ice-cream container, people
 
-        // ToDo: remove this instance
-        // FIXME @sprax: debugging: C++ exception with description "drake::parsers::GetFullPath:
-        // ERROR: file_name "/Users/sprax/catkin_ws/src/salad_bar_description/urdf/" is not a file."
-        // thrown in the test body.
         log()->trace("CS:ConstraintSolver: drake::parsers::urdf::AddModelInstanceFromUrdfFile:");
         log()->trace("CS:ConstraintSolver: AddModelInstanceFromUrdfFile({}, kFixed, NIL, rbt.get())", urdf_path_);
         try {
@@ -247,7 +242,7 @@ namespace franka_driver {
         throw;  // rethrow it again
     }
 
-    // TODO @rkk: set this based on visualization level
+    // TODO: set this based on visualization level
     // this performs the magic of making the diagram publish to the visualizer.
     // not needed for the actual collision check.
     simulator_->get_system().Publish(simulator_->get_context());

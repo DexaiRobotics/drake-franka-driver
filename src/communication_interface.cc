@@ -36,10 +36,9 @@ CommunicationInterface::CommunicationInterface(
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
 
-  // TODO @rkk: define this in parameters file?
+  // TODO: define this in parameters file
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
-  // TODO @rkk: remove this status channel by combining it
-  // with the robot status channel:
+  // TODO: remove this channel by combining it with the robot status channel
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
 
   dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
@@ -183,7 +182,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
   while (running_) {
     auto time_start = std::chrono::steady_clock::now();
     PublishRobotStatus();
-    // TODO @rkk: make pause status part of the robot status
+    // TODO: make pause status part of the robot status
     PublishPauseStatus();
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
@@ -313,8 +312,7 @@ void CommunicationInterface::HandlePlan(
   }
 
   robot_plan_.utime = robot_spline->utime;
-  //$ publish confirmation that plan was received with same utime
-  // TODO @rkk: move this to later in the function...
+  // publish confirmation that plan was received with same utime
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
   dexai::log()->info(
       "CommunicationInterface::HandlePlan: "
@@ -345,7 +343,7 @@ void CommunicationInterface::HandlePlan(
       piecewise_polynomial.value(piecewise_polynomial.start_time());
 
   auto q = this->GetRobotState().q;
-  // TODO @rkk: move this check to franka plan runner...
+  // TODO: move this check to franka plan runner
   Eigen::VectorXd q_eigen = utils::v_to_e(utils::ArrayToVector(q));
 
   auto max_angular_distance =
