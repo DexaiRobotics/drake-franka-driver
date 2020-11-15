@@ -3,45 +3,25 @@ project(drake-franka-driver)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-set(THREADS_PREFER_PTHREAD_FLAG ON)
-find_package(Threads REQUIRED)
+set(CMAKE_CXX_EXTENSIONS OFF)
+# TODO(dyt) enable -Werror
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -D_GLIBCXX_USE_CXX11_ABI=1")
 
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 
+# add macOS support
 set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib")
 set(CMAKE_INSTALL_NAME_DIR ${CMAKE_INSTALL_RPATH})
 
-## Removing Unnecessary Headers:
-# 1) Install:
-# $ sudo apt-get update -y && sudo apt-get install -y iwyu
-# 2) Comment out the following lines:
-# find_program(IWYU_PATH NAMES include-what-you-use iwyu)
-# if(NOT IWYU_PATH)
-#   message(FATAL_ERROR "Could not find the program include-what-you-use")
-# endif()
-# set(CMAKE_CXX_INCLUDE_WHAT_YOU_USE ${IWYU_PATH})
-# set(CMAKE_C_INCLUDE_WHAT_YOU_USE ${IWYU_PATH})
-
-## Set up environment
-message(STATUS "setting up environment!")
+# threads
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 # Set Drake's path
 set(DRAKE_BUILD_DIR "/opt/drake")
-message(STATUS "DRAKE_BUILD_DIR: ${DRAKE_BUILD_DIR}")
-
 set(FRANKA_BUILD_DIR "${CMAKE_SOURCE_DIR}/externals/libfranka/build")
-message(STATUS "FRANKA_BUILD_DIR: ${FRANKA_BUILD_DIR}")
 
-set(FILESYSTEM_INCLUDE_DIR "${CMAKE_SOURCE_DIR}/externals/filesystem/include")
-message(STATUS "FILESYSTEM_INCLUDE_DIR: ${FILESYSTEM_INCLUDE_DIR}")
-
-#LOCAL_PYTHON=`which python`
-#export LOCAL_PYTHON_PATH=`dirname $LOCAL_PYTHON`
-
-## end of setting environment variables
-
-
+# copy test data to build directory
 configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 configure_file(tests/data/franka_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 
