@@ -45,7 +45,6 @@ decodePolynomialMatrix(const drake::lcmt_polynomial_matrix& msg) {
  */
 void encodePiecewisePolynomial(const drake::trajectories::PiecewisePolynomial<
                                    double>& piecewise_polynomial,
-                               // NOLINTNEXTLINE(runtime/references)
                                drake::lcmt_piecewise_polynomial& msg);
 drake::trajectories::PiecewisePolynomial<double> decodePiecewisePolynomial(
     const drake::lcmt_piecewise_polynomial& msg);

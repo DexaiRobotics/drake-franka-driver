@@ -115,7 +115,6 @@ namespace franka_driver {
         return true;
     }
 
-    // TODO @sprax: Verify the new urdf_filepath and URDF file. 
     bool RobotParameters::UpdateUrdf(const std::string& new_urdf_file_name)
     {
         log()->trace("RobotParameters::UpdateUrdf({})", new_urdf_file_name);
@@ -132,7 +131,7 @@ namespace franka_driver {
         return true;
     }
 
-    // TODO @sprax #future: verbosity and exit_code can be changed once we
+    // TODO: verbosity and exit_code can be changed once we
     // log all params and accept default values.
     RobotParameters loadYamlParameters( const std::string& yaml_full_path
                                  , int verbose

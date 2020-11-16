@@ -34,7 +34,7 @@ namespace franka_driver {
         Eigen::Matrix<double, Eigen::Dynamic, 1> q_guess_;
         uint                                     num_actuatable_joints_;
         const std::string                        urdf_path_;
-        std::unique_ptr<RigidBodyTree<double>>   rigid_body_tree_ = nullptr; // ToDo: Remove once fully replaced
+        std::unique_ptr<RigidBodyTree<double>>   rigid_body_tree_ = nullptr;
 
         // added for MultibodyPlant functionality
         int robot_dof_;
