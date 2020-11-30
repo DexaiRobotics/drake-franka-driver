@@ -13,7 +13,8 @@
 #   * undesirable checks:
 #       * cppcoreguidelines-pro-type-static-cast-downcast ("do not use static_cast to downcast from a base to a derived class; use dynamic_cast instead")
 #       * fuchsia-default-arguments ("calling a function that uses a default argument is disallowed")
-#       * fuchsia-default-arguments-calls: ("calling a function that uses a default argument is disallowed")
+#       * fuchsia-default-arguments-calls ("calling a function that uses a default argument is disallowed")
+#       * fuchsia-default-arguments-declarations (declaring a parameter with a default argument is disallowed)
 #       * fuchsia-overloaded-operator ("cannot overload 'operatorFOO'")
 #       * fuchsia-statically-constructed-objects ("static objects are disallowed; if possible, use a constexpr constructor instead")
 #       * google-runtime-references ("non-const reference parameter 'foo', make it const or use a pointer")
@@ -63,7 +64,7 @@
 #   * others
 #       * clang-analyzer-alpha*
 
-Checks: '*,-fuchsia-default-arguments,-fuchsia-default-arguments-calls,-fuchsia-overloaded-operator,-fuchsia-statically-constructed-objects,-google-runtime-references,-llvmlibc-callee-namespace,-llvmlibc-implementation-in-namespace,-llvmlibc-restrict-system-libc-headers,-modernize-use-trailing-return-type,-readability-isolate-declaration,-cppcoreguidelines-avoid-magic-numbers,-readability-magic-numbers,-llvm-header-guard,-cppcoreguidelines-avoid-non-const-global-variables'
+Checks: '*,-fuchsia-default-arguments,-fuchsia-default-arguments-calls,-fuchsia-default-arguments-declarations,-fuchsia-overloaded-operator,-fuchsia-statically-constructed-objects,-google-runtime-references,-llvmlibc-callee-namespace,-llvmlibc-implementation-in-namespace,-llvmlibc-restrict-system-libc-headers,-modernize-use-trailing-return-type,-readability-isolate-declaration,-cppcoreguidelines-avoid-magic-numbers,-readability-magic-numbers,-llvm-header-guard,-cppcoreguidelines-avoid-non-const-global-variables'
 
 WarningsAsErrors: '*'
 
