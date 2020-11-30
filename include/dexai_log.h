@@ -12,7 +12,7 @@
 #include "spdlog/sinks/stdout_color_sinks.h"
 #include "spdlog/sinks/basic_file_sink.h"
 
-#define OVERRIDE_DRAKE_LOG 1    // TODO: Move this definition to the build system environment
+#define OVERRIDE_DRAKE_LOG 1
 
 #ifdef HAVE_SPDLOG
 using slogger = drake::logging::logger;
@@ -117,8 +117,6 @@ namespace dexai {
 namespace drake {
     // Shadow drake::log() with an overload.  NOTE: s_logger must be initialized elsewhere.
     logging::logger* log();
-
-    // TODO: Get the original drake logger, even if has been replaced by ours?  Or not?
     logging::logger* original_drake_log();
 }
 #endif  //  OVERRIDE_DRAKE_LOG

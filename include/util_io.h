@@ -23,7 +23,7 @@ namespace utils {
     /// Three-valued answer logic.
     namespace yes_no_maybe {    // Is this the most idiomatic or "natural" order?
         typedef enum {
-            No      =  -1,      // negative.  Note, as an unsigned, this may be UINT_MAX.  TODO: find out.
+            No      =  -1,      // negative.  Note, as an unsigned, this may be UINT_MAX.
             Maybe   =   0,      // neutral
             Yes     =   1,      // positive
         }   YesNoMaybe;         // Examples: Responses to user prompts or system queries

@@ -30,7 +30,7 @@ typedef PiecewisePolynomial<double> PPType;
 
 namespace franka_driver {
 
-// TODO @rkk: remove this franka specific state and make it generic:
+// TODO: remove this franka specific state and make it generic:
 struct RobotData {
   std::atomic<bool> has_robot_data_;
   franka::RobotState robot_state;
@@ -59,8 +59,7 @@ class CommunicationInterface {
   bool HasNewPlan();
   void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
 
-  // TODO @rkk: remove franka specific RobotState type
-  // and replace with std::array type:
+  // TODO: remove franka specific RobotState type and replace with std::array
   franka::RobotState GetRobotState();
   /// Blocking call that sets the robot state
   void SetRobotData(const franka::RobotState& robot_state,

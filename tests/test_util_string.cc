@@ -3,7 +3,7 @@
 
 #include "util_string.h"
 
-// ToDo: Add test for hostname_string()
+// TODO: Add test for hostname_string()
 
 // Expected: convert to uppercase
 TEST(UtilString, to_uppercase)
