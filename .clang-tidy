@@ -58,6 +58,7 @@
 #   * bug in toolchain/clang-tidy:
 #       * clang-analyzer-cplusplus.NewDeleteLeaks ("Potential leak of memory pointed to by field '_M_head_impl'") See https://bugs.llvm.org/show_bug.cgi?id=38176 ("clang-analyzer-cplusplus.NewDeleteLeaks false positive in C++17 mode only")
 #       * fuchsia-trailing-return: Doesn't really help that much, but gives various false positives.
+#       * cppcoreguidelines-avoid-non-const-global-variables (variable foo is non-const and globally accessible, consider making it const), false positive when variable is specified as const
 #
 #   * others
 #       * clang-analyzer-alpha*
