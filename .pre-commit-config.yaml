@@ -92,6 +92,7 @@ repos:
       # the -i exclusion option doesn't work with --project
       args: ["--enable=all",
              "--std=c++20",
+             "--language=c++",
              "--inline-suppr",
              "--quiet",
              "--project=build/compile_commands_escape.json",
