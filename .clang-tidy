@@ -25,6 +25,7 @@
 #       * modernize-use-trailing-return-type ("use a trailing return type for this function")
 #       * readability-isolate-declaration ("multiple declarations in a single statement reduces readability")
 #       * cppcoreguidelines-avoid-magic-numbers,readability-magic-numbers ("is a magic number; consider replacing it with a named constant"), false positives (needed by eigen)
+#       * llvm-header-guard ("header guard does not follow preferred style"), conflicts with Google style: INCLUDE_DIR_FOO_BAR_FILENAME_H_
 #
 #   * desirable checks, but hard to fix currently:
 #       * android-cloexec-fopen ("use 'fopen' mode 'e' to set O_CLOEXEC") Ancient CentOS 5 doesn't have O_CLOEXEC
@@ -61,7 +62,7 @@
 #   * others
 #       * clang-analyzer-alpha*
 
-Checks: '*,-fuchsia-default-arguments,-fuchsia-default-arguments-calls,-fuchsia-overloaded-operator,-fuchsia-statically-constructed-objects,-google-runtime-references,-llvmlibc-callee-namespace,-llvmlibc-implementation-in-namespace,-llvmlibc-restrict-system-libc-headers,-modernize-use-trailing-return-type,-readability-isolate-declaration,-cppcoreguidelines-avoid-magic-numbers,-readability-magic-numbers'
+Checks: '*,-fuchsia-default-arguments,-fuchsia-default-arguments-calls,-fuchsia-overloaded-operator,-fuchsia-statically-constructed-objects,-google-runtime-references,-llvmlibc-callee-namespace,-llvmlibc-implementation-in-namespace,-llvmlibc-restrict-system-libc-headers,-modernize-use-trailing-return-type,-readability-isolate-declaration,-cppcoreguidelines-avoid-magic-numbers,-readability-magic-numbers,-llvm-header-guard'
 
 WarningsAsErrors: '*'
 
