@@ -50,8 +50,9 @@ endif()
 configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 configure_file(tests/data/franka_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
 
-set(INCLUDES
-    include
+# add include dir for Franka headers
+include_directories(
+    ${CMAKE_SOURCE_DIR}
     ${SPDLOG_INCLUDE_DIR}
     ${YAML_INCLUDES}
     ${FILESYSTEM_INCLUDE_DIR}
@@ -59,11 +60,6 @@ set(INCLUDES
     ${Python3_INCLUDE_DIRS}
     ${Python3_NumPy_INCLUDE_DIRS}
     ${GTEST_INCLUDE_DIRS}
-)
-
-# add include dir for Franka headers
-include_directories(
-    ${INCLUDES}
 )
 
 add_executable(send_stop
