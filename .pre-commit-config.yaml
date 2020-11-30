@@ -1,0 +1,127 @@
+repos:
+-   repo: https://github.com/timothycrosley/isort
+    rev: 5.6.4
+    hooks:
+    - id: isort
+      types: [python]
+      args: [--filter-files]
+-   repo: https://github.com/psf/black
+    rev: 20.8b1
+    hooks:
+    - id: black
+      args: [--line-length, '79']
+-   repo: https://gitlab.com/pycqa/flake8
+    rev: 3.8.4
+    hooks:
+    - id: flake8
+-   repo: local
+    hooks:
+    - id: pylint
+      name: pylint
+      entry: pylint
+      language: system
+      types: [python]
+      args: [--rcfile=setup.cfg]
+-   repo: https://github.com/pycqa/pydocstyle
+    rev: 5.1.1
+    hooks:
+    - id: pydocstyle
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v0.790
+    hooks:
+    - id: mypy
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
+    hooks:
+    - id: check-added-large-files
+      args: [--maxkb=100]
+      exclude: '.*[.]ipynb$'
+    - id: check-ast
+    - id: check-builtin-literals
+    - id: check-byte-order-marker
+    - id: check-case-conflict
+    # - id: check-docstring-first
+    - id: check-executables-have-shebangs
+    - id: check-json
+    - id: check-merge-conflict
+    - id: check-symlinks
+    # - id: check-xml
+    - id: check-yaml
+      args: [--allow-multiple-documents]
+    - id: debug-statements
+    - id: end-of-file-fixer
+      exclude: '.*[.](urdf|obj|lcm|lcmlog)$'
+    - id: mixed-line-ending
+      args: [--fix=lf]
+    - id: no-commit-to-branch
+      args: [--branch, master]
+    - id: pretty-format-json
+      args: [--autofix, --indent, '4', --no-ensure-ascii]
+    - id: requirements-txt-fixer
+    - id: trailing-whitespace
+      exclude: '.*[.](urdf|obj|lcm|lcmlog)$'
+# below are C++ hooks ordered by speed, benchmark time on a single source file
+#   * clang-format    0.7 s
+#   * cpplint         0.7 s
+#   * cppcheck       34.1 s
+#   * oclint         47.9 s
+#   * clang-tidy    438.8 s
+-   repo: local
+    hooks:
+    - id: compile-commands
+      name: Export compile commands for static code analyses
+      language: system
+      entry: ./compile_commands_export.sh
+      always_run: true
+-   repo: https://github.com/bmorcos/pre-commit-hooks-cpp
+    rev: master
+    hooks:
+    - id: clang-format
+      args: [--style=file]
+    - id: cpplint
+      # Some C++11 headers are unapproved by Google style; ignore that.
+      args: [
+        --verbose=0,
+        --counting=toplevel,
+        --recursive,
+        "--filter=-build/c++11,-runtime/references"]
+    - id: cppcheck
+      # manual: http://cppcheck.sourceforge.net/manual.pdf
+      # need fix_ros_escape.sh due to the following error before running this
+      # error: bad macro syntax. macroname=ROS_PACKAGE_NAME value=\"stuff_getter\" [internalError]
+      # the -i exclusion option doesn't work with --project
+      args: ["--enable=all",
+             "--std=c++20",
+             "--inline-suppr",
+             "--quiet",
+             "--project=build/compile_commands_escape.json",
+             # suppress external libraries warnings
+             "--suppress=*:*/externals/*",
+             # suppress ompl header warnings
+             "--suppress=*:/usr/*",
+             "--suppress=*:/opt/drake/*",
+             # "--suppress=missingInclude",
+             # If DRAKE_DEPRECATED is a macro then please configure it. [unknownMacro]
+             "--suppress=unknownMacro",
+             # [eigen] warning: Found suspicious operator ',' [constStatement]
+             "--suppress=constStatement",
+             "--suppress=unmatchedSuppression",
+             # unused function is always positive when running on a small subset of codebase
+             "--suppress=unusedFunction"
+             ]
+-   repo: https://github.com/pocc/pre-commit-hooks
+    rev: python
+    hooks:
+    - id: oclint
+      # keep the original compile_commands.json as oclint requires it
+      args: [-p=build/compile_commands.json,
+             -enable-clang-static-analyzer,
+             -enable-global-analysis,
+             "--extra-arg=-I/usr/include/clang/12/include"]
+    - id: clang-tidy
+      args: [-p=build/compile_commands.json,
+             --config-file=.clang-tidy]
+    # - id: uncrustify
+    # doesn't seem to add much more value, to be evaluated further
+    # - id: cppcheck
+    # the cppcheck in this repo doesn't print any ouput when not passing
