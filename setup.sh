@@ -1,6 +1,19 @@
 #!/bin/bash
 
-set -euxo pipefail
+set -eufo pipefail
+
+# parse --dev option for developer mode
+OPT_DEV=false
+while (( $# )); do
+  case "$1" in
+    --dev)
+      OPT_DEV=true
+      shift
+      ;;
+    *)
+      break
+  esac
+done
 
 # Positional Parameters for specifying different behavior via the command line.
 # see http://linuxcommand.org/lc3_wss0120.php
@@ -12,6 +25,17 @@ build_debug=${4:-0} # Make build type Debug (with symbols) ctest if > 0.  Defaul
 clean_build=${5:-1} # Remove the build directory and start over if > 0.  Defaults to Yes (1).
 skip_slower=${6:-0} # Skip the slow tests, such as test_foi (or all matching 'test_[A-Z].+').  Defaults to No (0).
 exclude_pat=${7:-test_multiple_plans} # Regex for excluding some (slow) tests, such as test_foi.
+
+if [[ $OPT_DEV == true ]]; then
+  echo "Instaling git pre-commit hooks assuing all dependencies are present..."
+  git config --unset-all core.hooksPath
+  git lfs install
+  pip install -U pre-commit pylint
+  pre-commit install
+  echo "dev setup complete"
+  exit 0
+fi
+
 
 if (( $build_tests > 0 )); then
     target=all
@@ -36,7 +60,7 @@ if [ ! -f "build/libfranka.so" ]; then
     mkdir -p build && cd build
     if (( $build_debug > 0 )); then
         echo "Build libfranka in Debug mode!"
-        cmake .. -DCMAKE_BUILD_TYPE=Debug \ 
+        cmake .. -DCMAKE_BUILD_TYPE=Debug \
                  -DCMAKE_C_COMPILER=gcc-7 \
                  -DCMAKE_CXX_COMPILER=g++-7
     else
