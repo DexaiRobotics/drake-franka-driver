@@ -1,4 +1,5 @@
 // @file  constraint_solver.cc
+#include <unistd.h>
 #include "constraint_solver.h"
 #include "utils.h"
 
