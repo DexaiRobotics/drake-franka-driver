@@ -3,6 +3,7 @@
 #pragma once
 
 #include <array>  // for array
+
 #include <Eigen/Core>
 #include <franka/robot.h>
 
@@ -12,16 +13,17 @@
  */
 
 /**
- * Sets a default collision behavior, joint impedance, Cartesian impedance, and filter frequency.
+ * Sets a default collision behavior, joint impedance, Cartesian impedance, and
+ * filter frequency.
  *
  * @param[in] robot Robot instance to set behavior on.
  */
 void setDefaultBehavior(franka::Robot& robot);
 
 /**
- * An example showing how to generate a joint pose motion to a goal position. Adapted from:
- * Wisama Khalil and Etienne Dombre. 2002. Modeling, Identification and Control of Robots
- * (Kogan Page Science Paper edition).
+ * An example showing how to generate a joint pose motion to a goal position.
+ * Adapted from: Wisama Khalil and Etienne Dombre. 2002. Modeling,
+ * Identification and Control of Robots (Kogan Page Science Paper edition).
  */
 class MotionGenerator {
  public:
@@ -41,7 +43,8 @@ class MotionGenerator {
    *
    * @return Joint positions for use inside a control loop.
    */
-  franka::JointPositions operator()(const franka::RobotState& robot_state, franka::Duration period);
+  franka::JointPositions operator()(const franka::RobotState& robot_state,
+                                    franka::Duration period);
 
  private:
   using Vector7d = Eigen::Matrix<double, 7, 1, Eigen::ColMajor>;
@@ -64,7 +67,8 @@ class MotionGenerator {
 
   double time_ = 0.0;
 
-  Vector7d dq_max_ = (Vector7d() << 2.0, 2.0, 2.0, 2.0, 2.5, 2.5, 2.5).finished();
+  Vector7d dq_max_ =
+      (Vector7d() << 2.0, 2.0, 2.0, 2.0, 2.5, 2.5, 2.5).finished();
   Vector7d ddq_max_start_ = (Vector7d() << 5, 5, 5, 5, 5, 5, 5).finished();
   Vector7d ddq_max_goal_ = (Vector7d() << 5, 5, 5, 5, 5, 5, 5).finished();
 };

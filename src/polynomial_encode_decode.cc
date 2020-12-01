@@ -1,10 +1,12 @@
 #include "polynomial_encode_decode.h"
+
 #include <vector>
+
 #include "drake/util/drakeUtil.h"
+using drake::trajectories::PiecewisePolynomial;
 using Eigen::Dynamic;
 using Eigen::Map;
 using Eigen::VectorXd;
-using drake::trajectories::PiecewisePolynomial;
 void encodePolynomial(const Polynomial<double>& polynomial,
                       // NOLINTNEXTLINE(runtime/references)
                       drake::lcmt_polynomial& msg) {

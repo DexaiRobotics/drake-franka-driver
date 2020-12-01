@@ -14,6 +14,7 @@ repos:
     rev: 3.8.4
     hooks:
     - id: flake8
+      exclude: scripts/robot_msgs/
 -   repo: local
     hooks:
     - id: pylint
@@ -22,6 +23,7 @@ repos:
       language: system
       types: [python]
       args: [--rcfile=setup.cfg]
+      exclude: scripts/robot_msgs/
 -   repo: https://github.com/pycqa/pydocstyle
     rev: 5.1.1
     hooks:
