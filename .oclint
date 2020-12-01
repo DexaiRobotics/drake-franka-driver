@@ -1,0 +1,253 @@
+################################################################################
+#                                                                              #
+# Sample OCLint configuration file with current (v0.13) default values.        #
+#                                                                              #
+# Place this file in the directory you invoke oclint from and rename it        #
+# to '.oclint'                                                                 #
+#                                                                              #
+# See http://oclint-docs.readthedocs.io/en/stable/howto/rcfile.html            #
+#                                                                              #
+################################################################################
+
+# Allow duplicated violations in the OCLint report
+#
+# maps to command line argument '-allow-duplicated-violations'
+allow-duplicated-violations: false
+
+# Disable the following rules
+#
+# maps to command line argument '-disable-rule <rule name>'
+disable-rules:
+# Priority 1
+  # - BrokenNilCheck                        # Priority 1
+  # - BrokenNullCheck                       # Priority 1
+  # - CallingProhibitedMethod               # Priority 1
+  # - CallingProtectedMethod                # Priority 1
+  # - MisplacedNilCheck                     # Priority 1
+  # - MisplacedNullCheck                    # Priority 1
+  # - MissingAbstractMethodImplementation   # Priority 1
+  # - MissingCallToBaseMethod               # Priority 1
+  # - MissingHashMethod                     # Priority 1
+# Priority 2
+  # - AssignIvarOutsideAccessors            # Priority 2
+  # - AvoidBranchingStatementAsLastInLoop   # Priority 2
+  # - BitwiseOperatorInConditional          # Priority 2
+  # - BrokenOddnessCheck                    # Priority 2
+  # - ConstantConditionalOperator           # Priority 2
+  # - ConstantIfExpression                  # Priority 2
+  # - DeadCode                              # Priority 2
+  # - DestructorOfVirtualClass              # Priority 2
+  # - DoubleNegative                        # Priority 2
+  # - EmptyCatchStatement                   # Priority 2
+  # - EmptyDoWhileStatement                 # Priority 2
+  # - EmptyElseBlock                        # Priority 2
+  # - EmptyFinallyStatement                 # Priority 2
+  # - EmptyForStatement                     # Priority 2
+  # - EmptyIfStatement                      # Priority 2
+  # - EmptySwitchStatement                  # Priority 2
+  # - EmptyTryStatement                     # Priority 2
+  # - EmptyWhileStatement                   # Priority 2
+  # - HighCyclomaticComplexity              # Priority 2
+  # - HighNPathComplexity                   # Priority 2
+  # - HighNcssMethod                        # Priority 2
+  # - JumbledIncrementer                    # Priority 2
+  # - MissingBreakInSwitchStatement         # Priority 2
+  # - MultipleUnaryOperator                 # Priority 2
+  # - ProblematicBaseClassDestructor        # Priority 2
+  # - ReturnFromFinallyBlock                # Priority 2
+  # - ThrowExceptionFromFinallyBlock        # Priority 2
+  # - UseNumberLiteral                      # Priority 2
+# Priority 3
+  # - AvoidDefaultArgumentsOnVirtualMethods # Priority 3
+  # - AvoidPrivateStaticMembers             # Priority 3
+  # - CollapsibleIfStatements               # Priority 3
+  # - DeepNestedBlock                       # Priority 3
+  # - ForLoopShouldBeWhileLoop              # Priority 3
+  # - GotoStatement                         # Priority 3
+  # - InvertedLogic                         # Priority 3
+  # - LongClass                             # Priority 3
+  # - LongLine                              # Priority 3
+  # - LongMethod                            # Priority 3
+  # - LongVariableName                      # Priority 3
+  # - MisplacedDefaultLabel                 # Priority 3
+  # - MissingDefaultStatement               # Priority 3
+  # - NonCaseLabelInSwitchStatement         # Priority 3
+  # - ParameterReassignment                 # Priority 3
+  # - PreferEarlyExit                       # Priority 3
+  # - RedundantConditionalOperator          # Priority 3
+  # - RedundantIfStatement                  # Priority 3
+  # - RedundantLocalVariable                # Priority 3
+  # - RedundantNilCheck                     # Priority 3
+  # - ShortVariableName                     # Priority 3
+  # - TooFewBranchesInSwitchStatement       # Priority 3
+  # - TooManyFields                         # Priority 3
+  # - TooManyMethods                        # Priority 3
+  # - TooManyParameters                     # Priority 3
+  # - UnnecessaryDefaultStatement           # Priority 3
+  # - UnnecessaryElseStatement              # Priority 3
+  # - UnnecessaryNullCheckForDealloc        # Priority 3
+  # - UnusedLocalVariable                   # Priority 3
+  # - UnusedMethodParameter                 # Priority 3
+  # - UseBoxedExpression                    # Priority 3
+  # - UseContainerLiteral                   # Priority 3
+  # - UseObjectSubscripting                 # Priority 3
+  # - UselessParentheses                    # Priority 3
+
+# Enable Clang Static Analyzer, and integrate results into OCLint report
+#
+# default: not set (false)
+# maps to command line argument '-enable-clang-static-analyzer'
+enable-clang-static-analyzer: false
+
+# Compile every source, and analyze across global contexts (depends on number
+# of source files, could results in high memory load)
+#
+# default: not set (false)
+# maps to command line argument '-enable-global-analysis'
+enable-global-analysis: false
+
+# The max allowed number of priority [1|2|3] violations
+#
+# default: 0/10/20
+# maps to command line argument '-max-priority-[1|2|3]=<threshold>'
+# see http://oclint-docs.readthedocs.io/en/stable/howto/rcfile.html
+max-priority-1: 0
+max-priority-2: 10
+max-priority-3: 20
+
+# Change output report type.
+# Available report types: text, html, xml, json, pmd, xcode
+#
+# defaults to 'text' format
+# maps to command line argument '-report-type=<name>'
+# see http://oclint-docs.readthedocs.io/en/stable/howto/selectreporters.html
+report-type: "text"
+
+# Write output to <path> (or output to stdout if empty or omitted)
+#
+# default: not set, output to stdout
+# maps to command line argument '-o=<path>'
+# see http://oclint-docs.readthedocs.io/en/stable/howto/selectreporters.html
+output: ""
+
+# Customize rule thresholds
+#
+# maps to command line argument '-rc=<parameter>=<value>'
+# see http://oclint-docs.readthedocs.io/en/stable/howto/thresholds.html
+rule-configurations:
+  - key: CYCLOMATIC_COMPLEXITY
+    value: 10
+  - key: LONG_CLASS
+    value: 1000
+  - key: LONG_LINE
+    value: 100
+  - key: LONG_METHOD
+    value: 50
+  - key: LONG_VARIABLE_NAME
+    value: 21
+  - key: MAXIMUM_IF_LENGTH
+    value: 15
+  - key: MINIMUM_CASES_IN_SWITCH
+    value: 3
+  - key: NPATH_COMPLEXITY
+    value: 200
+  - key: NCSS_METHOD
+    value: 30
+  - key: NESTED_BLOCK_DEPTH
+    value: 5
+  - key: SHORT_VARIABLE_NAME
+    value: 2
+  - key: TOO_MANY_FIELDS
+    value: 20
+  - key: TOO_MANY_METHODS
+    value: 30
+  - key: TOO_MANY_PARAMETERS
+    value: 10
+
+# Add directory to rule loading path
+#
+# - default rule search path: '$(/path/to/bin/oclint)/../lib/oclint/rules'
+# - maps to command line argument '-R'
+# - see http://oclint-docs.readthedocs.io/en/stable/howto/selectrules.html
+rule-paths:
+
+# Explicitly pick rules
+#
+# - defaults to all rules found at rule search path
+# - maps to command line argument '-rule=<rule name>'
+# - see http://oclint-docs.readthedocs.io/en/stable/howto/selectrules.html
+rules:
+# Priority 1
+  # - BrokenNilCheck                        # Priority 1
+  # - BrokenNullCheck                       # Priority 1
+  # - CallingProhibitedMethod               # Priority 1
+  # - CallingProtectedMethod                # Priority 1
+  # - MisplacedNilCheck                     # Priority 1
+  # - MisplacedNullCheck                    # Priority 1
+  # - MissingAbstractMethodImplementation   # Priority 1
+  # - MissingCallToBaseMethod               # Priority 1
+  # - MissingHashMethod                     # Priority 1
+# Priority 2
+  # - AssignIvarOutsideAccessors            # Priority 2
+  # - AvoidBranchingStatementAsLastInLoop   # Priority 2
+  # - BitwiseOperatorInConditional          # Priority 2
+  # - BrokenOddnessCheck                    # Priority 2
+  # - ConstantConditionalOperator           # Priority 2
+  # - ConstantIfExpression                  # Priority 2
+  # - DeadCode                              # Priority 2
+  # - DestructorOfVirtualClass              # Priority 2
+  # - DoubleNegative                        # Priority 2
+  # - EmptyCatchStatement                   # Priority 2
+  # - EmptyDoWhileStatement                 # Priority 2
+  # - EmptyElseBlock                        # Priority 2
+  # - EmptyFinallyStatement                 # Priority 2
+  # - EmptyForStatement                     # Priority 2
+  # - EmptyIfStatement                      # Priority 2
+  # - EmptySwitchStatement                  # Priority 2
+  # - EmptyTryStatement                     # Priority 2
+  # - EmptyWhileStatement                   # Priority 2
+  # - HighCyclomaticComplexity              # Priority 2
+  # - HighNPathComplexity                   # Priority 2
+  # - HighNcssMethod                        # Priority 2
+  # - JumbledIncrementer                    # Priority 2
+  # - MissingBreakInSwitchStatement         # Priority 2
+  # - MultipleUnaryOperator                 # Priority 2
+  # - ProblematicBaseClassDestructor        # Priority 2
+  # - ReturnFromFinallyBlock                # Priority 2
+  # - ThrowExceptionFromFinallyBlock        # Priority 2
+  # - UseNumberLiteral                      # Priority 2
+# Priority 3
+  # - AvoidDefaultArgumentsOnVirtualMethods # Priority 3
+  # - AvoidPrivateStaticMembers             # Priority 3
+  # - CollapsibleIfStatements               # Priority 3
+  # - DeepNestedBlock                       # Priority 3
+  # - ForLoopShouldBeWhileLoop              # Priority 3
+  # - GotoStatement                         # Priority 3
+  # - InvertedLogic                         # Priority 3
+  # - LongClass                             # Priority 3
+  # - LongLine                              # Priority 3
+  # - LongMethod                            # Priority 3
+  # - LongVariableName                      # Priority 3
+  # - MisplacedDefaultLabel                 # Priority 3
+  # - MissingDefaultStatement               # Priority 3
+  # - NonCaseLabelInSwitchStatement         # Priority 3
+  # - ParameterReassignment                 # Priority 3
+  # - PreferEarlyExit                       # Priority 3
+  # - RedundantConditionalOperator          # Priority 3
+  # - RedundantIfStatement                  # Priority 3
+  # - RedundantLocalVariable                # Priority 3
+  # - RedundantNilCheck                     # Priority 3
+  # - ShortVariableName                     # Priority 3
+  # - TooFewBranchesInSwitchStatement       # Priority 3
+  # - TooManyFields                         # Priority 3
+  # - TooManyMethods                        # Priority 3
+  # - TooManyParameters                     # Priority 3
+  # - UnnecessaryDefaultStatement           # Priority 3
+  # - UnnecessaryElseStatement              # Priority 3
+  # - UnnecessaryNullCheckForDealloc        # Priority 3
+  # - UnusedLocalVariable                   # Priority 3
+  # - UnusedMethodParameter                 # Priority 3
+  # - UseBoxedExpression                    # Priority 3
+  # - UseContainerLiteral                   # Priority 3
+  # - UseObjectSubscripting                 # Priority 3
+  # - UselessParentheses                    # Priority 3
