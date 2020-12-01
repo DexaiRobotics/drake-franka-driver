@@ -2,8 +2,8 @@
 ///
 /// franka_driver runs an instance of franka_plan_runner
 
-#include "util_io.h"  // for lock_pid_file
 #include "franka_plan_runner.h"
+#include "util_io.h"  // for lock_pid_file
 
 namespace dru = utils;
 
@@ -13,8 +13,7 @@ int do_main(std::string param_yaml = "franka_test.yaml") {
   dexai::create_log("franka_driver");
   int verbose = 0;
   dexai::log()->info("Loading parameters: {}", param_yaml);
-  RobotParameters params =
-      loadYamlParameters(param_yaml, verbose);
+  RobotParameters params = loadYamlParameters(param_yaml, verbose);
   FrankaPlanRunner frankaPlanRunner(params);
   return frankaPlanRunner.Run();
 }
@@ -26,7 +25,8 @@ int main(int argc, char** argv) {
   std::string pid_file = "/var/run/cobot_driver.pid";
   bool kill_existing_process = true;
   bool prompt_before_kill = false;
-  if (!utils::lock_pid_file(pid_file, kill_existing_process, prompt_before_kill)) {
+  if (!utils::lock_pid_file(pid_file, kill_existing_process,
+                            prompt_before_kill)) {
     std::cerr << "Failed to set up singleton cobot driver app." << std::endl;
     return 1;
   }

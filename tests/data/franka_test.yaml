@@ -62,7 +62,7 @@ robot_parameters:
       - 1000
       - 1000
   stop_epsilon: 0.015 # used to calculate when robot counts as "stopped"
-  stop_margin: 0.6    # how long robot sleeps before ready to recieve continue 
+  stop_margin: 0.6    # how long robot sleeps before ready to recieve continue
   simulated: true
   urdf: franka_test.urdf
   urdf_dir: ''
