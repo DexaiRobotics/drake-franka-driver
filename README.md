@@ -13,7 +13,7 @@ curl -SL https://drake-packages.csail.mit.edu/drake/nightly/drake-20200530-bioni
 cd /opt/drake/share/drake/setup && yes | ./install_prereqs
 ```
 
-See [drake-shambhala](https://github.com/RobotLocomotion/drake-shambhala) for more examples. 
+See [drake-shambhala](https://github.com/RobotLocomotion/drake-shambhala) for more examples.
 
 You also need the LCM library.
 ```bash
@@ -29,7 +29,7 @@ git clone --recursive https://github.com/DexaiRobotics/drake-franka-driver.git`
 drake-franka-driver/setup.sh
 ```
 
-See the beginning of `setuo.sh` for more flags.
+See the beginning of `setup.sh` for more flags.
 
 ## Running the driver
 
@@ -37,7 +37,7 @@ Once built, the executable `drake-franka-driver` can be found in the `build/` di
 ```bash
 drake-franka-driver <robot_name> <robot_ip_address>
 ```
-where the default robot_name is `franka_0` and the default IP is `192.168.200.0`. This enables multiple robots to be run on the same network. 
+where the default robot_name is `franka_0` and the default IP is `192.168.200.0`. This enables multiple robots to be run on the same network.
 
 ## Communicating with the robot
 
