@@ -28,10 +28,12 @@ repos:
     rev: 5.1.1
     hooks:
     - id: pydocstyle
+      exclude: scripts/robot_msgs/
 -   repo: https://github.com/pre-commit/mirrors-mypy
     rev: v0.790
     hooks:
     - id: mypy
+      exclude: scripts/robot_msgs/
 -   repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.2.0
     hooks:
