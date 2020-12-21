@@ -13,24 +13,25 @@
 /// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
 
-#include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
-#include "franka/robot_state.h"                              // for RobotState
-#include "robot_parameters.h"                                // for RobotParameters
+#include <cstdint>  // for int64_t
+#include <mutex>    // for mutex
+#include <thread>   // for thread
 
 #include <bits/stdint-intn.h>           // for int64_t
-#include <cstdint>                      // for int64_t
-#include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
-#include <mutex>                        // for mutex
-#include <robot_msgs/pause_cmd.hpp>     // for pause_cmd
-#include <thread>                       // for thread
 #include <lcm/lcm-cpp.hpp>              // for lcm
+#include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
+#include <robot_msgs/pause_cmd.hpp>     // for pause_cmd
+
+#include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
+#include "franka/robot_state.h"                              // for RobotState
+#include "robot_parameters.h"  // for RobotParameters
 
 using drake::trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
 
 namespace franka_driver {
 
-// TODO @rkk: remove this franka specific state and make it generic:
+// TODO: remove this franka specific state and make it generic:
 struct RobotData {
   std::atomic<bool> has_robot_data_;
   franka::RobotState robot_state;
@@ -52,7 +53,7 @@ class CommunicationInterface {
  public:
   CommunicationInterface(const RobotParameters params,
                          double lcm_publish_rate = 200.0 /* Hz */);
-  ~CommunicationInterface(){};
+  ~CommunicationInterface() {};
   void StartInterface();
   void StopInterface();
 
@@ -60,8 +61,7 @@ class CommunicationInterface {
   bool IsContinuous(std::unique_ptr<PPType>& plan, double franka_time);
   void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
 
-  // TODO @rkk: remove franka specific RobotState type
-  // and replace with std::array type:
+  // TODO: remove franka specific RobotState type and replace with std::array
   franka::RobotState GetRobotState();
   /// Blocking call that sets the robot state
   void SetRobotData(const franka::RobotState& robot_state,
@@ -100,7 +100,7 @@ class CommunicationInterface {
 
  private:
   RobotParameters params_;
-  std::atomic_bool running_{false};
+  std::atomic_bool running_ {false};
   ::lcm::LCM lcm_;
 
   RobotPiecewisePolynomial robot_plan_;

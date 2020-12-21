@@ -1,5 +1,6 @@
 #pragma once
 #include <Eigen/Core>
+
 #include "drake/common/trajectories/piecewise_polynomial.h"
 #include "drake/lcmt_piecewise_polynomial.hpp"
 #include "drake/lcmt_polynomial.hpp"
@@ -7,8 +8,7 @@
 void encodePolynomial(const Polynomial<double>& polynomial,
                       // NOLINTNEXTLINE(runtime/references)
                       drake::lcmt_polynomial& msg);
-Polynomial<double> decodePolynomial(
-    const drake::lcmt_polynomial& msg);
+Polynomial<double> decodePolynomial(const drake::lcmt_polynomial& msg);
 template <int RowsAtCompileTime, int ColsAtCompileTime>
 void encodePolynomialMatrix(
     const Eigen::Matrix<Polynomial<double>, RowsAtCompileTime,
@@ -45,7 +45,6 @@ decodePolynomialMatrix(const drake::lcmt_polynomial_matrix& msg) {
  */
 void encodePiecewisePolynomial(const drake::trajectories::PiecewisePolynomial<
                                    double>& piecewise_polynomial,
-                               // NOLINTNEXTLINE(runtime/references)
                                drake::lcmt_piecewise_polynomial& msg);
 drake::trajectories::PiecewisePolynomial<double> decodePiecewisePolynomial(
     const drake::lcmt_piecewise_polynomial& msg);

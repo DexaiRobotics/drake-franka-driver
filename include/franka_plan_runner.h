@@ -11,29 +11,33 @@
 /// current plan and wait until a new plan is received.
 #pragma once
 
+#include <cstdint>  // for int64_t
+#include <mutex>    // for mutex
+#include <thread>   // for thread
+
+#include <Eigen/Dense>                  // for Eigen::VectorXd
+#include <bits/stdint-intn.h>           // for int64_t
+#include <cnpy.h>                       // to read joint position offsets
+#include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
+
 #include "communication_interface.h"  // for CommunicationInterface
-#include "constraint_solver.h"     // for ConstraintSolver
+#include "constraint_solver.h"        // for ConstraintSolver
 #include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
 #include "franka/control_types.h"  // for franka::JointPositions
 #include "franka/duration.h"       // for franka::Duration
 #include "franka/robot.h"          // for franka::Robot
 #include "franka/robot_state.h"    // for franka::RobotState
-#include "util_conv.h"             // for RobotStatus
 #include "robot_parameters.h"      // for RobotParameters
+#include "util_conv.h"             // for RobotStatus
 
-#include <Eigen/Dense>                  // for Eigen::VectorXd
-#include <bits/stdint-intn.h>           // for int64_t
-#include <cstdint>                      // for int64_t
-#include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
-#include <mutex>                        // for mutex
-#include <thread>                       // for thread
+#define FRANKA_DOF 7
 
 namespace franka_driver {
 
 class FrankaPlanRunner {
  public:
   FrankaPlanRunner(const RobotParameters params);
-  ~FrankaPlanRunner(){};
+  ~FrankaPlanRunner() {};
 
   /// This starts the franka driver
   int Run();
@@ -83,7 +87,7 @@ class FrankaPlanRunner {
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
-  std::unique_ptr<ConstraintSolver>   constraint_solver_;
+  std::unique_ptr<ConstraintSolver> constraint_solver_;
   RobotParameters params_;
 
   std::string ip_addr_;
@@ -116,6 +120,9 @@ class FrankaPlanRunner {
   Eigen::VectorXd start_reversing_conf_franka_;
   // config of franka when plan ends:
   Eigen::VectorXd end_conf_plan_;
+
+  bool is_joint_pos_offset_available_ {false};
+  Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
   double allowable_max_angle_error_ = 0.001;  // empirically proven, increased to work w/ sim robot

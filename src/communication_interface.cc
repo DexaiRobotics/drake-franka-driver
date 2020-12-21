@@ -14,20 +14,21 @@
 
 #include "communication_interface.h"
 
-#include "util_io.h"                  // for get_current_utime
+#include "util_io.h"  // for get_current_utime
 // #include "drake/lcmt_iiwa_status.hpp"
-#include "util_conv.h"                // ConvertToLcmStatus
-#include "robot_msgs/pause_cmd.hpp"   // for pause_cmd
-#include "robot_msgs/trigger_t.hpp"   // for trigger_t
-// following is deprecated, see: https://github.com/DexaiRobotics/drake-franka-driver/issues/54
-#include "polynomial_encode_decode.h" // for decodePiecewisePolynomial
-
+#include "robot_msgs/pause_cmd.hpp"  // for pause_cmd
+#include "robot_msgs/trigger_t.hpp"  // for trigger_t
+#include "util_conv.h"               // ConvertToLcmStatus
+// following is deprecated, see:
+// https://github.com/DexaiRobotics/drake-franka-driver/issues/54
 #include <chrono>  // for steady_clock, for duration
+
+#include "polynomial_encode_decode.h"  // for decodePiecewisePolynomial
 
 using namespace franka_driver;
 
-CommunicationInterface::CommunicationInterface(
-    const RobotParameters params, double lcm_publish_rate)
+CommunicationInterface::CommunicationInterface(const RobotParameters params,
+                                               double lcm_publish_rate)
     : params_(params),
       lcm_(params_.lcm_url),
       lcm_publish_rate_(lcm_publish_rate) {
@@ -36,10 +37,9 @@ CommunicationInterface::CommunicationInterface(
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
 
-  // TODO @rkk: define this in parameters file?
+  // TODO: define this in parameters file
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
-  // TODO @rkk: remove this status channel by combining it
-  // with the robot status channel:
+  // TODO: remove this channel by combining it with the robot status channel
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
 
   dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
@@ -90,8 +90,8 @@ void CommunicationInterface::StopInterface() {
       "CommunicationInterface::StopInterface: Before LCM threads join");
   // clean-up threads if they're still alive.
   running_ = false;  // sets the lcm threads to inactive.
-  while (!lcm_handle_thread_.joinable() ||
-         !lcm_publish_status_thread_.joinable()) {
+  while (!lcm_handle_thread_.joinable()
+         || !lcm_publish_status_thread_.joinable()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     dexai::log()->warn(
         "CommunicationInterface::StopInterface: Waiting for LCM threads to be "
@@ -190,8 +190,9 @@ void CommunicationInterface::PublishPlanComplete(
 
 void CommunicationInterface::PublishDriverStatus(
     bool success, std::string driver_status_string) {
-  PublishTriggerToChannel(utils::get_current_utime(), lcm_driver_status_channel_,
-                          success, driver_status_string);
+  PublishTriggerToChannel(utils::get_current_utime(),
+                          lcm_driver_status_channel_, success,
+                          driver_status_string);
 }
 
 void CommunicationInterface::HandleLcm() {
@@ -207,7 +208,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
   while (running_) {
     auto time_start = std::chrono::steady_clock::now();
     PublishRobotStatus();
-    // TODO @rkk: make pause status part of the robot status
+    // TODO: make pause status part of the robot status
     PublishPauseStatus();
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
@@ -337,8 +338,7 @@ void CommunicationInterface::HandlePlan(
   }
 
   robot_plan_.utime = robot_spline->utime;
-  //$ publish confirmation that plan was received with same utime
-  // TODO @rkk: move this to later in the function...
+  // publish confirmation that plan was received with same utime
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
   dexai::log()->info(
       "CommunicationInterface::HandlePlan: "
@@ -346,7 +346,7 @@ void CommunicationInterface::HandlePlan(
       robot_spline->utime);
 
   PPType piecewise_polynomial =
-    decodePiecewisePolynomial(robot_spline->piecewise_polynomial);
+      decodePiecewisePolynomial(robot_spline->piecewise_polynomial);
 
   if (piecewise_polynomial.get_number_of_segments() < 1) {
     dexai::log()->error(
@@ -369,7 +369,7 @@ void CommunicationInterface::HandlePlan(
       piecewise_polynomial.value(piecewise_polynomial.start_time());
 
   auto q = this->GetRobotState().q;
-  // TODO @rkk: move this check to franka plan runner...
+  // TODO: move this check to franka plan runner
   Eigen::VectorXd q_eigen = utils::v_to_e(utils::ArrayToVector(q));
 
   auto max_angular_distance =
@@ -413,8 +413,8 @@ void CommunicationInterface::HandlePause(
     dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received 'pause = true' from {}",
         pause_cmd_msg->source);
-    if (pause_data_.pause_sources_set_.insert(pause_cmd_msg->source).second ==
-        false) {
+    if (pause_data_.pause_sources_set_.insert(pause_cmd_msg->source).second
+        == false) {
       dexai::log()->warn(
           "CommunicationInterface::HandlePause: "
           "Already paused by source: {}",
@@ -424,8 +424,8 @@ void CommunicationInterface::HandlePause(
     dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received 'pause = false' from {}",
         pause_cmd_msg->source);
-    if (pause_data_.pause_sources_set_.find(pause_cmd_msg->source) !=
-        pause_data_.pause_sources_set_.end()) {
+    if (pause_data_.pause_sources_set_.find(pause_cmd_msg->source)
+        != pause_data_.pause_sources_set_.end()) {
       pause_data_.pause_sources_set_.erase(pause_cmd_msg->source);
     } else {
       dexai::log()->warn(
