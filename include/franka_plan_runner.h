@@ -60,7 +60,7 @@ class FrankaPlanRunner {
   int RunSim();
 
   /// Check and limit conf according to provided parameters for joint limits
-  bool IsWithinJointLimits(Eigen::VectorXd& conf);
+  bool LimitJoints(Eigen::VectorXd& conf);
 
   /// Calculate the time to advance while pausing or unpausing
   /// Inputs to method have seconds as their unit.
