@@ -2,7 +2,7 @@
 
 pushd /src/drake-franka-driver
 
-if [[ ! -v SIM_ROBOT ]]; then # SIM_ROBOT environment variable not set
+if [[ ${SIM_ROBOT:-false} == 'false' ]]; then
     config=franka.yaml
 else
     config=franka_sim.yaml
