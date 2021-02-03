@@ -1,9 +1,11 @@
 ///@file: test_continuity.cc -- part of a googletest suite
+/// Test cases for is_continuous function in src/util_math.cc
+
 #include <gtest/gtest.h>
 #include "util_math.h"
 typedef drake::trajectories::PiecewisePolynomial<double> PPType;
 
-// Construct the PiecewisePolynomial.
+// given the same plan, is_continuous should output "true"
 TEST(UtilMath, is_continuous_with_same_plan)
 {
     const std::vector<double> breaks = { -1.0, 0.0, 1.0 };
@@ -15,9 +17,12 @@ TEST(UtilMath, is_continuous_with_same_plan)
     }
     
     std::unique_ptr<PPType> square = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples));
-    EXPECT_TRUE(utils::is_continuous(square, square, 0, Eigen::VectorXd::Zero(2), Eigen::VectorXd::Zero(2), Eigen::VectorXd::Zero(2)));
+    for (double i = -1; i < 1; i+=0.001) {
+        EXPECT_TRUE(utils::is_continuous(square, square, i, Eigen::VectorXd::Zero(2), Eigen::VectorXd::Zero(2), Eigen::VectorXd::Zero(2)));
+    }
 }
 
+// given [1,0,4] and [1,0,2], is_continuous should output "true" near the beginning and "false" near the end
 TEST(UtilMath, is_pos_continuous)
 {
     const std::vector<double> breaks = { -1.0, 0.0, 2.0 };
@@ -34,11 +39,17 @@ TEST(UtilMath, is_pos_continuous)
         samples2[i](0, 0) = std::abs(breaks[i]);
     }
     std::unique_ptr<PPType> abs = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples2));
-
-    EXPECT_FALSE(utils::is_continuous(square, abs, 1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
-    EXPECT_FALSE(utils::is_continuous(square, abs, 0.25, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    
+    for (double i = -1; i < 0; i+=0.001) {
+        EXPECT_TRUE(utils::is_continuous(square, abs, i, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    }
+    for (double i = 0; i < 2; i+=0.001) {
+        EXPECT_FALSE(utils::is_continuous(square, abs, i, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    }
 }
 
+
+// given the same 1D function but shifted vertically, is_continuous should output "false" everywhere
 TEST(UtilMath, is_vel_continuous)
 {
     const std::vector<double> breaks = { -1.0, 0.0, 1.0 };
@@ -56,10 +67,12 @@ TEST(UtilMath, is_vel_continuous)
     }
     std::unique_ptr<PPType> square_shifted_h = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples_h));
 
-    EXPECT_FALSE(utils::is_continuous(square, square_shifted_h, 0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
-    EXPECT_FALSE(utils::is_continuous(square, square_shifted_h, 0.67, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    for (double i = -1; i < 1; i+=0.001) {
+        EXPECT_FALSE(utils::is_continuous(square, square_shifted_h, i, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    }
 }
 
+// given [-1,0,1] and [1,0,1], is_continuous should output "false" near the beginning and "true" near the end
 TEST(UtilMath, is_acc_continuous)
 {
     const std::vector<double> breaks = { -1.0, 0.0, 1.0 };
@@ -77,9 +90,15 @@ TEST(UtilMath, is_acc_continuous)
     }
     std::unique_ptr<PPType> line = std::make_unique<PPType>(PPType::FirstOrderHold(breaks, samples_h));
 
-    EXPECT_FALSE(utils::is_continuous(square, line, -0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    for (double i = -1; i < 0; i+=0.001) {
+        EXPECT_FALSE(utils::is_continuous(square, line, i, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    }
+    for (double i = 0; i < 1; i+=0.001) {
+        EXPECT_TRUE(utils::is_continuous(square, line, i, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    }
 }
 
+// two totally different 1D functions, is_continuous should output false
 TEST(UtilMath, is_not_continuous)
 {
     const std::vector<double> breaks = { -1.0, 0.0, 1.0 };
@@ -98,5 +117,7 @@ TEST(UtilMath, is_not_continuous)
     }
     std::unique_ptr<PPType> line = std::make_unique<PPType>(PPType::FirstOrderHold(breaks_h, samples_h));
 
-    EXPECT_FALSE(utils::is_continuous(square, line, -0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    for (double i = -1; i < 1; i+=0.001) {
+        EXPECT_FALSE(utils::is_continuous(square, line, -0.1, Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1), Eigen::VectorXd::Zero(1)));
+    }
 }
