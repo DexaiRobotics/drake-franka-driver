@@ -125,7 +125,7 @@ class FrankaPlanRunner {
   Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
-  double allowable_max_angle_error_ = 0.001;  // empirically proven
+  double allowable_max_angle_error_ = 0.001;  // empirically proven, increased to work w/ sim robot
 
 };  // FrankaPlanRunner
 

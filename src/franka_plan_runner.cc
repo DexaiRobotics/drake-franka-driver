@@ -39,7 +39,6 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
       std::make_unique<CommunicationInterface>(params_, lcm_publish_rate_);
 
   // for pause logic:
-  franka_time_ = 0.0;
   max_accels_ = params.robot_max_accelerations;
 
   assert(!params_.urdf_filepath.empty()
@@ -546,6 +545,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
 
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const franka::RobotState& robot_state, franka::Duration period) {
+  
   // check pause status and update franka_time_:
   IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec());
 
@@ -562,7 +562,24 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   if (comm_interface_->HasNewPlan()) {
     // get the current plan from the communication interface
+
+    bool starting_new_plan = (plan_utime_ == -1);
+    if(!plan_){
+      franka_time_ = 0.0;
+      log()->info("JointPositionCallback: Resetting franka time to 0");
+    } else{
+      log()->info("Franka time is {}", franka_time_);
+    }
+
     comm_interface_->TakePlan(plan_, plan_utime_);
+    if(starting_new_plan){
+      log()->info("JointPositionCallback: Creating new start_conf_plan_ as last plan has finished");
+      start_conf_plan_ = plan_->value(franka_time_);
+    }
+
+    franka::JointPositions output_to_franka = robot_state.q_d;
+    auto q_d_v = ArrayToVector(robot_state.q_d);
+    Eigen::VectorXd current_conf_franka = utils::v_to_e(q_d_v);
 
     // first time step of plan, reset time:
     franka_time_ = 0.0;
@@ -585,10 +602,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     dexai::log()->debug("JointPositionCallback: starting plan q = {}",
                         start_conf_plan_.transpose());
 
+    
     // Maximum change in joint angle between two confs
     auto max_ang_distance =
         utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
-    if (max_ang_distance > params_.kMediumJointDistance) {
+    if (starting_new_plan && max_ang_distance > params_.kMediumJointDistance) {
       dexai::log()->error(
           "JointPositionCallback: Discarding plan, mismatched start position."
           " Max distance: {} > {}",
@@ -648,11 +666,12 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
   output_to_franka = utils::EigenToArray(output_to_franka_eigen);
 
-  if (franka_time_ > plan_->end_time()) {
+  if (franka_time_ >= plan_->end_time()) {
     // Maximum change in joint angle between two confs
-    double error_final =
-        utils::max_angular_distance(end_conf_plan_, current_conf_franka);
-    auto current_dq = utils::v_to_e(ArrayToVector(cannonical_robot_state.dq));
+    end_conf_plan_ = plan_->value(plan_->end_time());
+    dexai::log()->warn("franka time: {}, plan end time: {}, end_conf_plan_: {} , current_conf_franka: {}", franka_time_, plan_->end_time(), end_conf_plan_.transpose(), current_conf_franka.transpose());
+    double error_final {utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
+    auto current_dq {utils::v_to_e(ArrayToVector(cannonical_robot_state.dq))};
 
     if (error_final < allowable_max_angle_error_
         && current_dq.norm() < allowable_max_angle_error_) {

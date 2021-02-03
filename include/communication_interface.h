@@ -58,6 +58,7 @@ class CommunicationInterface {
   void StopInterface();
 
   bool HasNewPlan();
+  bool IsContinuous(std::unique_ptr<PPType>& plan, double franka_time);
   void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
 
   // TODO: remove franka specific RobotState type and replace with std::array

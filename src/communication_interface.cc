@@ -108,6 +108,30 @@ bool CommunicationInterface::HasNewPlan() {
   return robot_plan_.has_plan_data_;  // is atomic
 }
 
+
+
+bool CommunicationInterface::IsContinuous(std::unique_ptr<PPType>& plan, double franka_time){
+  //checks if new plan is continuous with old plan
+  if(!plan){
+    return true;
+  }
+  if (!HasNewPlan()){
+    throw std::runtime_error("CommunicationInterface::IsContinuous: No new plan to check for continuity!");
+  }
+
+  const Eigen::VectorXd pos_tolerance = (params_.robot_high_joint_limits - params_.robot_low_joint_limits)*1e-5;
+  const Eigen::VectorXd vel_tolerance = (params_.robot_max_velocities)*1e-5;
+  const Eigen::VectorXd acc_tolerance = (params_.robot_max_accelerations)*1e-5; 
+
+  if (!utils::is_continuous(robot_plan_.plan_, plan, franka_time, pos_tolerance, vel_tolerance, acc_tolerance)){
+    dexai::log()->error("CommunicationInterface::IsContinuous: New plan not continuous"
+     " with pos, vel or acc of old plan at franka time {}. Continuing old plan!", franka_time);
+     return false;
+  } 
+  dexai::log()->info("CommunicationInterface::IsContinuous: New plan is continuous with old plan. Switching to new plan!");
+  return true;
+}
+
 void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
                                       int64_t& plan_utime) {
   std::lock_guard<std::mutex> lock(robot_plan_mutex_);
@@ -115,7 +139,7 @@ void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
     throw std::runtime_error("TakePlan: No plan to take over!");
   }
   robot_plan_.has_plan_data_ = false;
-  plan = std::move(robot_plan_.plan_);
+  plan = std::move(robot_plan_.plan_); //old plan is let go of, set plan to new plan object
   if (!plan) {
     throw std::runtime_error("TakePlan: Failed to take plan!");
   }
@@ -350,18 +374,21 @@ void CommunicationInterface::HandlePlan(
 
   auto max_angular_distance =
       utils::max_angular_distance(commanded_start, q_eigen);
-  if (max_angular_distance > params_.kMediumJointDistance) {
-    // discard the plan if we are too far away from current robot start
-    Eigen::VectorXd joint_delta = q_eigen - commanded_start;
-    dexai::log()->error(
-        "CommunicationInterface::HandlePlan: "
-        "Discarding plan {}, mismatched start position with delta: {}.",
-        robot_spline->utime, joint_delta.transpose());
-    robot_plan_.has_plan_data_ = false;
-    robot_plan_.plan_.release();
-    lock.unlock();
-    PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
-                        "mismatched_start_position");
+
+  if(!robot_data_.has_robot_data_){
+    if (max_angular_distance > params_.kMediumJointDistance) {
+      // discard the plan if we are too far away from current robot start  
+      Eigen::VectorXd joint_delta = q_eigen - commanded_start;
+      dexai::log()->error(
+          "CommunicationInterface::HandlePlan: "
+          "Discarding plan {}, mismatched start position with delta: {}.",
+          robot_spline->utime, joint_delta.transpose());
+      robot_plan_.has_plan_data_ = false;
+      robot_plan_.plan_.release();
+      lock.unlock();
+      PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
+                          "mismatched_start_position");
+    }
     return;
   }
 
