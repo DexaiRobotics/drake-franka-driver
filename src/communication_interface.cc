@@ -217,6 +217,7 @@ void CommunicationInterface::PublishRobotStatus() {
     lock.unlock();
 
     robot_msgs::bool_t user_stop_status;
+    user_stop_status.utime = franka_status.utime;
     user_stop_status.data = current_mode == franka::RobotMode::kUserStopped;
     lcm_.publish(params_.lcm_status_channel, &franka_status);
     lcm_.publish(lcm_user_stop_channel_, &user_stop_status);
