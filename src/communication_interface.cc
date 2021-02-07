@@ -16,6 +16,7 @@
 
 #include "util_io.h"  // for get_current_utime
 // #include "drake/lcmt_iiwa_status.hpp"
+#include "robot_msgs/bool_t.hpp"
 #include "robot_msgs/pause_cmd.hpp"  // for pause_cmd
 #include "robot_msgs/trigger_t.hpp"  // for trigger_t
 #include "util_conv.h"               // ConvertToLcmStatus
@@ -39,8 +40,9 @@ CommunicationInterface::CommunicationInterface(const RobotParameters params,
 
   // TODO: define this in parameters file
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
-  // TODO: remove this channel by combining it with the robot status channel
+  // TODO: remove these channels by combining it with the robot status channel
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
+  lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
 
   dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
   dexai::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
@@ -210,9 +212,14 @@ void CommunicationInterface::PublishRobotStatus() {
     drake::lcmt_iiwa_status franka_status =
         utils::ConvertToLcmStatus(robot_data_);
     // publish data over lcm
+    franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
     robot_data_.has_robot_data_ = false;
     lock.unlock();
+
+    robot_msgs::bool_t user_stop_status;
+    user_stop_status.data = current_mode == franka::RobotMode::kUserStopped;
     lcm_.publish(params_.lcm_status_channel, &franka_status);
+    lcm_.publish(lcm_user_stop_channel_, &user_stop_status);
   } else {
     lock.unlock();
   }
