@@ -68,7 +68,7 @@ if [ ! -f "build/libfranka.so" ]; then
                  -DCMAKE_C_COMPILER=gcc-7 \
                  -DCMAKE_CXX_COMPILER=g++-7
     fi
-    cmake --build . -j $num_threads --target franka
+    cmake --build . -j $num_threads --target franka communication_test
     popd
 fi
 
