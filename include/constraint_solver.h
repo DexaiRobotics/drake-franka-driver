@@ -3,13 +3,6 @@
 
 #include "robot_parameters.h"
 
-// Parsers
-#include "drake/multibody/parsers/sdf_parser.h"
-#include "drake/multibody/parsers/urdf_parser.h"
-
-// RigidBodyTree (depreccated - ToDo: Remove)
-#include "drake/multibody/rigid_body_tree.h"
-
 // MultibodyPlant:
 #include "drake/geometry/scene_graph.h"
 #include "drake/multibody/parsing/parser.h"
@@ -22,26 +15,22 @@ using drake::multibody::ModelInstanceIndex;
 using drake::multibody::MultibodyPlant;
 using drake::multibody::Parser;
 using drake::systems::Context;
-
 namespace franka_driver {
 
 class ConstraintSolver {
  private:
-  const RobotParameters* p_ = nullptr;
+  const RobotParameters* params_ = nullptr;
   Eigen::VectorXd joint_indices_;
   Eigen::Matrix<double, Eigen::Dynamic, 1> q_nominal_;
   Eigen::Matrix<double, Eigen::Dynamic, 1> q_guess_;
-  uint num_actuatable_joints_;
+  size_t num_actuatable_joints_;
   const std::string urdf_path_;
-  std::unique_ptr<RigidBodyTree<double>> rigid_body_tree_ = nullptr;
 
   // added for MultibodyPlant functionality
-  int robot_dof_;
+  size_t robot_dof_;
   drake::systems::DiagramBuilder<double> builder_;
-  SceneGraph<double>* scene_graph_;                 // is owned by builder_
-  MultibodyPlant<double>* robots_plant_;            // is owned by builder_
-  MultibodyPlant<double>* robots_plant_non_final_;  // is owned by builder_
-  std::unique_ptr<Parser> parser_;
+  std::unique_ptr<SceneGraph<double>> scene_graph_;
+  std::unique_ptr<MultibodyPlant<double>> robots_plant_;
   ModelInstanceIndex robot_model_idx_;
   std::unique_ptr<drake::systems::Diagram<double>> diagram_;
   std::unique_ptr<drake::systems::Context<double>> context_;
@@ -57,14 +46,8 @@ class ConstraintSolver {
   ConstraintSolver(const RobotParameters* parameters);
   ~ConstraintSolver();
 
-  inline const RobotParameters* GetParameters() const { return p_; }
-  inline RigidBodyTree<double>* GetRigidBodyTreePtr() const {
-    return rigid_body_tree_.get();
-  }
-  inline RigidBodyTree<double>& GetRigidBodyTreeRef() const {
-    return *rigid_body_tree_.get();
-  }
-  inline unsigned GetNumActuatableJoints() const {
+  inline const RobotParameters* GetParameters() const { return params_; }
+  inline size_t GetNumActuatableJoints() const {
     return num_actuatable_joints_;
   }
   const std::string& GetUrdfPath() const { return urdf_path_; }
