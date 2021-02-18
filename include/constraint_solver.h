@@ -4,12 +4,11 @@
 #include "robot_parameters.h"
 
 // MultibodyPlant:
+#include <drake/geometry/scene_graph.h>
 #include <drake/multibody/parsing/parser.h>
-
-#include "drake/geometry/scene_graph.h"
-#include "drake/multibody/plant/multibody_plant.h"
-#include "drake/systems/analysis/simulator.h"
-#include "drake/systems/framework/diagram_builder.h"
+#include <drake/multibody/plant/multibody_plant.h>
+#include <drake/systems/analysis/simulator.h>
+#include <drake/systems/framework/diagram_builder.h>
 
 using drake::geometry::SceneGraph;
 using drake::multibody::ModelInstanceIndex;
@@ -21,7 +20,6 @@ namespace franka_driver {
 class ConstraintSolver {
  private:
   const RobotParameters* params_ = nullptr;
-  Eigen::VectorXd joint_indices_;
   Eigen::Matrix<double, Eigen::Dynamic, 1> q_nominal_;
   Eigen::Matrix<double, Eigen::Dynamic, 1> q_guess_;
   size_t num_actuatable_joints_;
@@ -44,7 +42,7 @@ class ConstraintSolver {
   ///////////////////// Ctor, Dtor, Accessors
   //////////////////////////////////////
  public:
-  ConstraintSolver(const RobotParameters* parameters);
+  explicit ConstraintSolver(const RobotParameters* parameters);
   ~ConstraintSolver();
 
   inline const RobotParameters* GetParameters() const { return params_; }
