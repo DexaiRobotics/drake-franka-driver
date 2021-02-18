@@ -19,11 +19,22 @@ class ConstraintSolver {
   size_t num_actuatable_joints_;
   const std::string urdf_path_;
   Eigen::MatrixXd joint_limits_;
-
   size_t robot_dof_ {};
-  drake::multibody::ModelInstanceIndex robot_model_idx_ {};
-  drake::geometry::SceneGraph<double>* scene_graph_ {};
+
+  drake::systems::DiagramBuilder<double> builder_;
+  /**
+   * DiagramBuilder takes ownership of system pointers when they are added,
+   * and then transfers the ownership of the system pointers to the Diagram
+   * when build() is called.
+   * Raw pointers below are owned by Diagram, their lifetime guaranteed by it.
+   * AddMultibodyPlantSceneGraphResult has semantics for giving back
+   * both raw pointers, MultibodyPlant and SceneGraph.
+   * We keep Diagram which is the owner of everything. Also keep builder
+   * for access to raw pointers if needed.
+   */
   drake::multibody::MultibodyPlant<double>* mb_plant_ {};
+  drake::geometry::SceneGraph<double>* scene_graph_ {};
+  drake::multibody::ModelInstanceIndex robot_model_idx_ {};
   std::unique_ptr<drake::systems::Diagram<double>> diagram_ {};
   std::unique_ptr<drake::systems::Context<double>> context_ {};
   drake::systems::Context<double>* plant_context_ {};
