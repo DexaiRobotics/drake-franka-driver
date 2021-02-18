@@ -1,17 +1,19 @@
 #pragma once
 #include <Eigen/Core>
+#include <drake/common/polynomial.h>
+#include <drake/common/trajectories/piecewise_polynomial.h>
 
-#include "drake/common/trajectories/piecewise_polynomial.h"
-#include "drake/lcmt_piecewise_polynomial.hpp"
-#include "drake/lcmt_polynomial.hpp"
-#include "drake/lcmt_polynomial_matrix.hpp"
-void encodePolynomial(const Polynomial<double>& polynomial,
+#include <drake/lcmt_piecewise_polynomial.hpp>
+#include <drake/lcmt_polynomial.hpp>
+#include <drake/lcmt_polynomial_matrix.hpp>
+
+void encodePolynomial(const drake::Polynomiald& polynomial,
                       // NOLINTNEXTLINE(runtime/references)
                       drake::lcmt_polynomial& msg);
-Polynomial<double> decodePolynomial(const drake::lcmt_polynomial& msg);
+drake::Polynomiald decodePolynomial(const drake::lcmt_polynomial& msg);
 template <int RowsAtCompileTime, int ColsAtCompileTime>
 void encodePolynomialMatrix(
-    const Eigen::Matrix<Polynomial<double>, RowsAtCompileTime,
+    const Eigen::Matrix<drake::Polynomiald, RowsAtCompileTime,
                         ColsAtCompileTime>& polynomial_matrix,
     // NOLINTNEXTLINE(runtime/references)
     drake::lcmt_polynomial_matrix& msg) {
@@ -28,9 +30,9 @@ void encodePolynomialMatrix(
   msg.cols = polynomial_matrix.cols();
 }
 template <int RowsAtCompileTime, int ColsAtCompileTime>
-Eigen::Matrix<Polynomial<double>, RowsAtCompileTime, ColsAtCompileTime>
+Eigen::Matrix<drake::Polynomiald, RowsAtCompileTime, ColsAtCompileTime>
 decodePolynomialMatrix(const drake::lcmt_polynomial_matrix& msg) {
-  Eigen::Matrix<Polynomial<double>, RowsAtCompileTime, ColsAtCompileTime> ret(
+  Eigen::Matrix<drake::Polynomiald, RowsAtCompileTime, ColsAtCompileTime> ret(
       msg.rows, msg.cols);
   for (int row = 0; row < msg.rows; ++row) {
     for (int col = 0; col < msg.cols; ++col) {

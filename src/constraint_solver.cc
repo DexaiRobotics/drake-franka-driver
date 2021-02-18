@@ -3,30 +3,29 @@
 
 #include <unistd.h>
 
+#include <drake/geometry/drake_visualizer.h>
+#include <drake/geometry/geometry_visualization.h>
+#include <drake/math/quaternion.h>
+#include <drake/math/rotation_conversion_gradient.h>
+#include <drake/multibody/inverse_kinematics/inverse_kinematics.h>
+
 #include <algorithm>
+#include <filesystem>
 #include <limits>
 
-#include "drake/geometry/geometry_visualization.h"
-#include "drake/manipulation/planner/rbt_differential_inverse_kinematics.h"
-#include "drake/math/quaternion.h"
-#include "drake/math/rotation_conversion_gradient.h"
 #include "utils.h"
 
-using dexai::log;
-using drake::manipulation::planner::DifferentialInverseKinematicsParameters;
+namespace fs = std::filesystem;
 
-using drake::geometry::GeometrySet;
-using drake::geometry::QueryObject;
-using drake::math::RigidTransform;
-using drake::multibody::Body;
-using drake::multibody::BodyIndex;
-using drake::multibody::Parser;
-using namespace Eigen;
+using drake::geometry::SceneGraph;
+using drake::multibody::AddMultibodyPlantSceneGraph;
+using drake::multibody::MultibodyPlant;
+using drake::systems::Context;
 
 namespace franka_driver {
 
 ConstraintSolver::ConstraintSolver(const RobotParameters* params)
-    : p_(params), urdf_path_(params->urdf_filepath) {
+    : params_ {params}, urdf_path_ {params->urdf_filepath} {
   log()->debug("CS:ConstraintSolver: ctor: BEGIN");
   if (urdf_path_.empty()) {
     std::string error_msg =
@@ -35,151 +34,83 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     log()->error(error_msg);
     throw std::runtime_error(error_msg);
   }
-  if (!utils::file_exists(urdf_path_)) {
+  if (!fs::exists(urdf_path_)) {
     std::string error_msg =
         "CS::ConstraintSolver: URDF NOT FOUND: " + urdf_path_;
     log()->error(error_msg);
     throw std::runtime_error(error_msg);
   }
 
-  auto robot_urdf_filepath = urdf_path_;
-  auto robot_root_link_in_urdf = params->world_frame;
-  // create a scene graph that contains all the geometry of the system.
-  scene_graph_ = builder_.AddSystem<SceneGraph>();
-  scene_graph_->set_name("scene_graph");
-
-  // TODO: investigate difference of a discrete system
-  // (0.1) vs a continuous system (0) in performance
-  // Can't use continuous b/c: "Currently MultibodyPlant does not handle
-  // joint limits for continuous models. However a limit was specified for joint
-  // ``franka_joint1`."
-  double time_step = 0.1;
-  // created a plant that will later receive the two robots.
-  robots_plant_ = builder_.AddSystem<MultibodyPlant>(time_step);
-  // attach plant as source for the scenegraph
-  robots_plant_->RegisterAsSourceForSceneGraph(scene_graph_);
-
-  dexai::log()->debug(
-      "CS::ConstraintSolver: "
-      "Creating robot model parser with URDF {} \n"
-      "using root link name in URDF: {}",
-      robot_urdf_filepath, robot_root_link_in_urdf);
-
-  parser_ = std::make_unique<Parser>(robots_plant_, scene_graph_);
-
-  dexai::log()->info("Name of world frame before adding model: {}",
-                     robots_plant_->world_frame().name());
-
+  static const double time_step {0.1};
+  auto [mb_plant, scene_graph] {AddMultibodyPlantSceneGraph(
+      &builder_, std::make_unique<MultibodyPlant<double>>(time_step))};
+  mb_plant_ = &mb_plant;
+  scene_graph_ = &scene_graph;
   try {
-    // Parse the robot's urdf
-    robot_model_idx_ =
-        parser_->AddModelFromFile(robot_urdf_filepath, "robot_arm");
-  } catch (std::exception const& err) {
-    dexai::log()->error(
-        "CS:ConstraintSolver: Error: Exception in CTOR: \n"
-        "Problem parsing this robot's urdf file: {}\n"
-        "Exception message from Drake Multibody tree is: {}",
-        robot_urdf_filepath, err.what());
-    // no clean up is needed before throwing, no heap memory was allocated,
-    // DiagramBuilder (builder_) cleans up after itself.
-    throw;  // rethrow it again
+    robot_model_idx_ = drake::multibody::Parser(mb_plant_, scene_graph_)
+                           .AddModelFromFile(urdf_path_, "robot_arm");
+  } catch (std::exception const& ex) {
+    dexai::log()->error("AddModelFromFile failed: {}", ex.what());
+    throw;
   }
 
-  // obtain vector of Body Indices for each model for the Geometry Sets
-  std::vector<BodyIndex> robot_body_indices =
-      robots_plant_->GetBodyIndices(robot_model_idx_);
-
-  std::vector<const Body<double>*> robot_bodies;
-  for (size_t k = 0; k < robot_body_indices.size(); k++) {
-    robot_bodies.push_back(&robots_plant_->get_body(robot_body_indices[k]));
-  }
-
-  dexai::log()->info(
-      "CS:ctor: Trying to weld robot frame: {} ... \n"
-      "... to world frame: {}",
-      robot_root_link_in_urdf, robots_plant_->world_frame().name());
-
-  // // use translation and orientation parameters to place in world frame
-  // RigidTransform<double> X_WorldToRobot(
-  // drake::math::RollPitchYaw<double>(urdf_offset_rpy)
-  //                                      , urdf_offset_xyz);
-
-  try {
+  {
     // get child frame of urdf that is used as root
-    auto& child_frame = robots_plant_->GetFrameByName(robot_root_link_in_urdf,
-                                                      robot_model_idx_);
-    robots_plant_->WeldFrames(robots_plant_->world_frame(), child_frame);
-    //   robots_plant_->WeldFrames(robots_plant_->world_frame(), child_frame,
-    //   X_WorldToRobot2);
-  } catch (std::exception const& err) {
-    dexai::log()->error(
-        "CS:Error: Exception in dual robot collision ctor: \n"
-        "Problem parsing this robot's ROOT LINK named: {}\n"
-        "Exception message from Drake Multibody tree is: {}",
-        robot_root_link_in_urdf, err.what());
-    // no clean up is needed before throwing, no heap memory was allocated,
-    // DiagramBuilder (builder_) cleans up after itself.
-    throw;  // rethrow exception again
-  }
-  // ... collision checking setup is done in regards to this robot
-
-  // make a copy of model before finalizing, copy can then be used to
-  // make changes to the model later
-  robots_plant_non_final_ = robots_plant_;
-
-  try {
-    // Now the model is complete.
-    robots_plant_->Finalize();
-  } catch (std::exception const& err) {
-    dexai::log()->error(
-        "CS:Error: Exception in dual robot collision ctor: \n"
-        "Problem finalizing this robot: {}\n"
-        "Exception message from Drake Multibody tree is: {}",
-        err.what());
-    // no clean up is needed before throwing, no heap memory was allocated,
-    // DiagramBuilder (builder_) cleans up after itself.
-    throw;  // rethrow exception again
+    auto robot_root_link {params->world_frame};
+    try {
+      dexai::log()->debug(
+          "CS::ConstraintSolver: "
+          "Creating robot model parser with URDF {} \n"
+          "using root link name in URDF: {}",
+          urdf_path_, robot_root_link);
+      dexai::log()->info(
+          "CS:ctor: Trying to weld robot frame: {} ... \n"
+          "... to world frame: {}",
+          robot_root_link, mb_plant.world_frame().name());
+      auto& child_frame {
+          mb_plant.GetFrameByName(robot_root_link, robot_model_idx_)};
+      mb_plant.WeldFrames(mb_plant.world_frame(), child_frame);
+    } catch (std::exception const& err) {
+      dexai::log()->error(
+          "CS:Error: Exception in dual robot collision ctor: \n"
+          "Problem parsing this robot's ROOT LINK named: {}\n"
+          "Exception message from Drake Multibody tree is: {}",
+          robot_root_link, err.what());
+      throw;  // rethrow exception again
+    }
   }
 
-  robot_dof_ = robots_plant_->num_positions(robot_model_idx_);
+  mb_plant.Finalize();
+  robot_dof_ = mb_plant.num_positions(robot_model_idx_);
   dexai::log()->info("CS::ConstraintSolver: robot_dof_: {}", robot_dof_);
 
-  // Register Geometry Sets for robot plants for the purpose of collision
-  // checking
-  GeometrySet set_robot = robots_plant_->CollectRegisteredGeometries(
-      const_cast<const std::vector<const Body<double>*>&>(robot_bodies));
-  // ToDo: Check if Collision Filter Groups work...
+  // TODO(@anyone): Check if Collision Filter Groups work...
   // remove collisions within each set - do not check for collisions against
   // robot itself
-  scene_graph_->ExcludeCollisionsWithin(set_robot);
-
-  // Sanity check on the availability of the optional source id before using it.
-  DRAKE_DEMAND(!!robots_plant_->get_source_id());
-
-  // Connect robot poses as input to scene graph
-  builder_.Connect(robots_plant_->get_geometry_poses_output_port(),
-                   scene_graph_->get_source_pose_port(
-                       robots_plant_->get_source_id().value()));
-
-  // Connect scene graph's geometry as a query object to robot plant
-  builder_.Connect(scene_graph_->get_query_output_port(),
-                   robots_plant_->get_geometry_query_input_port());
+  {
+    using drake::multibody::Body;
+    std::vector<const Body<double>*> robot_bodies;
+    for (const auto& i : mb_plant.GetBodyIndices(robot_model_idx_)) {
+      robot_bodies.push_back(&mb_plant_->get_body(i));
+    }
+    // cannot call {} because no {GeometrySet} constructor is available
+    drake::geometry::GeometrySet set_robot(
+        mb_plant.CollectRegisteredGeometries(robot_bodies));
+    scene_graph.ExcludeCollisionsWithin(set_robot);
+  }
 
   // allow for visualization
-  drake::geometry::ConnectDrakeVisualizer(&builder_, *scene_graph_);
-
+  drake::geometry::DrakeVisualizerd::AddToBuilder(&builder_, scene_graph);
   // build a diagram
-  diagram_ = builder_.Build();
+  diagram_ = builder_.Build();  // system ownership transferred
   // create a context
   context_ = diagram_->CreateDefaultContext();
-  diagram_->SetDefaultContext(context_.get());
-
-  auto scene_context = scene_graph_->AllocateContext();
-  auto output = diagram_->AllocateOutput();
+  // auto scene_context {scene_graph.AllocateContext()};
+  // auto output {diagram_->AllocateOutput()};
 
   // Following is needed if simulator is removed
   // plant_context_ = &diagram_->GetMutableSubsystemContext(
-  //   *robots_plant_, context_.get());
+  //   *mb_plant_, context_);
 
   // TODO: simulator and derived plant_context_ from simulator is
   // only needed so that something gets published to the drake visualizer.
@@ -189,56 +120,57 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   simulator_ = std::make_unique<drake::systems::Simulator<double>>(*diagram_);
   simulator_->Initialize();
   plant_context_ = &diagram_->GetMutableSubsystemContext(
-      *robots_plant_, &simulator_->get_mutable_context());
+      mb_plant, &simulator_->get_mutable_context());
+  // diagram_->SetDefaultContext(context_.get());
 
-  Eigen::VectorXd pos_robot = Eigen::VectorXd::Zero(robot_dof_);
-  this->UpdateModel(pos_robot);
-
-  // TODO: remove this instance
-  rigid_body_tree_ = std::make_unique<RigidBodyTree<double>>();
-  // TODO: make this into a list of SDF files or a single SDF with <include>
-  // robot + end-effector created in software
-  // environment as list of objects with free-floating joints? ice-cream
-  // container, people
-
-  log()->trace(
-      "CS:ConstraintSolver: "
-      "drake::parsers::urdf::AddModelInstanceFromUrdfFile:");
-  log()->trace(
-      "CS:ConstraintSolver: AddModelInstanceFromUrdfFile({}, kFixed, NIL, "
-      "rbt.get())",
-      urdf_path_);
-  try {
-    // NOTE: The number of bodies, number of joints/DOF, and so on, are set in
-    // RBT here.
-    drake::parsers::urdf::AddModelInstanceFromUrdfFile(
-        urdf_path_, drake::multibody::joints::kFixed, nullptr,
-        GetRigidBodyTreePtr());
-  } catch (const std::exception& ex) {
-    log()->error("Error in CS::ConstraintSolver ctor: {}", ex.what());
-    throw;
+  this->UpdateModel(Eigen::VectorXd::Zero(robot_dof_));
+  /**
+   * All robot_dof_ should be actuatable but
+   * mb_plant.num_actuated_dofs() relies on the URDF being complete,
+   * which is often not the case. Instead of
+   *   num_actuatable_joints_ = mb_plant.num_actuated_dofs(robot_model_idx_);
+   * we check that typename == revolute to pick out the N_revolute
+   * and verify N_revolute = N_dof
+   */
+  {
+    size_t i {};
+    for (const auto& joint_idx : mb_plant.GetJointIndices(robot_model_idx_)) {
+      const auto& joint {mb_plant.get_joint(joint_idx)};
+      dexai::log()->debug(
+          "joint #{}, name: {}, typename: {}, n_pos: {}, lim size: {}", ++i,
+          joint.name(), joint.type_name(), joint.num_positions(),
+          joint.position_lower_limits().size());
+      if (joint.type_name() == "weld") {
+        continue;
+      } else if (joint.type_name() == "revolute") {
+        joint_names_.push_back(joint.name());
+      } else {
+        std::string err_msg {"Unrecognised joint type: {}" + joint.type_name()};
+        dexai::log()->error(err_msg);
+        throw std::runtime_error(err_msg);
+      }
+    }
   }
 
-  log()->trace("CS:ConstraintSolver: Number of positions: {}",
-               GetRigidBodyTreeRef().get_num_positions());
-  log()->trace("CS:ConstraintSolver: Number of bodies: {}",
-               GetRigidBodyTreeRef().get_num_bodies());
-
-  num_actuatable_joints_ = GetRigidBodyTreeRef().get_num_positions();
-  log()->trace("CS:ConstraintSolver: Number of actuatable joints: {}",
-               num_actuatable_joints_);
-
-  joint_indices_.resize(num_actuatable_joints_, 1);
-  joint_indices_.setZero();
-  for (uint i = 0; i < num_actuatable_joints_; i++) {
-    joint_indices_(i) = i;
+  if (joint_names_.size() != robot_dof_) {
+    std::string err_msg {"Number of joint mismatch. Double check URDF."};
+    dexai::log()->error(err_msg);
+    throw std::runtime_error(err_msg);
+  }
+  dexai::log()->info(
+      "CS:ConstraintSolver: Number of dof (actuatable joints): {}", robot_dof_);
+  // fill joint limits matrix
+  joint_limits_.resize(robot_dof_, 2);
+  for (size_t i {}; i < joint_names_.size(); i++) {
+    const auto& joint {mb_plant.GetJointByName(joint_names_.at(i))};
+    joint_limits_(i, 0) = joint.position_lower_limits()[0];
+    joint_limits_(i, 1) = joint.position_upper_limits()[0];
   }
 
-  q_nominal_.resize(num_actuatable_joints_, 1);
-  q_guess_.resize(num_actuatable_joints_, 1);
+  q_nominal_.resize(robot_dof_, 1);
+  q_guess_.resize(robot_dof_, 1);
   q_nominal_.setZero();
-  q_guess_.setZero();  // NOTE @sprax: Wondering if this is good enough?
-
+  q_guess_.setZero();
   log()->trace("CS:ConstraintSolver: END");
 }
 
@@ -251,11 +183,11 @@ ConstraintSolver::~ConstraintSolver() {
 void ConstraintSolver::UpdateModel(
     const Eigen::Ref<const Eigen::VectorXd> pos_robot) {
   try {
-    robots_plant_->SetPositions(plant_context_, robot_model_idx_, pos_robot);
+    mb_plant_->SetPositions(plant_context_, robot_model_idx_, pos_robot);
   } catch (std::exception const& err) {
     dexai::log()->error(
         "ConstraintSolver::UpdateModel: "
-        "failed with error {}. Robot reports conf: {}",
+        "failed with error: {}. Robot reports conf: {}",
         err.what(), pos_robot.transpose());
     throw;  // rethrow it again
   }
@@ -264,68 +196,6 @@ void ConstraintSolver::UpdateModel(
   // this performs the magic of making the diagram publish to the visualizer.
   // not needed for the actual collision check.
   simulator_->get_system().Publish(simulator_->get_context());
-}
-
-std::vector<std::string> ConstraintSolver::GetJointNames() const {
-  std::vector<std::string> joint_names;
-  for (size_t i = 0; i < num_actuatable_joints_; i++) {
-    auto name = GetRigidBodyTreeRef().get_position_name(i);
-    joint_names.push_back(name);
-  }
-  return joint_names;
-}
-
-Eigen::MatrixXd ConstraintSolver::GetJointLimits() const {
-  auto joint_names = GetJointNames();
-  Eigen::MatrixXd joint_limits;
-  joint_limits.resize(num_actuatable_joints_, 2);
-  for (size_t j = 0; j < joint_names.size(); j++) {
-    joint_limits(j, 0) = GetRigidBodyTreeRef()
-                             .FindChildBodyOfJoint(joint_names.at(j))
-                             ->getJoint()
-                             .getJointLimitMin()[0];
-    joint_limits(j, 1) = GetRigidBodyTreeRef()
-                             .FindChildBodyOfJoint(joint_names.at(j))
-                             ->getJoint()
-                             .getJointLimitMax()[0];
-  }
-  return joint_limits;
-}
-
-std::pair<Eigen::VectorXd, Eigen::VectorXd>
-ConstraintSolver::GetJointLimitsVectorXdPair() const {
-  auto joint_names = GetJointNames();
-  Eigen::VectorXd lower_limits(num_actuatable_joints_);
-  Eigen::VectorXd upper_limits(num_actuatable_joints_);
-  for (size_t j = 0; j < joint_names.size(); j++) {
-    double lower_limit = GetRigidBodyTreeRef()
-                             .FindChildBodyOfJoint(joint_names.at(j))
-                             ->getJoint()
-                             .getJointLimitMin()[0];
-    lower_limits(j) = (double)round(lower_limit * 1e4) / 1.0e4;
-    double upper_limit = GetRigidBodyTreeRef()
-                             .FindChildBodyOfJoint(joint_names.at(j))
-                             ->getJoint()
-                             .getJointLimitMax()[0];
-    upper_limits(j) = (double)round(upper_limit * 1e4) / 1.0e4;
-  }
-  return std::make_pair(lower_limits, upper_limits);
-}
-
-int ConstraintSolver::CheckJointLimits(const Eigen::VectorXd& posture) const {
-  Eigen::MatrixXd joint_limits = GetJointLimits();
-  Eigen::VectorXd joint_limits_lower = joint_limits.col(0);
-  Eigen::VectorXd joint_limits_upper = joint_limits.col(1);
-
-  auto lower_limit = posture.array() <= joint_limits_lower.array();
-  auto upper_limit = posture.array() >= joint_limits_upper.array();
-
-  if (lower_limit.any()) {
-    return -1;
-  } else if (upper_limit.any()) {
-    return 1;
-  }
-  return 0;
 }
 
 }  // namespace franka_driver
