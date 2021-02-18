@@ -87,12 +87,9 @@ mkdir -p build; cd build
 echo "build_debug = $build_debug"
 if (( $build_debug > 0 )); then
     echo "Build in Debug mode!"
-    cmake .. -DCMAKE_BUILD_TYPE=Debug \
-             -DCMAKE_C_COMPILER=gcc-7 \
-             -DCMAKE_CXX_COMPILER=g++-7 || exit 4   # Build for debugging
+    cmake .. -DCMAKE_BUILD_TYPE=Debug   || exit 4   # Build for debugging
 else
-    cmake .. -DCMAKE_C_COMPILER=gcc-7 \
-             -DCMAKE_CXX_COMPILER=g++-7 || exit 5
+    cmake .. -DCMAKE_BUILD_TYPE=Release || exit 5
 fi
 
 make  -j $num_threads $target           || exit 6
