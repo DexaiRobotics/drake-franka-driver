@@ -91,7 +91,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     using drake::multibody::Body;
     std::vector<const Body<double>*> robot_bodies;
     for (const auto& i : mb_plant.GetBodyIndices(robot_model_idx_)) {
-      robot_bodies.push_back(.get_body(i));
+      robot_bodies.push_back(&mb_plant_->get_body(i));
     }
     // cannot call {} because no {GeometrySet} constructor is available
     drake::geometry::GeometrySet set_robot(
@@ -124,24 +124,53 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   // diagram_->SetDefaultContext(context_.get());
 
   this->UpdateModel(Eigen::VectorXd::Zero(robot_dof_));
+  /**
+   * All robot_dof_ should be actuatable but
+   * mb_plant.num_actuated_dofs() relies on the URDF being complete,
+   * which is often not the case. Instead of
+   *   num_actuatable_joints_ = mb_plant.num_actuated_dofs(robot_model_idx_);
+   * we check that typename == revolute to pick out the N_revolute
+   * and verify N_revolute = N_dof
+   */
+  {
+    size_t i {};
+    for (const auto& joint_idx : mb_plant.GetJointIndices(robot_model_idx_)) {
+      const auto& joint {mb_plant.get_joint(joint_idx)};
+      dexai::log()->debug(
+          "joint #{}, name: {}, typename: {}, n_pos: {}, lim size: {}", ++i,
+          joint.name(), joint.type_name(), joint.num_positions(),
+          joint.position_lower_limits().size());
+      if (joint.type_name() == "weld") {
+        continue;
+      } else if (joint.type_name() == "revolute") {
+        joint_names_.push_back(joint.name());
+      } else {
+        std::string err_msg {"Unrecognised joint type: {}" + joint.type_name()};
+        dexai::log()->error(err_msg);
+        throw std::runtime_error(err_msg);
+      }
+    }
+  }
 
-  num_actuatable_joints_ = mb_plant.num_actuated_dofs(robot_model_idx_);
-  dexai::log()->trace("CS:ConstraintSolver: Number of actuatable joints: {}",
-                      num_actuatable_joints_);
-
-  q_nominal_.resize(num_actuatable_joints_, 1);
-  q_guess_.resize(num_actuatable_joints_, 1);
-  q_nominal_.setZero();
-  q_guess_.setZero();
-
-  // set joint names and joint_limits
-  joint_limits_.resize(num_actuatable_joints_, 2);
-  for (const auto& i : mb_plant.GetJointIndices(robot_model_idx_)) {
-    const auto& joint {mb_plant.get_joint(i)};
-    auto ll {joint.position_lower_limits()};
+  if (joint_names_.size() != robot_dof_) {
+    std::string err_msg {"Number of joint mismatch. Double check URDF."};
+    dexai::log()->error(err_msg);
+    throw std::runtime_error(err_msg);
+  }
+  dexai::log()->info(
+      "CS:ConstraintSolver: Number of dof (actuatable joints): {}", robot_dof_);
+  // fill joint limits matrix
+  joint_limits_.resize(robot_dof_, 2);
+  for (size_t i {}; i < joint_names_.size(); i++) {
+    const auto& joint {mb_plant.GetJointByName(joint_names_.at(i))};
     joint_limits_(i, 0) = joint.position_lower_limits()[0];
     joint_limits_(i, 1) = joint.position_upper_limits()[0];
   }
+
+  q_nominal_.resize(robot_dof_, 1);
+  q_guess_.resize(robot_dof_, 1);
+  q_nominal_.setZero();
+  q_guess_.setZero();
   log()->trace("CS:ConstraintSolver: END");
 }
 

@@ -16,8 +16,8 @@ class ConstraintSolver {
   const RobotParameters* params_;
   Eigen::Matrix<double, Eigen::Dynamic, 1> q_nominal_;
   Eigen::Matrix<double, Eigen::Dynamic, 1> q_guess_;
-  size_t num_actuatable_joints_;
   const std::string urdf_path_;
+  std::vector<std::string> joint_names_;
   Eigen::MatrixXd joint_limits_;
   size_t robot_dof_ {};
 
@@ -50,9 +50,6 @@ class ConstraintSolver {
   ~ConstraintSolver();
 
   inline const RobotParameters* GetParameters() const { return params_; }
-  inline size_t GetNumActuatableJoints() const {
-    return num_actuatable_joints_;
-  }
   inline const std::string& GetUrdfPath() const { return urdf_path_; }
   inline const Eigen::MatrixXd& GetJointLimits() const { return joint_limits_; }
 };
