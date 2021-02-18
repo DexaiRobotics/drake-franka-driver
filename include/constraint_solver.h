@@ -3,16 +3,10 @@
 
 #include "robot_parameters.h"
 
-// Parsers
-#include "drake/multibody/parsers/sdf_parser.h"
-#include "drake/multibody/parsers/urdf_parser.h"
-
-// RigidBodyTree (depreccated - ToDo: Remove)
-#include "drake/multibody/rigid_body_tree.h"
-
 // MultibodyPlant:
+#include <drake/multibody/parsing/parser.h>
+
 #include "drake/geometry/scene_graph.h"
-#include "drake/multibody/parsing/parser.h"
 #include "drake/multibody/plant/multibody_plant.h"
 #include "drake/systems/analysis/simulator.h"
 #include "drake/systems/framework/diagram_builder.h"

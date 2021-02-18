@@ -7,7 +7,6 @@
 #include <limits>
 
 #include "drake/geometry/geometry_visualization.h"
-#include "drake/manipulation/planner/rbt_differential_inverse_kinematics.h"
 #include "drake/math/quaternion.h"
 #include "drake/math/rotation_conversion_gradient.h"
 #include "utils.h"
