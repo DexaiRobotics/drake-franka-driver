@@ -24,6 +24,7 @@ class ConstraintSolver {
   Eigen::Matrix<double, Eigen::Dynamic, 1> q_guess_;
   size_t num_actuatable_joints_;
   const std::string urdf_path_;
+  Eigen::MatrixXd joint_limits_;
 
   // added for MultibodyPlant functionality
   size_t robot_dof_;
@@ -49,15 +50,8 @@ class ConstraintSolver {
   inline size_t GetNumActuatableJoints() const {
     return num_actuatable_joints_;
   }
-  const std::string& GetUrdfPath() const { return urdf_path_; }
-  std::vector<std::string> GetJointNames() const;
-  Eigen::MatrixXd GetJointLimits() const;
-  inline Eigen::MatrixXd GetJointLimitsMatrixXd() const {
-    return GetJointLimits();
-  }
-  std::pair<Eigen::VectorXd, Eigen::VectorXd> GetJointLimitsVectorXdPair()
-      const;
-  int CheckJointLimits(const Eigen::VectorXd& posture) const;
+  inline const std::string& GetUrdfPath() const { return urdf_path_; }
+  inline const Eigen::MatrixXd& GetJointLimits() const { return joint_limits_; }
 };
 
 }  // namespace franka_driver

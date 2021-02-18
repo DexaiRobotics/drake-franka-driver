@@ -40,7 +40,8 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   }
 
   // create a scene graph that contains all the geometry of the system.
-  scene_graph_ = builder_.AddSystem<SceneGraph>();
+  scene_graph_ =
+      std::make_unique<SceneGraph<double>>(builder_.AddSystem<SceneGraph>());
   scene_graph_->set_name("scene_graph");
 
   {
@@ -52,7 +53,8 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     // ``franka_joint1`."
     double time_step {0.1};
     // created a plant that will later receive the two robots.
-    robots_plant_ = builder_.AddSystem<MultibodyPlant>(time_step);
+    robots_plant_ = std::make_unique<MultibodyPlant<double>>(
+        builder_.AddSystem<MultibodyPlant>(time_step));
   }
 
   // attach plant as source for the scenegraph
@@ -149,6 +151,16 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   q_guess_.resize(num_actuatable_joints_, 1);
   q_nominal_.setZero();
   q_guess_.setZero();
+
+  // set joint names and joint_limits
+
+  joint_limits_.resize(num_actuatable_joints_, 2);
+  for (const auto& i : robots_plant_->GetJointIndices(robot_model_idx_)) {
+    const auto& joint {robot_plant_->get_joint(i)};
+    joint_names_.push_back(joint.name());
+    joint_limits_.col(0) = joint.position_lower_limits();
+    joint_limits_.col(1) = joint.position_upper_limits();
+  }
   log()->trace("CS:ConstraintSolver: END");
 }
 
@@ -174,68 +186,6 @@ void ConstraintSolver::UpdateModel(
   // this performs the magic of making the diagram publish to the visualizer.
   // not needed for the actual collision check.
   simulator_->get_system().Publish(simulator_->get_context());
-}
-
-std::vector<std::string> ConstraintSolver::GetJointNames() const {
-  std::vector<std::string> joint_names;
-  for (size_t i = 0; i < num_actuatable_joints_; i++) {
-    auto name = GetRigidBodyTreeRef().get_position_name(i);
-    joint_names.push_back(name);
-  }
-  return joint_names;
-}
-
-Eigen::MatrixXd ConstraintSolver::GetJointLimits() const {
-  auto joint_names = GetJointNames();
-  Eigen::MatrixXd joint_limits;
-  joint_limits.resize(num_actuatable_joints_, 2);
-  for (size_t j = 0; j < joint_names.size(); j++) {
-    joint_limits(j, 0) = GetRigidBodyTreeRef()
-                             .FindChildBodyOfJoint(joint_names.at(j))
-                             ->getJoint()
-                             .getJointLimitMin()[0];
-    joint_limits(j, 1) = GetRigidBodyTreeRef()
-                             .FindChildBodyOfJoint(joint_names.at(j))
-                             ->getJoint()
-                             .getJointLimitMax()[0];
-  }
-  return joint_limits;
-}
-
-std::pair<Eigen::VectorXd, Eigen::VectorXd>
-ConstraintSolver::GetJointLimitsVectorXdPair() const {
-  auto joint_names = GetJointNames();
-  Eigen::VectorXd lower_limits(num_actuatable_joints_);
-  Eigen::VectorXd upper_limits(num_actuatable_joints_);
-  for (size_t j = 0; j < joint_names.size(); j++) {
-    double lower_limit = GetRigidBodyTreeRef()
-                             .FindChildBodyOfJoint(joint_names.at(j))
-                             ->getJoint()
-                             .getJointLimitMin()[0];
-    lower_limits(j) = (double)round(lower_limit * 1e4) / 1.0e4;
-    double upper_limit = GetRigidBodyTreeRef()
-                             .FindChildBodyOfJoint(joint_names.at(j))
-                             ->getJoint()
-                             .getJointLimitMax()[0];
-    upper_limits(j) = (double)round(upper_limit * 1e4) / 1.0e4;
-  }
-  return std::make_pair(lower_limits, upper_limits);
-}
-
-int ConstraintSolver::CheckJointLimits(const Eigen::VectorXd& posture) const {
-  Eigen::MatrixXd joint_limits = GetJointLimits();
-  Eigen::VectorXd joint_limits_lower = joint_limits.col(0);
-  Eigen::VectorXd joint_limits_upper = joint_limits.col(1);
-
-  auto lower_limit = posture.array() <= joint_limits_lower.array();
-  auto upper_limit = posture.array() >= joint_limits_upper.array();
-
-  if (lower_limit.any()) {
-    return -1;
-  } else if (upper_limit.any()) {
-    return 1;
-  }
-  return 0;
 }
 
 }  // namespace franka_driver

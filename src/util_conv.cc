@@ -120,7 +120,7 @@ drake::lcmt_iiwa_status EigenToLcmStatus(Eigen::VectorXd robot_state) {
 
 franka::RobotState ConvertToCannonical(const franka::RobotState& robot_state,
                                        const Eigen::VectorXd& offsets) {
-  if (robot_state.q.size() != offsets.size()) {
+  if (robot_state.q.size() != static_cast<size_t>(offsets.size())) {
     std::string err_msg = fmt::format(
         "utils:ConvertToCannonical robot_state.q.size({}) != offsets.size({})",
         robot_state.q.size(), offsets.size());
@@ -128,7 +128,7 @@ franka::RobotState ConvertToCannonical(const franka::RobotState& robot_state,
     throw std::runtime_error(err_msg);
   }
   franka::RobotState cannonical_robot_state = robot_state;
-  for (size_t i = 0; i < offsets.size(); i++) {
+  for (size_t i {}; i < static_cast<size_t>(offsets.size()); i++) {
     cannonical_robot_state.q[i] += offsets[i];    // actual
     cannonical_robot_state.q_d[i] += offsets[i];  // desired
   }

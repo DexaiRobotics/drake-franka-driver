@@ -10,6 +10,7 @@
 #include <sys/time.h>
 
 #include <ctime>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -17,11 +18,9 @@
 #include <thread>
 #include <vector>
 
-#include <experimental/filesystem>  // NOLINT
-
 #include "include/dexai_log.h"
 
-namespace fs = std::experimental::filesystem;
+namespace fs = std::filesystem;
 
 namespace utils {
 
