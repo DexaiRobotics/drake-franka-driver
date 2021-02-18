@@ -62,7 +62,5 @@ TEST(ConstraintSolver, TestConstructor) {
   } catch (std::exception const& err) {
     FAIL() << "CAUGHT AN EXCEPTION: " << err.what() << std::endl;
   }
-  EXPECT_EQ(constraint_solver->GetNumActuatableJoints(),
-            constraint_solver->GetRigidBodyTreeRef().get_num_positions());
   EXPECT_FALSE(constraint_solver->GetUrdfPath().empty());
 }
