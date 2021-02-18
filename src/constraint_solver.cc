@@ -15,13 +15,12 @@
 
 #include "utils.h"
 
-// using drake::multibody::BodyIndex;
 namespace fs = std::filesystem;
 
 using drake::geometry::SceneGraph;
+using drake::multibody::AddMultibodyPlantSceneGraph;
 using drake::multibody::MultibodyPlant;
 using drake::systems::Context;
-using drake::multibody::AddMultibodyPlantSceneGraph;
 
 namespace franka_driver {
 
@@ -42,13 +41,13 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     throw std::runtime_error(error_msg);
   }
 
-  static const double time_step {0};
-  auto [mb_plant, scene_graph] {
-    AddMultibodyPlantSceneGraph(
-      &builder_,
-      std::make_unique<MultibodyPlant<double>>(time_step))};
+  static const double time_step {0.1};
+  auto [mb_plant, scene_graph] {AddMultibodyPlantSceneGraph(
+      &builder_, std::make_unique<MultibodyPlant<double>>(time_step))};
+  mb_plant_ = &mb_plant;
+  scene_graph_ = &scene_graph;
   try {
-    robot_model_idx_ = drake::multibody::Parser(&mb_plant, &scene_graph)
+    robot_model_idx_ = drake::multibody::Parser(mb_plant_, scene_graph_)
                            .AddModelFromFile(urdf_path_, "robot_arm");
   } catch (std::exception const& ex) {
     dexai::log()->error("AddModelFromFile failed: {}", ex.what());
@@ -77,26 +76,22 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
           "Problem parsing this robot's ROOT LINK named: {}\n"
           "Exception message from Drake Multibody tree is: {}",
           robot_root_link, err.what());
-      // no clean up is needed before throwing, no heap memory was allocated,
-      // DiagramBuilder (builder) cleans up after itself.
       throw;  // rethrow exception again
     }
   }
 
-  // make a copy of model before finalizing, copy can then be used to
-  // make changes to the model later
   mb_plant.Finalize();
   robot_dof_ = mb_plant.num_positions(robot_model_idx_);
   dexai::log()->info("CS::ConstraintSolver: robot_dof_: {}", robot_dof_);
 
-  // ToDo: Check if Collision Filter Groups work...
+  // TODO(@anyone): Check if Collision Filter Groups work...
   // remove collisions within each set - do not check for collisions against
   // robot itself
   {
     using drake::multibody::Body;
     std::vector<const Body<double>*> robot_bodies;
     for (const auto& i : mb_plant.GetBodyIndices(robot_model_idx_)) {
-      robot_bodies.push_back(&mb_plant.get_body(i));
+      robot_bodies.push_back(.get_body(i));
     }
     // cannot call {} because no {GeometrySet} constructor is available
     drake::geometry::GeometrySet set_robot(
@@ -108,11 +103,10 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   drake::geometry::DrakeVisualizerd::AddToBuilder(&builder_, scene_graph);
   // build a diagram
   diagram_ = builder_.Build();  // system ownership transferred
-  std::tie(mb_plant_, scene_graph_) = AddMultibodyPlantSceneGraph(&builder_, time_step);
   // create a context
   context_ = diagram_->CreateDefaultContext();
-  auto scene_context {scene_graph.AllocateContext()};
-  auto output {diagram_->AllocateOutput()};
+  // auto scene_context {scene_graph.AllocateContext()};
+  // auto output {diagram_->AllocateOutput()};
 
   // Following is needed if simulator is removed
   // plant_context_ = &diagram_->GetMutableSubsystemContext(
@@ -127,7 +121,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   simulator_->Initialize();
   plant_context_ = &diagram_->GetMutableSubsystemContext(
       mb_plant, &simulator_->get_mutable_context());
-  diagram_->SetDefaultContext(plant_context_);
+  // diagram_->SetDefaultContext(context_.get());
 
   this->UpdateModel(Eigen::VectorXd::Zero(robot_dof_));
 
