@@ -3,12 +3,14 @@
 
 #include <unistd.h>
 
+#include <drake/geometry/geometry_visualization.h>
+#include <drake/math/quaternion.h>
+#include <drake/math/rotation_conversion_gradient.h>
+#include <drake/multibody/inverse_kinematics/inverse_kinematics.h>
+
 #include <algorithm>
 #include <limits>
 
-#include "drake/geometry/geometry_visualization.h"
-#include "drake/math/quaternion.h"
-#include "drake/math/rotation_conversion_gradient.h"
 #include "utils.h"
 
 using dexai::log;
@@ -25,7 +27,7 @@ using namespace Eigen;
 namespace franka_driver {
 
 ConstraintSolver::ConstraintSolver(const RobotParameters* params)
-    : p_(params), urdf_path_(params->urdf_filepath) {
+    : params_ {params}, urdf_path_ {params->urdf_filepath} {
   log()->debug("CS:ConstraintSolver: ctor: BEGIN");
   if (urdf_path_.empty()) {
     std::string error_msg =
@@ -64,7 +66,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
       "using root link name in URDF: {}",
       robot_urdf_filepath, robot_root_link_in_urdf);
 
-  parser_ = std::make_unique<Parser>(robots_plant_, scene_graph_);
+  auto parser {std::make_unique<Parser>(robots_plant_, scene_graph_)};
 
   dexai::log()->info("Name of world frame before adding model: {}",
                      robots_plant_->world_frame().name());
@@ -72,7 +74,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   try {
     // Parse the robot's urdf
     robot_model_idx_ =
-        parser_->AddModelFromFile(robot_urdf_filepath, "robot_arm");
+        parser->AddModelFromFile(robot_urdf_filepath, "robot_arm");
   } catch (std::exception const& err) {
     dexai::log()->error(
         "CS:ConstraintSolver: Error: Exception in CTOR: \n"
@@ -193,8 +195,6 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   Eigen::VectorXd pos_robot = Eigen::VectorXd::Zero(robot_dof_);
   this->UpdateModel(pos_robot);
 
-  // TODO: remove this instance
-  rigid_body_tree_ = std::make_unique<RigidBodyTree<double>>();
   // TODO: make this into a list of SDF files or a single SDF with <include>
   // robot + end-effector created in software
   // environment as list of objects with free-floating joints? ice-cream
