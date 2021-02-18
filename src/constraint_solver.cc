@@ -59,7 +59,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   }
 
   // attach plant as source for the scenegraph
-  mb_plant_->RegisterAsSourceForSceneGraph(scene_graph_);
+  auto source_id {mb_plant_->RegisterAsSourceForSceneGraph(scene_graph_)};
   try {
     robot_model_idx_ = drake::multibody::Parser(mb_plant_, scene_graph_)
                            .AddModelFromFile(urdf_path_, "robot_arm");
@@ -117,13 +117,14 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     scene_graph_->ExcludeCollisionsWithin(set_robot);
   }
 
-  // Connect robot poses as input to scene graph
-  builder.Connect(
-      mb_plant_->get_geometry_poses_output_port(),
-      scene_graph_->get_source_pose_port(mb_plant_->get_source_id().value()));
   // Connect scene graph's geometry as a query object to robot plant
   builder.Connect(scene_graph_->get_query_output_port(),
                   mb_plant_->get_geometry_query_input_port());
+  // Connect robot poses as input to scene graph
+  auto registerd {mb_plant_->geometry_source_is_registered()};
+  // cannot use mb_plant_->get_source_id() as it returns junk values
+  builder.Connect(mb_plant_->get_geometry_poses_output_port(),
+                  scene_graph_->get_source_pose_port(source_id));
 
   // allow for visualization
   drake::geometry::DrakeVisualizerd::AddToBuilder(&builder, *scene_graph_);
@@ -167,6 +168,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   joint_limits_.resize(num_actuatable_joints_, 2);
   for (const auto& i : mb_plant_->GetJointIndices(robot_model_idx_)) {
     const auto& joint {mb_plant_->get_joint(i)};
+    auto ll {joint.position_lower_limits()};
     joint_limits_(i, 0) = joint.position_lower_limits()[0];
     joint_limits_(i, 1) = joint.position_upper_limits()[0];
   }
