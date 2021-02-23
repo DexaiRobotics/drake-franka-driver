@@ -43,6 +43,7 @@ CommunicationInterface::CommunicationInterface(const RobotParameters params,
   // TODO: remove these channels by combining it with the robot status channel
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
   lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
+  lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
 
   dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
   dexai::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
@@ -219,8 +220,14 @@ void CommunicationInterface::PublishRobotStatus() {
     robot_msgs::bool_t user_stop_status;
     user_stop_status.utime = franka_status.utime;
     user_stop_status.data = current_mode == franka::RobotMode::kUserStopped;
+
+    robot_msgs::bool_t brakes_locked_status;
+    brakes_locked_status.utime = franka_status.utime;
+    brakes_locked_status.data = current_mode == franka::RobotMode::kOther;
+
     lcm_.publish(params_.lcm_status_channel, &franka_status);
     lcm_.publish(lcm_user_stop_channel_, &user_stop_status);
+    lcm_.publish(lcm_brakes_locked_channel_, &brakes_locked_status);
   } else {
     lock.unlock();
   }
@@ -253,11 +260,13 @@ void CommunicationInterface::PublishTriggerToChannel(int64_t utime,
   lcm_.publish(lcm_channel, &msg);
 }
 
-bool CommunicationInterface::CanReceiveCommands() {
-  std::unique_lock<std::mutex> lock(robot_data_mutex_);
-  franka::RobotMode current_mode = robot_data_.robot_state.robot_mode;
-  lock.unlock();
+franka::RobotMode CommunicationInterface::GetRobotMode() {
+  std::scoped_lock<std::mutex> lock {robot_data_mutex_};
+  return robot_data_.robot_state.robot_mode;
+}
 
+bool CommunicationInterface::CanReceiveCommands(
+    const franka::RobotMode& current_mode) {
   switch (current_mode) {
     case franka::RobotMode::kOther:
       dexai::log()->error("CanReceiveCommands: Wrong mode: {}!",
@@ -302,13 +311,15 @@ void CommunicationInterface::HandlePlan(
   dexai::log()->info("CommunicationInterface::HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
+  const auto current_mode {GetRobotMode()};
+
   //$ check if in proper mode to receive commands
-  if (!CanReceiveCommands()) {
-    dexai::log()->error(
-        "CommunicationInterface::HandlePlan: "
-        "Discarding plan with utime: {},"
-        " robot is in wrong mode!",
-        robot_spline->utime);
+  if (!CanReceiveCommands(current_mode)) {
+    const auto err_msg {fmt::format(
+        "Discarding plan with utime: {}, robot is in wrong mode: {}!",
+        robot_spline->utime, utils::RobotModeToString(current_mode))};
+    dexai::log()->error("CommunicationInterface::HandlePlan: {}", err_msg);
+    PublishDriverStatus(false, err_msg);
     return;
   }
 
