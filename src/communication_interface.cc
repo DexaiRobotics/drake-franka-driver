@@ -253,11 +253,13 @@ void CommunicationInterface::PublishTriggerToChannel(int64_t utime,
   lcm_.publish(lcm_channel, &msg);
 }
 
-bool CommunicationInterface::CanReceiveCommands() {
-  std::unique_lock<std::mutex> lock(robot_data_mutex_);
-  franka::RobotMode current_mode = robot_data_.robot_state.robot_mode;
-  lock.unlock();
+franka::RobotMode CommunicationInterface::GetRobotMode() {
+  std::lock_guard<std::mutex> lock(robot_data_mutex_);
+  return robot_data_.robot_state.robot_mode;
+}
 
+bool CommunicationInterface::CanReceiveCommands(
+    const franka::RobotMode& current_mode) {
   switch (current_mode) {
     case franka::RobotMode::kOther:
       dexai::log()->error("CanReceiveCommands: Wrong mode: {}!",
@@ -302,13 +304,15 @@ void CommunicationInterface::HandlePlan(
   dexai::log()->info("CommunicationInterface::HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
+  const auto current_mode {GetRobotMode()};
+
   //$ check if in proper mode to receive commands
-  if (!CanReceiveCommands()) {
-    dexai::log()->error(
-        "CommunicationInterface::HandlePlan: "
-        "Discarding plan with utime: {},"
-        " robot is in wrong mode!",
-        robot_spline->utime);
+  if (!CanReceiveCommands(current_mode)) {
+    const auto err_msg {fmt::format(
+        "Discarding plan with utime: {}, robot is in wrong mode: {}!",
+        robot_spline->utime, utils::RobotModeToString(current_mode))};
+    dexai::log()->error("CommunicationInterface::HandlePlan: {}", err_msg);
+    PublishDriverStatus(false, err_msg);
     return;
   }
 

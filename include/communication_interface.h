@@ -62,6 +62,10 @@ class CommunicationInterface {
 
   // TODO: remove franka specific RobotState type and replace with std::array
   franka::RobotState GetRobotState();
+
+  // acquire mutex lock and return robot mode
+  franka::RobotMode GetRobotMode();
+
   /// Blocking call that sets the robot state
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf);
@@ -91,7 +95,7 @@ class CommunicationInterface {
                                bool success = true, std::string message = "");
   /// check if robot is in a mode that can receive commands, i.e. not user
   /// stopped or error recovery
-  bool CanReceiveCommands();
+  bool CanReceiveCommands(const franka::RobotMode&);
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
                   const lcmtypes::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
