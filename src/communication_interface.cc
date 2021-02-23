@@ -254,7 +254,7 @@ void CommunicationInterface::PublishTriggerToChannel(int64_t utime,
 }
 
 franka::RobotMode CommunicationInterface::GetRobotMode() {
-  std::lock_guard<std::mutex> lock(robot_data_mutex_);
+  std::scoped_lock<std::mutex> lock {robot_data_mutex_};
   return robot_data_.robot_state.robot_mode;
 }
 
