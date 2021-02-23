@@ -95,7 +95,7 @@ class CommunicationInterface {
                                bool success = true, std::string message = "");
   /// check if robot is in a mode that can receive commands, i.e. not user
   /// stopped or error recovery
-  bool CanReceiveCommands(const franka::RobotMode&);
+  bool CanReceiveCommands(const franka::RobotMode& current_mode);
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
                   const lcmtypes::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
