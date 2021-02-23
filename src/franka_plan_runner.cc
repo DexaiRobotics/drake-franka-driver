@@ -558,8 +558,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   Eigen::VectorXd current_conf_franka =
       utils::v_to_e(ArrayToVector(cannonical_robot_state.q_d));
 
-  static bool first_run = true;
-
   if (comm_interface_->HasNewPlan()) {
     // get the current plan from the communication interface
     comm_interface_->TakePlan(plan_, plan_utime_);
