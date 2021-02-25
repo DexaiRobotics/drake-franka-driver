@@ -155,48 +155,51 @@ franka::RobotMode FrankaPlanRunner::GetRobotMode(franka::Robot& robot) {
 }
 
 int FrankaPlanRunner::RunFranka() {
-  //$ attempt connection to robot and read current mode
-  //$ return if connection fails, or robot is in a mode that cannot receive
-  // commands
-  try {
-    franka::Robot robot(ip_addr_);
+  bool connection_established {false};
+  // attempt connection to robot and read current mode
+  // and if it fails, keep trying instead of exiting the program
+  while (!connection_established) {
+    try {
+      franka::Robot robot(ip_addr_);
 
-    size_t count = 0;
-    auto current_mode = GetRobotMode(robot);
+      auto current_mode {GetRobotMode(robot)};
 
-    if (current_mode == franka::RobotMode::kReflex) {
-      dexai::log()->warn(
-          "RunFranka: Robot in mode: {} at startup, trying to do "
-          "automaticErrorRecovery ...",
-          utils::RobotModeToString(current_mode));
-      try {
-        robot.automaticErrorRecovery();
-        dexai::log()->info(
-            "RunFranka: automaticErrorRecovery() succeeded, "
-            "robot now in mode: {}.",
+      // if in reflex mode, attempt automatic error recovery
+      if (current_mode == franka::RobotMode::kReflex) {
+        dexai::log()->warn(
+            "RunFranka: Robot in mode: {} at startup, trying to do "
+            "automaticErrorRecovery ...",
             utils::RobotModeToString(current_mode));
-      } catch (const franka::ControlException& ce) {
-        dexai::log()->warn("RunFranka: Caught control exception: {}.",
-                           ce.what());
-        dexai::log()->error("RunFranka: Error recovery did not work!");
-        comm_interface_->PublishDriverStatus(false, ce.what());
-        return 1;
+        try {
+          robot.automaticErrorRecovery();
+          dexai::log()->info(
+              "RunFranka: automaticErrorRecovery() succeeded, "
+              "robot now in mode: {}.",
+              utils::RobotModeToString(current_mode));
+        } catch (const franka::ControlException& ce) {
+          dexai::log()->warn("RunFranka: Caught control exception: {}.",
+                             ce.what());
+          dexai::log()->error("RunFranka: Error recovery did not work!");
+          comm_interface_->PublishDriverStatus(false, ce.what());
+          continue;
+        }
+      } else if (current_mode != franka::RobotMode::kIdle) {
+        auto err_msg {fmt::format("Robot cannot receive commands in mode {}",
+                                  utils::RobotModeToString(current_mode))};
+        dexai::log()->error("RunFranka: {}", err_msg);
+        comm_interface_->PublishDriverStatus(false, err_msg);
+      } else {
+        // if we got this far, we are talking to the Franka and it is happy
+        connection_established = true;
       }
-    } else if (current_mode != franka::RobotMode::kIdle) {
-      dexai::log()->error(
-          "RunFranka: Robot cannot receive commands in mode: {}",
-          utils::RobotModeToString(current_mode));
-      comm_interface_->PublishDriverStatus(
-          false, utils::RobotModeToString(current_mode));
-      return 1;
+    } catch (franka::Exception const& e) {
+      // if we hit this logic, there is probably something wrong with the
+      // networking
+      auto err_msg {fmt::format("Franka connection error: {}", e.what())};
+      dexai::log()->error("RunFranka: {}", err_msg);
+      comm_interface_->PublishDriverStatus(false, err_msg);
     }
-  } catch (franka::Exception const& e) {
-    dexai::log()->error(
-        "RunFranka: Received franka exception: {} - Do not have error handling "
-        "for it yet...",
-        e.what());
-    comm_interface_->PublishDriverStatus(false, e.what());
-    return 1;
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 
   try {

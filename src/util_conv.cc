@@ -16,7 +16,7 @@ std::string RobotModeToString(franka::RobotMode mode) {
   std::string mode_string;
   switch (mode) {
     case franka::RobotMode::kOther:
-      mode_string = "Other";
+      mode_string = "Locked";
       break;
     case franka::RobotMode::kIdle:
       mode_string = "Idle";
