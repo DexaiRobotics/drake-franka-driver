@@ -162,7 +162,7 @@ int FrankaPlanRunner::RunFranka() {
     try {
       franka::Robot robot(ip_addr_);
 
-      auto current_mode = GetRobotMode(robot);
+      auto current_mode {GetRobotMode(robot)};
 
       // if in reflex mode, attempt automatic error recovery
       if (current_mode == franka::RobotMode::kReflex) {
