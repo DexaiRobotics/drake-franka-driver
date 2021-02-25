@@ -184,8 +184,8 @@ int FrankaPlanRunner::RunFranka() {
           continue;
         }
       } else if (current_mode != franka::RobotMode::kIdle) {
-        auto err_msg {
-            fmt::format("Robot cannot receive commands in mode {}", e.what())};
+        auto err_msg {fmt::format("Robot cannot receive commands in mode {}",
+                                  utils::RobotModeToString(current_mode))};
         dexai::log()->error("RunFranka: {}", err_msg);
         comm_interface_->PublishDriverStatus(false, err_msg);
       } else {
