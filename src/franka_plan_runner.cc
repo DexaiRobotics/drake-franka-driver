@@ -183,10 +183,15 @@ int FrankaPlanRunner::RunFranka() {
           comm_interface_->PublishDriverStatus(false, ce.what());
           continue;
         }
+      } else if (current_mode != franka::RobotMode::kIdle) {
+        auto err_msg {
+            fmt::format("Robot cannot receive commands in mode {}", e.what())};
+        dexai::log()->error("RunFranka: {}", err_msg);
+        comm_interface_->PublishDriverStatus(false, err_msg);
+      } else {
+        // if we got this far, we are talking to the Franka and it is happy
+        connection_established = true;
       }
-      // if we got this far, we are talking to the Franka and it is happy
-      connection_established = true;
-
     } catch (franka::Exception const& e) {
       // if we hit this logic, there is probably something wrong with the
       // networking
