@@ -199,6 +199,7 @@ int FrankaPlanRunner::RunFranka() {
       dexai::log()->error("RunFranka: {}", err_msg);
       comm_interface_->PublishDriverStatus(false, err_msg);
     }
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   }
 
   try {
