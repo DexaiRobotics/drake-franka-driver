@@ -9,7 +9,7 @@ namespace dru = utils;
 
 namespace franka_driver {
 
-int do_main(std::string param_yaml = "franka_test.yaml", bool safety_off) {
+int do_main(std::string param_yaml, bool safety_off) {
   dexai::create_log("franka_driver");
   int verbose = 0;
   dexai::log()->info("Loading parameters: {}", param_yaml);
