@@ -11,11 +11,12 @@
 /// current plan and wait until a new plan is received.
 #pragma once
 
+#include <Eigen/Dense>  // for Eigen::VectorXd
+
 #include <cstdint>  // for int64_t
 #include <mutex>    // for mutex
 #include <thread>   // for thread
 
-#include <Eigen/Dense>                  // for Eigen::VectorXd
 #include <bits/stdint-intn.h>           // for int64_t
 #include <cnpy.h>                       // to read joint position offsets
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
@@ -36,7 +37,7 @@ namespace franka_driver {
 
 class FrankaPlanRunner {
  public:
-  FrankaPlanRunner(const RobotParameters params);
+  FrankaPlanRunner(const RobotParameters params, bool safety_off);
   ~FrankaPlanRunner() {};
 
   /// This starts the franka driver
@@ -84,6 +85,7 @@ class FrankaPlanRunner {
  private:
   const int dof_;                // degrees of freedom of franka
   const std::string home_addr_;  // home address of robot
+  const bool safety_off_;        // torque limits to max
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;

@@ -26,11 +26,13 @@
 using namespace franka_driver;
 using namespace utils;
 
-FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
+FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params,
+                                   bool safety_off)
     : dof_(FRANKA_DOF),
       home_addr_("192.168.1.1"),
       params_(params),
-      ip_addr_(params.robot_ip) {
+      ip_addr_(params.robot_ip),
+      safety_off_(safety_off) {
   // define robot's state as uninitialized at start:
   status_ = RobotStatus::Uninitialized;
 
@@ -115,14 +117,19 @@ void FrankaPlanRunner::SetCollisionBehaviorSafetyOn(franka::Robot& robot) {
                              + utils::RobotModeToString(mode)
                              + " cannot change collision behavior!");
   }
-  robot.setCollisionBehavior({{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
-                             {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
-                             {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
-                             {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
-                             {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
-                             {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
-                             {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
-                             {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}});
+
+  if (!safety_off_) {
+    robot.setCollisionBehavior({{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                               {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                               {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                               {{40.0, 40.0, 36.0, 36.0, 32.0, 28.0, 24.0}},
+                               {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
+                               {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
+                               {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}},
+                               {{40.0, 40.0, 40.0, 50.0, 50.0, 50.0}});
+  } else {
+    SetCollisionBehaviorSafetyOff(robot);
+  }
 }
 
 void FrankaPlanRunner::SetCollisionBehaviorSafetyOff(franka::Robot& robot) {

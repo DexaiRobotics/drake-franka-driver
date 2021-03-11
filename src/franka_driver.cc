@@ -9,12 +9,12 @@ namespace dru = utils;
 
 namespace franka_driver {
 
-int do_main(std::string param_yaml = "franka_test.yaml") {
+int do_main(std::string param_yaml = "franka_test.yaml", bool safety_off) {
   dexai::create_log("franka_driver");
   int verbose = 0;
   dexai::log()->info("Loading parameters: {}", param_yaml);
   RobotParameters params = loadYamlParameters(param_yaml, verbose);
-  FrankaPlanRunner frankaPlanRunner(params);
+  FrankaPlanRunner frankaPlanRunner(params, safety_off);
   return frankaPlanRunner.Run();
 }
 
@@ -31,17 +31,14 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  if (argc != 1 && argc != 2) {
+  if (argc != 2 && argc != 3) {
     std::cerr << "Usage: " << argv[0] << " <params_filepath>" << std::endl;
     return -1;
   }
 
-  if (argc == 1) {
-    dexai::log()->info(
-        "Loading default parameters with sim robot: franka_test.yaml");
-    return franka_driver::do_main();
-  } else {
-    std::string param_yaml = argv[1];
-    return franka_driver::do_main(param_yaml);
-  }
+  bool safety_off = argc == 3;
+
+  dexai::log()->info("Safety off: {}", safety_off);
+  std::string param_yaml = argv[1];
+  return franka_driver::do_main(param_yaml, safety_off);
 }
