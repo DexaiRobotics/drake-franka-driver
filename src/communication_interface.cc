@@ -217,17 +217,11 @@ void CommunicationInterface::PublishRobotStatus() {
     robot_data_.has_robot_data_ = false;
     lock.unlock();
 
-    robot_msgs::bool_t user_stop_status;
-    user_stop_status.utime = franka_status.utime;
-    user_stop_status.data = current_mode == franka::RobotMode::kUserStopped;
-
-    robot_msgs::bool_t brakes_locked_status;
-    brakes_locked_status.utime = franka_status.utime;
-    brakes_locked_status.data = current_mode == franka::RobotMode::kOther;
-
     lcm_.publish(params_.lcm_status_channel, &franka_status);
-    lcm_.publish(lcm_user_stop_channel_, &user_stop_status);
-    lcm_.publish(lcm_brakes_locked_channel_, &brakes_locked_status);
+    PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
+                         current_mode == franka::RobotMode::kUserStopped);
+    PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
+                         current_mode == franka::RobotMode::kOther);
   } else {
     lock.unlock();
   }
@@ -249,15 +243,23 @@ void CommunicationInterface::PublishPauseStatus() {
   lcm_.publish(lcm_pause_status_channel_, &msg);
 }
 
-void CommunicationInterface::PublishTriggerToChannel(int64_t utime,
-                                                     std::string lcm_channel,
-                                                     bool success,
-                                                     std::string message) {
+void CommunicationInterface::PublishTriggerToChannel(
+    int64_t utime, std::string_view lcm_channel, bool success,
+    std::string_view message) {
   robot_msgs::trigger_t msg;
   msg.utime = utime;
   msg.success = success;
-  msg.message = message;
-  lcm_.publish(lcm_channel, &msg);
+  msg.message = message.data();
+  lcm_.publish(lcm_channel.data(), &msg);
+}
+
+void CommunicationInterface::PublishBoolToChannel(int64_t utime,
+                                                  std::string_view lcm_channel,
+                                                  bool data) {
+  robot_msgs::bool_t msg;
+  msg.utime = utime;
+  msg.data = data;
+  lcm_.publish(lcm_channel.data(), &msg);
 }
 
 franka::RobotMode CommunicationInterface::GetRobotMode() {

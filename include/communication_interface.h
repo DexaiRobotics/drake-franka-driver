@@ -80,6 +80,10 @@ class CommunicationInterface {
                            std::string driver_status_string = "");
 
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
+  void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
+                            bool data);
+
+  std::string GetUserStopChannelName() { return lcm_user_stop_channel_; };
 
  protected:
   void ResetData();
@@ -91,8 +95,9 @@ class CommunicationInterface {
   void PublishLcmAndPauseStatus();
   void PublishRobotStatus();
   void PublishPauseStatus();
-  void PublishTriggerToChannel(int64_t utime, std::string lcm_channel,
-                               bool success = true, std::string message = "");
+  void PublishTriggerToChannel(int64_t utime, std::string_view lcm_channel,
+                               bool success = true,
+                               std::string_view message = "");
   /// check if robot is in a mode that can receive commands, i.e. not user
   /// stopped or error recovery
   bool CanReceiveCommands(const franka::RobotMode& current_mode);
