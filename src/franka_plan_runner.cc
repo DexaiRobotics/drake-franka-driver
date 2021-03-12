@@ -127,8 +127,26 @@ void FrankaPlanRunner::SetCollisionBehaviorSafetyOn(franka::Robot& robot) {
                              + " cannot change collision behavior!");
   }
 
-  // Changes the collision behavior. Forces or torques above the upper
-  // threshold are registered as collision and cause the robot to stop moving.
+  // Changes the collision behavior. Set separate torque and force boundaries
+  // for acceleration/deceleration and constant velocity movement phases.
+
+  // Forces or torques between lower and upper threshold are shown as contacts
+  // in the RobotState. Forces or torques above the upper threshold are
+  // registered as collision and cause the robot to stop moving.
+
+  // Params in order:
+  // lower_torque_thresholds_acceleration,
+  // upper_torque_thresholds_acceleration,
+  // lower_torque_thresholds_nominal,
+  // upper_torque_thresholds_nominal,
+  // lower_force_thresholds_acceleration,
+  // upper_force_thresholds_acceleration,
+  // lower_force_thresholds_nominal,
+  // upper_force_thresholds_nominal
+
+  // TODO(@syler): can we just set the lower threshold to something reasonable
+  // and get away with only increasing the upper threshold?
+
   robot.setCollisionBehavior(upper_torque_threshold_, upper_torque_threshold_,
                              upper_torque_threshold_, upper_torque_threshold_,
                              upper_force_threshold_, upper_force_threshold_,
