@@ -85,7 +85,7 @@ class FrankaPlanRunner {
  private:
   const int dof_;                // degrees of freedom of franka
   const std::string home_addr_;  // home address of robot
-  const bool safety_off_;        // torque limits to max
+  const bool safety_off_;        // torque and force limits to max
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
