@@ -11,11 +11,12 @@
 /// current plan and wait until a new plan is received.
 #pragma once
 
+#include <Eigen/Dense>  // for Eigen::VectorXd
+
 #include <cstdint>  // for int64_t
 #include <mutex>    // for mutex
 #include <thread>   // for thread
 
-#include <Eigen/Dense>                  // for Eigen::VectorXd
 #include <bits/stdint-intn.h>           // for int64_t
 #include <cnpy.h>                       // to read joint position offsets
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
@@ -84,6 +85,7 @@ class FrankaPlanRunner {
  private:
   const int dof_;                // degrees of freedom of franka
   const std::string home_addr_;  // home address of robot
+  const bool safety_off_;        // torque and force limits to max
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
@@ -126,6 +128,21 @@ class FrankaPlanRunner {
 
   Eigen::VectorXd max_accels_;
   double allowable_max_angle_error_ = 0.001;  // empirically proven
+
+  // Collision torque thresholds for each joint in [Nm].
+  const std::array<double, 7> kHighTorqueThreshold {100.0, 100.0, 100.0, 100.0,
+                                                    100.0, 100.0, 100.0};
+  const std::array<double, 7> kMediumTorqueThreshold {40.0, 40.0, 36.0, 36.0,
+                                                      32.0, 28.0, 24.0};
+
+  // Collision force thresholds for (x, y, z, R, P, Y) in [N].
+  const std::array<double, 6> kHighForceThreshold {100.0, 100.0, 100.0,
+                                                   100.0, 100.0, 100.0};
+  const std::array<double, 6> kMediumForceThreshold {40.0, 40.0, 40.0,
+                                                     50.0, 50.0, 50.0};
+
+  std::array<double, 7> upper_torque_threshold_;
+  std::array<double, 6> upper_force_threshold_;
 
 };  // FrankaPlanRunner
 
