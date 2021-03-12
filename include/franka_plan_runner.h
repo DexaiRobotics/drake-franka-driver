@@ -37,7 +37,7 @@ namespace franka_driver {
 
 class FrankaPlanRunner {
  public:
-  FrankaPlanRunner(const RobotParameters params, bool safety_off);
+  FrankaPlanRunner(const RobotParameters params);
   ~FrankaPlanRunner() {};
 
   /// This starts the franka driver
@@ -128,6 +128,18 @@ class FrankaPlanRunner {
 
   Eigen::VectorXd max_accels_;
   double allowable_max_angle_error_ = 0.001;  // empirically proven
+
+  // Collision torque thresholds for each joint in [Nm].
+  const std::array<double, 7> kHighTorqueThreshold {100.0, 100.0, 100.0, 100.0,
+                                                    100.0, 100.0, 100.0};
+  const std::array<double, 7> kMediumTorqueThreshold {40.0, 40.0, 36.0, 36.0,
+                                                      32.0, 28.0, 24.0};
+
+  // Collision force thresholds for (x, y, z, R, P, Y) in [N].
+  const std::array<double, 6> kHighForceThreshold {100.0, 100.0, 100.0,
+                                                   100.0, 100.0, 100.0};
+  const std::array<double, 6> kMediumForceThreshold {40.0, 40.0, 40.0,
+                                                     50.0, 50.0, 50.0};
 
 };  // FrankaPlanRunner
 
