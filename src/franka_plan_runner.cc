@@ -86,6 +86,14 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
 
   log()->warn("Collision Safety {}", safety_off_ ? "OFF" : "ON");
 
+  if (safety_off_) {
+    upper_torque_threshold_ = kHighTorqueThreshold;
+    upper_force_threshold_ = kHighForceThreshold;
+  } else {
+    upper_torque_threshold_ = kMediumTorqueThreshold;
+    upper_force_threshold_ = kMediumForceThreshold;
+  }
+
   // define the joint_position_callback_ needed for the robot control loop:
   joint_position_callback_ =
       [&, this](const franka::RobotState& robot_state,
@@ -119,16 +127,12 @@ void FrankaPlanRunner::SetCollisionBehaviorSafetyOn(franka::Robot& robot) {
                              + " cannot change collision behavior!");
   }
 
-  if (!safety_off_) {
-    // Changes the collision behavior. Forces or torques above the upper
-    // threshold are registered as collision and cause the robot to stop moving.
-    robot.setCollisionBehavior(kMediumTorqueThreshold, kMediumTorqueThreshold,
-                               kMediumTorqueThreshold, kMediumTorqueThreshold,
-                               kMediumForceThreshold, kMediumForceThreshold,
-                               kMediumForceThreshold, kMediumForceThreshold);
-  } else {
-    SetCollisionBehaviorSafetyOff(robot);
-  }
+  // Changes the collision behavior. Forces or torques above the upper
+  // threshold are registered as collision and cause the robot to stop moving.
+  robot.setCollisionBehavior(upper_torque_threshold_, upper_torque_threshold_,
+                             upper_torque_threshold_, upper_torque_threshold_,
+                             upper_force_threshold_, upper_force_threshold_,
+                             upper_force_threshold_, upper_force_threshold_);
 }
 
 void FrankaPlanRunner::SetCollisionBehaviorSafetyOff(franka::Robot& robot) {
