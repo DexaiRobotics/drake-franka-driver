@@ -459,6 +459,16 @@ bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
 double FrankaPlanRunner::TimeToAdvanceWhilePausing(double period,
                                                    double target_stop_time,
                                                    double timestep) {
+  dexai::log()->debug(
+      "FrankaPlanRunner:TimeToAdvanceWhilePausing: period: {:.3f} s target "
+      "stop time: {:.1f} s timestep: {:.1f} s",
+      period, target_stop_time, timestep);
+
+  if (target_stop_time <= 0) {
+    // target stop time will be zero if the robot was paused while not moving
+    // so return early to prevent division by zero
+    return 0;
+  }
   double a = 2 / target_stop_time;
   double t_current = period * timestep;
   double current_franka_time =
@@ -466,7 +476,10 @@ double FrankaPlanRunner::TimeToAdvanceWhilePausing(double period,
   double t_prev = period * (timestep - 1);
   double prev_franka_time =
       (target_stop_time - 4 / (a * (exp(a * t_prev) + 1)));
-  return (current_franka_time - prev_franka_time);
+  double time_to_advance {current_franka_time - prev_franka_time};
+  dexai::log()->debug("FrankaPlanRunner:TimeToAdvanceWhilePausing: {:.2f} s",
+                      time_to_advance);
+  return time_to_advance;
 }
 
 void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
@@ -555,7 +568,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     double delta_franka_time = TimeToAdvanceWhilePausing(
         period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += delta_franka_time;
-    dexai::log()->debug(
+    dexai::log()->info(
         "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing "
         "delta_franka_time: {}",
         delta_franka_time);
