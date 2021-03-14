@@ -592,6 +592,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
     // first time step of plan, reset time:
     franka_time_ = 0.0;
+
     start_conf_plan_ = plan_->value(franka_time_);
 
     if (!LimitJoints(start_conf_plan_)) {
