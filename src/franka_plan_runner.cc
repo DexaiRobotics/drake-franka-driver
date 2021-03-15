@@ -213,6 +213,11 @@ int FrankaPlanRunner::RunFranka() {
                                   utils::RobotModeToString(current_mode))};
         dexai::log()->error("RunFranka: {}", err_msg);
         comm_interface_->PublishDriverStatus(false, err_msg);
+      } else if (current_mode == franka::RobotMode::kUserStopped) {
+        dexai::log()->error("RunFranka: Robot User Stopped");
+        comm_interface_->PublishBoolToChannel(
+            utils::get_current_utime(),
+            comm_interface_->GetUserStopChannelName(), true);
       } else {
         // if we got this far, we are talking to the Franka and it is happy
         connection_established = true;
