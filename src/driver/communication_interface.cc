@@ -70,6 +70,8 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                  this);
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
+  lcm_.subscribe(params_.lcm_user_stop_channel, &CommunicationInterface::HandleUserStop,
+                 this);
 
   // TODO(@anyone): define this in parameters file
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
@@ -273,6 +275,17 @@ void CommunicationInterface::PublishTriggerToChannel(
   msg.utime = utime;
   msg.success = success;
   msg.message = message.data();
+  lcm_.publish(lcm_channel.data(), &msg);
+}
+
+void CommunicationInterface::PublishPauseToChannel(int64_t utime,
+                                                   std::string_view lcm_channel,
+                                                   bool data,
+                                                   std::string_view source) {
+  robot_msgs::pause_cmd msg;
+  msg.utime = utime;
+  msg.data = data;
+  msg.source = source;
   lcm_.publish(lcm_channel.data(), &msg);
 }
 
@@ -493,4 +506,15 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
   }
 
   // TODO(@andrey): use this for u-stop, check desired state for on/off
+}
+
+
+void CommunicationInterface::HandleUserStop(
+    const ::lcm::ReceiveBuffer*, const std::string&,
+    const robot_msgs::pause_cmd* user_stop_msg) {
+
+  PublishPauseToChannel(utils::get_current_utime(),
+                       lcm_user_stop_channel_,
+                       user_stop_msg->data, 
+                       user_stop_msg->source);
 }
