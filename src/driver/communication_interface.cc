@@ -245,8 +245,19 @@ void CommunicationInterface::PublishRobotStatus() {
     lock.unlock();
 
     lcm_.publish(params_.lcm_status_channel, &franka_status);
-    PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
-                         current_mode == franka::RobotMode::kUserStopped);
+    // publish true to user_stop_channel if U-stop is simulated
+    if(sim_u_stop){
+      PublishPauseToChannel(franka_status.utime, lcm_user_stop_channel_,
+                            true, sim_u_stop_source);
+    }
+    // otherwise publish current franka U-stop status
+    else{
+      PublishPauseToChannel(franka_status.utime, lcm_user_stop_channel_,
+                            current_mode == franka::RobotMode::kUserStopped,
+                            params_.robot_name);
+    }
+    // PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
+                        //  current_mode == franka::RobotMode::kUserStopped);
     PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
                          current_mode == franka::RobotMode::kOther);
   }
@@ -508,10 +519,14 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
   // TODO(@andrey): use this for u-stop, check desired state for on/off
 }
 
-
 void CommunicationInterface::HandleUserStop(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::pause_cmd* user_stop_msg) {
+
+  dexai::log()->warn(
+      "CommunicationInterface::HandleUserStop: Received 'U-stop = {}' from {}",
+      user_stop_msg->data,
+      user_stop_msg->source);
 
   PublishPauseToChannel(utils::get_current_utime(),
                        lcm_user_stop_channel_,

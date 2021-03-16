@@ -131,8 +131,11 @@ class CommunicationInterface {
 
   std::string lcm_driver_status_channel_;
   std::string lcm_pause_status_channel_;
-  std::string lcm_user_stop_channel_;
   std::string lcm_brakes_locked_channel_;
+
+  std::string lcm_user_stop_channel_;
+  std::string sim_u_stop_source;
+  bool sim_u_stop;
 
   double lcm_publish_rate_;  // Hz
 };
