@@ -21,6 +21,7 @@
 #include <lcm/lcm-cpp.hpp>              // for lcm
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
 #include <robot_msgs/pause_cmd.hpp>     // for pause_cmd
+#include <robot_msgs/bool_t.hpp>        // for bool_t
 
 #include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
 #include "franka/robot_state.h"                              // for RobotState
@@ -82,6 +83,9 @@ class CommunicationInterface {
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
   void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
                             bool data);
+  void PublishPauseToChannel(int64_t utime, std::string_view lcm_channel,
+                             bool data,
+                             std::string_view source = "");
 
   std::string GetUserStopChannelName() { return lcm_user_stop_channel_; };
 
@@ -105,6 +109,8 @@ class CommunicationInterface {
                   const lcmtypes::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
                    const robot_msgs::pause_cmd* pause_cmd_msg);
+  void HandleUserStop(const ::lcm::ReceiveBuffer*, const std::string&,
+                      const robot_msgs::pause_cmd* user_stop_msg);
 
  private:
   RobotParameters params_;
