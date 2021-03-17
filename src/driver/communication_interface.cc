@@ -483,6 +483,8 @@ void CommunicationInterface::HandlePause(
           source);
       break;
   }
+  // set previous pause state for pause logging
+  prev_pause_state = paused;
 
   // if the set of pause sources is empty, then
   // the robot is not paused anymore:
