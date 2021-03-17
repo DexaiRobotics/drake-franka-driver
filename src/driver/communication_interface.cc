@@ -245,19 +245,18 @@ void CommunicationInterface::PublishRobotStatus() {
     lock.unlock();
 
     lcm_.publish(params_.lcm_status_channel, &franka_status);
+
     // publish true to user_stop_channel if U-stop is simulated
     if(sim_u_stop){
-      PublishPauseToChannel(franka_status.utime, lcm_user_stop_channel_,
-                            true, sim_u_stop_source);
+      PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
+                           true);
     }
     // otherwise publish current franka U-stop status
     else{
-      PublishPauseToChannel(franka_status.utime, lcm_user_stop_channel_,
-                            current_mode == franka::RobotMode::kUserStopped,
-                            params_.robot_name);
+      PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
+                           current_mode == franka::RobotMode::kUserStopped);
     }
-    // PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
-                        //  current_mode == franka::RobotMode::kUserStopped);
+
     PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
                          current_mode == franka::RobotMode::kOther);
   }
@@ -296,7 +295,7 @@ void CommunicationInterface::PublishPauseToChannel(int64_t utime,
   robot_msgs::pause_cmd msg;
   msg.utime = utime;
   msg.data = data;
-  msg.source = source;
+  msg.source = source.data();
   lcm_.publish(lcm_channel.data(), &msg);
 }
 
@@ -521,15 +520,10 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
 
 void CommunicationInterface::HandleUserStop(
     const ::lcm::ReceiveBuffer*, const std::string&,
-    const robot_msgs::pause_cmd* user_stop_msg) {
+    const robot_msgs::bool_t* user_stop_msg) {
 
-  dexai::log()->warn(
-      "CommunicationInterface::HandleUserStop: Received 'U-stop = {}' from {}",
-      user_stop_msg->data,
-      user_stop_msg->source);
-
-  PublishPauseToChannel(utils::get_current_utime(),
-                       lcm_user_stop_channel_,
-                       user_stop_msg->data, 
-                       user_stop_msg->source);
+  PublishPauseToChannel(user_stop_msg->utime,
+                        params_.lcm_stop_channel,
+                        user_stop_msg->data,
+                        params_.robot_name);
 }
