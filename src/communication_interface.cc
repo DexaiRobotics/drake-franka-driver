@@ -46,7 +46,7 @@ CommunicationInterface::CommunicationInterface(const RobotParameters params,
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
   lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
   lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
-  sim_u_stop_source = params_.robot_name + "_SIMULATED_USER_STOP";
+  sim_u_stop_source = params_.robot_name + "_SIMULATED_U_STOP";
 
   dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
   dexai::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
@@ -223,19 +223,18 @@ void CommunicationInterface::PublishRobotStatus() {
     lock.unlock();
 
     lcm_.publish(params_.lcm_status_channel, &franka_status);
+
     // publish true to user_stop_channel if U-stop is simulated
     if(sim_u_stop){
-      PublishPauseToChannel(franka_status.utime, lcm_user_stop_channel_,
-                            true, sim_u_stop_source);
+      PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
+                           true);
     }
     // otherwise publish current franka U-stop status
     else{
-      PublishPauseToChannel(franka_status.utime, lcm_user_stop_channel_,
-                            current_mode == franka::RobotMode::kUserStopped,
-                            params_.robot_name);
+      PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
+                           current_mode == franka::RobotMode::kUserStopped);
     }
-    // PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
-                        //  current_mode == franka::RobotMode::kUserStopped);
+
     PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
                          current_mode == franka::RobotMode::kOther);
   } else {
@@ -276,7 +275,7 @@ void CommunicationInterface::PublishPauseToChannel(int64_t utime,
   robot_msgs::pause_cmd msg;
   msg.utime = utime;
   msg.data = data;
-  msg.source = source;
+  msg.source = source.data();
   lcm_.publish(lcm_channel.data(), &msg);
 }
 
@@ -478,15 +477,10 @@ void CommunicationInterface::HandlePause(
 
 void CommunicationInterface::HandleUserStop(
     const ::lcm::ReceiveBuffer*, const std::string&,
-    const robot_msgs::pause_cmd* user_stop_msg) {
+    const robot_msgs::bool_t* user_stop_msg) {
 
-  dexai::log()->warn(
-      "CommunicationInterface::HandleUserStop: Received 'U-stop = {}' from {}",
-      user_stop_msg->data,
-      user_stop_msg->source);
-
-  PublishPauseToChannel(utils::get_current_utime(),
-                       lcm_user_stop_channel_,
-                       user_stop_msg->data, 
-                       user_stop_msg->source);
+  PublishPauseToChannel(user_stop_msg->utime,
+                        params_.lcm_stop_channel,
+                        user_stop_msg->data,
+                        params_.robot_name);
 }

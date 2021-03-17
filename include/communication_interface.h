@@ -110,7 +110,7 @@ class CommunicationInterface {
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
                    const robot_msgs::pause_cmd* pause_cmd_msg);
   void HandleUserStop(const ::lcm::ReceiveBuffer*, const std::string&,
-                      const robot_msgs::pause_cmd* user_stop_msg);
+                      const robot_msgs::bool_t* user_stop_msg);
 
  private:
   RobotParameters params_;
@@ -135,7 +135,7 @@ class CommunicationInterface {
 
   std::string lcm_user_stop_channel_;
   std::string sim_u_stop_source;
-  bool sim_u_stop;
+  bool sim_u_stop = false;
 
   double lcm_publish_rate_;  // Hz
 };
