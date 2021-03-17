@@ -46,7 +46,7 @@ CommunicationInterface::CommunicationInterface(const RobotParameters params,
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
   lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
   lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
-  sim_u_stop_source = params_.robot_name + "_SIMULATED_U_STOP";
+  sim_u_stop_source = params_.robot_name + "_SIM_U_STOP";
 
   dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
   dexai::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
