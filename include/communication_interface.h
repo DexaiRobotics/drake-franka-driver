@@ -136,6 +136,7 @@ class CommunicationInterface {
   std::string lcm_user_stop_channel_;
   std::string sim_u_stop_source;
   bool sim_u_stop = false;
+  bool prev_pause_state = false;
 
   double lcm_publish_rate_;  // Hz
 };
