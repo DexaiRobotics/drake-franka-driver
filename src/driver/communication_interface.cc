@@ -79,11 +79,15 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
   lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
   lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
+<<<<<<< HEAD:src/driver/communication_interface.cc
   lcm_sim_driver_event_trigger_channel_ =
       params_.robot_name + "_SIM_EVENT_TRIGGER";
 
   lcm_.subscribe(lcm_sim_driver_event_trigger_channel_,
                  &CommunicationInterface::HandleSimDriverEventTrigger, this);
+=======
+  sim_u_stop_source = params_.robot_name + "_SIM_U_STOP";
+>>>>>>> 3200001 (changed sim-u-stop source name):src/communication_interface.cc
 
   dexai::log()->info("Plan channel:\t\t\t\t{}", params_.lcm_plan_channel);
   dexai::log()->info("Stop channel:\t\t\t\t{}", params_.lcm_stop_channel);
