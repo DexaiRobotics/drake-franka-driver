@@ -364,7 +364,9 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   //   }
   //   dexai::log()->info("RunFranka: Finished reversing!");
   // }
-
+  dexai::log()->info("RunFranka: Turning Safety on again!");
+  SetCollisionBehaviorSafetyOn(robot);
+  dexai::log()->info("RunFranka: Turned Safety on again!");
   return RecoverFromControlException();
 }
 

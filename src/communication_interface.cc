@@ -69,6 +69,7 @@ void CommunicationInterface::ResetData() {
   robot_data_.robot_state = franka::RobotState();
   lock_data.unlock();
 
+  // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
   robot_plan_.has_plan_data_ = false;  // no new plan
   robot_plan_.plan_.release();         // unique ptr points to no plan
