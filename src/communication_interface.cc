@@ -62,7 +62,6 @@ void CommunicationInterface::ResetData() {
   robot_data_.robot_state = franka::RobotState();
   lock_data.unlock();
 
-  // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
   robot_plan_.has_plan_data_ = false;  // no new plan
   robot_plan_.plan_.release();         // unique ptr points to no plan
@@ -73,6 +72,8 @@ void CommunicationInterface::ResetData() {
   std::unique_lock<std::mutex> lock_pause(pause_mutex_);
   pause_data_.paused_ = false;             // not paused at start
   pause_data_.pause_sources_set_.clear();  // no pause sources at start
+  pause_data_.sim_control_exception =
+      false;  // not simulating control exception
   lock_pause.unlock();
 }
 
@@ -109,6 +110,15 @@ void CommunicationInterface::StopInterface() {
 
 bool CommunicationInterface::HasNewPlan() {
   return robot_plan_.has_plan_data_;  // is atomic
+}
+
+bool CommunicationInterface::IsSimulatingControlException() {
+  if (pause_data_.sim_control_exception) {
+    // reset the sim control exception variable, but still return true
+    pause_data_.sim_control_exception = false;
+    return true;
+  }
+  return false;
 }
 
 void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
@@ -404,6 +414,16 @@ void CommunicationInterface::HandlePause(
   // check if paused = true or paused = false was received:
   bool desired_pause {pause_cmd_msg->data};
   auto source {pause_cmd_msg->source};
+
+  // simulate control exception
+  if ((source == "sim_control_exception") && desired_pause) {
+    dexai::log()->error(
+        "CommunicationInterface::HandlePause: received command to simulate "
+        "control exception!");
+    pause_data_.sim_control_exception = true;
+    return;
+  }
+
   if (desired_pause) {
     dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received pause command from {}",

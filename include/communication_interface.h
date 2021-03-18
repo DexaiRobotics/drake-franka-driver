@@ -41,6 +41,7 @@ struct RobotData {
 struct PauseData {
   std::atomic<bool> paused_;
   std::set<std::string> pause_sources_set_;
+  std::atomic<bool> sim_control_exception;
 };
 
 struct RobotPiecewisePolynomial {
@@ -57,6 +58,7 @@ class CommunicationInterface {
   void StartInterface();
   void StopInterface();
 
+  bool IsSimulatingControlException();
   bool HasNewPlan();
   void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
 
