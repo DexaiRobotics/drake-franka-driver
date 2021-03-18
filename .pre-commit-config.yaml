@@ -82,6 +82,10 @@ repos:
     hooks:
     - id: clang-format
       args: [--style=file]
+      exclude: |
+        (?x)^(
+            externals/.*
+        )$
     - id: cpplint
       # Some C++11 headers are unapproved by Google style; ignore that.
       args: [
@@ -89,6 +93,10 @@ repos:
         --counting=toplevel,
         --recursive,
         "--filter=-build/c++11,-runtime/references"]
+      exclude: |
+        (?x)^(
+            externals/.*
+        )$
     - id: cppcheck
       # manual: http://cppcheck.sourceforge.net/manual.pdf
       # need fix_ros_escape.sh due to the following error before running this
@@ -99,7 +107,7 @@ repos:
              "--language=c++",
              "--inline-suppr",
              "--quiet",
-             "--project=build/compile_commands_escape.json",
+             "--project=build/compile_commands_escape-diff_only.json",
              # suppress external libraries warnings
              "--suppress=*:*/externals/*",
              # suppress ompl header warnings
@@ -119,12 +127,12 @@ repos:
     hooks:
     - id: oclint
       # keep the original compile_commands.json as oclint requires it
-      args: [-p=build/compile_commands.json,
+      args: [-p=build/compile_commands-diff_only.json,
              -enable-clang-static-analyzer,
              -enable-global-analysis,
              "--extra-arg=-I/usr/include/clang/12/include"]
     - id: clang-tidy
-      args: [-p=build/compile_commands.json,
+      args: [-p=build/compile_commands-diff_only.json,
              --config-file=.clang-tidy]
     # - id: uncrustify
     # doesn't seem to add much more value, to be evaluated further
