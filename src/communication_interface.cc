@@ -402,30 +402,30 @@ void CommunicationInterface::HandlePause(
     const robot_msgs::pause_cmd* pause_cmd_msg) {
   std::lock_guard<std::mutex> lock(pause_mutex_);
   // check if paused = true or paused = false was received:
-  bool paused = pause_cmd_msg->data;
-  if (paused) {
+  bool desired_pause {pause_cmd_msg->data};
+  auto source {pause_cmd_msg->source};
+  if (desired_pause) {
     dexai::log()->warn(
-        "CommunicationInterface::HandlePause: Received 'pause = true' from {}",
-        pause_cmd_msg->source);
-    if (pause_data_.pause_sources_set_.insert(pause_cmd_msg->source).second
-        == false) {
+        "CommunicationInterface::HandlePause: Received pause command from {}",
+        source);
+    if (pause_data_.pause_sources_set_.insert(source).second == false) {
       dexai::log()->warn(
-          "CommunicationInterface::HandlePause: "
-          "Already paused by source: {}",
-          pause_cmd_msg->source);
+          "CommunicationInterface::HandlePause: Already paused by source: {}",
+          source);
     }
   } else {
     dexai::log()->warn(
-        "CommunicationInterface::HandlePause: Received 'pause = false' from {}",
-        pause_cmd_msg->source);
-    if (pause_data_.pause_sources_set_.find(pause_cmd_msg->source)
+        "CommunicationInterface::HandlePause: Received continue command from "
+        "{}",
+        source);
+    if (pause_data_.pause_sources_set_.find(source)
         != pause_data_.pause_sources_set_.end()) {
-      pause_data_.pause_sources_set_.erase(pause_cmd_msg->source);
+      pause_data_.pause_sources_set_.erase(source);
     } else {
       dexai::log()->warn(
           "Unpausing command rejected: No matching "
           "pause command by source: {}'",
-          pause_cmd_msg->source);
+          source);
     }
   }
 
