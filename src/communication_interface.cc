@@ -44,6 +44,11 @@ CommunicationInterface::CommunicationInterface(const RobotParameters params,
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
   lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
   lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
+  lcm_sim_driver_event_trigger_channel_ =
+      params_.robot_name + "_SIM_EVENT_TRIGGER";
+
+  lcm_.subscribe(lcm_sim_driver_event_trigger_channel_,
+                 &CommunicationInterface::HandleSimDriverEventTrigger, this);
 
   dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
   dexai::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
@@ -54,6 +59,8 @@ CommunicationInterface::CommunicationInterface(const RobotParameters params,
   dexai::log()->info("Status channel:        {}", params_.lcm_status_channel);
   dexai::log()->info("Driver status channel: {}", lcm_driver_status_channel_);
   dexai::log()->info("Pause status channel:  {}", lcm_pause_status_channel_);
+  dexai::log()->info("Sim driver event trigger channel:  {}",
+                     lcm_sim_driver_event_trigger_channel_);
 };
 
 void CommunicationInterface::ResetData() {
@@ -72,8 +79,6 @@ void CommunicationInterface::ResetData() {
   std::unique_lock<std::mutex> lock_pause(pause_mutex_);
   pause_data_.paused_ = false;             // not paused at start
   pause_data_.pause_sources_set_.clear();  // no pause sources at start
-  pause_data_.sim_control_exception =
-      false;  // not simulating control exception
   lock_pause.unlock();
 }
 
@@ -113,9 +118,9 @@ bool CommunicationInterface::HasNewPlan() {
 }
 
 bool CommunicationInterface::IsSimulatingControlException() {
-  if (pause_data_.sim_control_exception) {
+  if (sim_control_exception_) {
     // reset the sim control exception variable, but still return true
-    pause_data_.sim_control_exception = false;
+    sim_control_exception_ = false;
     return true;
   }
   return false;
@@ -415,15 +420,6 @@ void CommunicationInterface::HandlePause(
   bool desired_pause {pause_cmd_msg->data};
   auto source {pause_cmd_msg->source};
 
-  // simulate control exception
-  if ((source == "sim_control_exception") && desired_pause) {
-    dexai::log()->error(
-        "CommunicationInterface::HandlePause: received command to simulate "
-        "control exception!");
-    pause_data_.sim_control_exception = true;
-    return;
-  }
-
   if (desired_pause) {
     dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received pause command from {}",
@@ -456,4 +452,29 @@ void CommunicationInterface::HandlePause(
   } else {
     pause_data_.paused_ = true;
   }
+}
+
+// TODO(@syler): this could be a different message type, pause_cmd is probably
+// not the best here
+void CommunicationInterface::HandleSimDriverEventTrigger(
+    const ::lcm::ReceiveBuffer*, const std::string&,
+    const robot_msgs::pause_cmd* cmd_msg) {
+  // bool desired_state {cmd_msg->data};
+  auto desired_event {cmd_msg->source};
+
+  // simulate control exception
+  if (desired_event == "control_exception") {
+    dexai::log()->error(
+        "CommunicationInterface:HandleSimDriverEventTrigger: received command "
+        "to simulate control exception!");
+    sim_control_exception_ = true;
+    return;
+  } else {
+    dexai::log()->error(
+        "CommunicationInterface:HandleSimDriverEventTrigger: Unrecognized "
+        "trigger {}!",
+        desired_event);
+  }
+
+  // TODO(@andrey): use this for u-stop, check desired state for on/off
 }
