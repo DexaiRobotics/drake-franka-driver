@@ -610,8 +610,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (comm_interface_->IsSimulatingControlException()) {
     dexai::log()->warn("Simulating control exception!");
     RecoverFromControlException();
-    franka::JointPositions output_current = robot_state.q;
-    return franka::MotionFinished(output_current);
+    // return current joint positions instead of running plan through to
+    // completion
+    franka::JointPositions joint_pos = robot_state.q;
+    return franka::MotionFinished(joint_pos);
   }
 
   if (comm_interface_->HasNewPlan()) {
