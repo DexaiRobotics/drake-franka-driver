@@ -118,15 +118,6 @@ bool CommunicationInterface::HasNewPlan() {
   return robot_plan_.has_plan_data_;  // is atomic
 }
 
-bool CommunicationInterface::IsSimulatingControlException() {
-  if (sim_control_exception_) {
-    // reset the sim control exception variable, but still return true
-    sim_control_exception_ = false;
-    return true;
-  }
-  return false;
-}
-
 void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
                                       int64_t& plan_utime) {
   std::lock_guard<std::mutex> lock(robot_plan_mutex_);
@@ -468,7 +459,7 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
     dexai::log()->error(
         "CommunicationInterface:HandleSimDriverEventTrigger: received command "
         "to simulate control exception!");
-    sim_control_exception_ = true;
+    sim_control_exception_triggered_ = true;
     return;
   } else {
     dexai::log()->error(

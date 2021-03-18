@@ -607,9 +607,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   Eigen::VectorXd current_conf_franka =
       utils::v_to_e(ArrayToVector(cannonical_robot_state.q_d));
 
-  if (comm_interface_->IsSimulatingControlException()) {
+  if (comm_interface_->SimControlExceptionTriggered()) {
     dexai::log()->warn("Simulating control exception!");
     RecoverFromControlException();
+    comm_interface_->ClearSimControlExceptionTrigger();
     // return current joint positions instead of running plan through to
     // completion
     franka::JointPositions joint_pos = robot_state.q;

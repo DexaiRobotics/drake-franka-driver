@@ -57,7 +57,13 @@ class CommunicationInterface {
   void StartInterface();
   void StopInterface();
 
-  bool IsSimulatingControlException();
+  bool SimControlExceptionTriggered() const {
+    return sim_control_exception_triggered_;
+  };
+  void ClearSimControlExceptionTrigger() {
+    sim_control_exception_triggered_ = false;
+  };
+
   bool HasNewPlan();
   void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
 
@@ -116,7 +122,7 @@ class CommunicationInterface {
  private:
   RobotParameters params_;
   std::atomic_bool running_ {false};
-  std::atomic<bool> sim_control_exception_ {false};
+  std::atomic<bool> sim_control_exception_triggered_ {false};
 
   ::lcm::LCM lcm_;
 
