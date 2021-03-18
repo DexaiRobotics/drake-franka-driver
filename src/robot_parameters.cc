@@ -133,6 +133,12 @@ bool RobotParameters::UpdateUrdf(const std::string& new_urdf_file_name) {
   return true;
 }
 
+// local function only used by loadYamlParameters below
+void ConstructPaths(RobotParameters& params) {
+  params.urdf_filepath = params.urdf_dir + params.urdf;
+  params.UpdateUrdf(params.urdf);
+}
+
 // TODO: verbosity and exit_code can be changed once we
 // log all params and accept default values.
 RobotParameters loadYamlParameters(
@@ -264,12 +270,6 @@ RobotParameters loadYamlParameters(
   p.yaml_source_full_path = std::string(yaml_full_path);
   logger->debug("loadYamlParameters: urdf_filepath: {}", p.urdf_filepath);
   return p;
-}
-
-void ConstructPaths(RobotParameters& p, const std::string& _traj_lib_base_dir) {
-  std::string home_dir = utils::get_home_dir() + "/";
-  p.urdf_filepath = p.urdf_dir + p.urdf;  // KEEP
-  p.UpdateUrdf(p.urdf);
 }
 
 }  // namespace franka_driver

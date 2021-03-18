@@ -103,13 +103,8 @@ time_t file_mod_time(const std::string& path);
 
 template <typename TimeT>
 TimeT expect_file_mod(const std::string& temp_file_path, TimeT max_seconds) {
-  TimeT time_mod {file_mod_time(temp_file_path)};
-  TimeT time_dif {std::time(nullptr) - time_mod};
-#if defined(ASSERT_TRUE) || defined(assertTrue)  // inside a test?
-  if (max_seconds > 0) {
-    EXPECT_LE(time_dif, max_seconds);
-  }
-#endif
+  auto time_mod {file_mod_time(temp_file_path)};
+  auto time_dif {static_cast<TimeT>(std::time(nullptr) - time_mod)};
   if (time_dif > max_seconds) {
     std::cerr << "    Checked file: " << temp_file_path
               << "    Seconds since file mod exceeds limit: " << time_dif

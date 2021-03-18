@@ -196,7 +196,4 @@ RobotParameters loadYamlParameters(
     int exit_code = 0  // calls exit on error if exit_code != 0
 );
 
-void ConstructPaths(RobotParameters& p,
-                    const std::string& _traj_lib_base_dir = "");
-
 }  // namespace franka_driver
