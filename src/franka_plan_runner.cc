@@ -704,7 +704,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
   output_to_franka = utils::EigenToArray(output_to_franka_eigen);
 
-  if (franka_time_ > plan_->end_time()) {
+  if (franka_time_ > plan_->end_time()) {  // check convergence
+    // the following two constants must be tuned together
+    static const double CONV_ANGLE_THRESHOLD {0.001};  // rad, empirical
+    static const double CONV_SPEED_THRESHOLD {0.003};  // rad/s, L2 norm
+
     // Maximum change in joint angle between two confs
     double max_joint_err {
         utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
@@ -715,8 +719,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         "franka_t = {:.4f}, max joint err = {:.4f}, dq norm = {:.4f}",
         plan_utime_, franka_time_, max_joint_err, dq_norm);
     // check convergence, return finished if two conditions are met
-    if (max_joint_err <= allowable_max_angle_error_
-        && dq_norm <= allowable_max_speed_error_) {
+    if (max_joint_err <= CONV_ANGLE_THRESHOLD
+        && dq_norm <= CONV_SPEED_THRESHOLD) {
       dexai::log()->warn(
           "JointPositionCallback: plan {} overtime, "
           "converged within grace period, motion finished cleanly",
@@ -730,12 +734,12 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     {  // print joints positions that have diverged
       auto error_eigen = (end_conf_plan_ - current_conf_franka).cwiseAbs();
       for (std::decay_t<decltype(dof_)> i {}; i < dof_; i++) {
-        if (error_eigen(i) > allowable_max_angle_error_) {
+        if (error_eigen(i) > CONV_ANGLE_THRESHOLD) {
           dexai::log()->warn(
               "JointPositionCallback: plan {} overtime, diverged, joint {} "
               "error: {} - {} = {} > max allowable: {}",
               plan_utime_, i, end_conf_plan_(i), current_conf_franka(i),
-              error_eigen(i), allowable_max_angle_error_);
+              error_eigen(i), CONV_ANGLE_THRESHOLD);
         }
       }
     }
