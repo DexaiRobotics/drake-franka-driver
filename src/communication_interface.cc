@@ -412,6 +412,13 @@ void CommunicationInterface::HandlePause(
   bool desired_pause {pause_cmd_msg->data};
   auto source {pause_cmd_msg->source};
 
+  if (source == "cancel_plan") {
+    dexai::log()->error(
+        "CommunicationInterface::HandlePause: Received cancel plan request!");
+    cancel_plan_requested_ = true;
+    return;
+  }
+
   if (desired_pause) {
     dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received pause command from {}",

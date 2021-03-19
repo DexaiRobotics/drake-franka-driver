@@ -64,6 +64,9 @@ class CommunicationInterface {
     sim_control_exception_triggered_ = false;
   };
 
+  bool CancelPlanRequested() const { return cancel_plan_requested_; };
+  void ClearCancelPlanRequest() { cancel_plan_requested_ = false; };
+
   bool HasNewPlan();
   void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
 
@@ -123,6 +126,7 @@ class CommunicationInterface {
   RobotParameters params_;
   std::atomic_bool running_ {false};
   std::atomic<bool> sim_control_exception_triggered_ {false};
+  std::atomic<bool> cancel_plan_requested_ {false};
 
   ::lcm::LCM lcm_;
 
