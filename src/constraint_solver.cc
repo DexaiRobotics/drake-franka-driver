@@ -63,10 +63,8 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
           "Creating robot model parser with URDF {} \n"
           "using root link name in URDF: {}",
           urdf_path_, robot_root_link);
-      dexai::log()->info(
-          "CS:ctor: Trying to weld robot frame: {} ... \n"
-          "... to world frame: {}",
-          robot_root_link, mb_plant.world_frame().name());
+      dexai::log()->debug("CS:ctor: welding robot frame {} to world frame: {}",
+                          robot_root_link, mb_plant.world_frame().name());
       auto& child_frame {
           mb_plant.GetFrameByName(robot_root_link, robot_model_idx_)};
       mb_plant.WeldFrames(mb_plant.world_frame(), child_frame);
