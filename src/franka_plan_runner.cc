@@ -711,7 +711,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (franka_time_ > plan_->end_time()) {  // check convergence
     // the following two constants must be tuned together
     static const double CONV_ANGLE_THRESHOLD {0.001};  // rad, empirical
-    static const double CONV_SPEED_THRESHOLD {0.003};  // rad/s, L2 norm
+    static const double CONV_SPEED_THRESHOLD {0.02};   // rad/s, L2 norm
 
     // Maximum change in joint angle between two confs
     double max_joint_err {
@@ -727,8 +727,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         && dq_norm <= CONV_SPEED_THRESHOLD) {
       dexai::log()->warn(
           "JointPositionCallback: plan {} overtime, "
-          "converged within grace period, motion finished cleanly",
-          plan_utime_);
+          "converged within grace period, motion finished cleanly; "
+          "plan duration: {:.4f}, frank_t: {:.4f}, overtime: {:.4f}",
+          plan_utime_, plan_end_time, franka_time_,
+          franka_time_ - plan_end_time);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
       plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
@@ -748,11 +750,13 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       }
     }
     // terminate plan if grace period has ended and still not converged
-    if (franka_time_ > (plan_->end_time() + 0.5)) {  // 500ms
+    if (franka_time_ > (plan_->end_time() + 0.2)) {  // 200ms
       dexai::log()->error(
           "JointPositionCallback: plan {} overtime, grace period exceeded, "
-          "motion aborted",
-          plan_utime_);
+          "motion aborted; plan duration: {:.4f}, frank_t: {:.4f}, overtime: "
+          "{:.4f}",
+          plan_utime_, plan_end_time, franka_time_,
+          franka_time_ - plan_end_time);
       comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
       plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
