@@ -5,7 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra")  #  -Werror")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wshadow=local")
+
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 
 # threads
@@ -96,7 +97,6 @@ target_link_libraries(franka_driver
   ${Python3_LIBRARIES}
   fcl
   cnpy
-  stdc++fs  # can be removed after gcc9
 )
 
 #-------------------
@@ -142,7 +142,6 @@ set(TEST_LINK_LIBRARIES
   drake::drake
   yaml-cpp
   ${Franka_LIBRARIES}
-  stdc++fs  # can be removed after gcc9
 )
 
 foreach(_file ${GTEST_SRC_FILES})

@@ -260,16 +260,11 @@ RobotParameters loadYamlParameters(
     throw;
   }
 
-  ConstructPaths(p);
+  p.urdf_filepath = p.urdf_dir + p.urdf;
+  p.UpdateUrdf(p.urdf);
   p.yaml_source_full_path = std::string(yaml_full_path);
   logger->debug("loadYamlParameters: urdf_filepath: {}", p.urdf_filepath);
   return p;
-}
-
-void ConstructPaths(RobotParameters& p, const std::string& _traj_lib_base_dir) {
-  std::string home_dir = utils::get_home_dir() + "/";
-  p.urdf_filepath = p.urdf_dir + p.urdf;  // KEEP
-  p.UpdateUrdf(p.urdf);
 }
 
 }  // namespace franka_driver

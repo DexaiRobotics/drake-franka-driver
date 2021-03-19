@@ -20,7 +20,7 @@ std::vector<T> ArrayToVector(const std::array<T, SIZE>& a) {
 
 template <typename T, std::size_t SIZE>
 void VectorToArray(const std::vector<T>& v, std::array<T, SIZE>& a) {
-  for (int i = 0; i < SIZE; i++) {
+  for (size_t i {}; i < SIZE; i++) {
     a[i] = v[i];
   }
 }

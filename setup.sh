@@ -88,11 +88,11 @@ fi
 
 # Now build the target from scratch:
 mkdir -p build; cd build
-echo "build_debug = $build_debug"
 if (( $build_debug > 0 )); then
-    echo "Build in Debug mode!"
+    echo "Building in debug mode"
     cmake .. -DCMAKE_BUILD_TYPE=Debug   || exit 4   # Build for debugging
 else
+    echo "Building in release mode"
     cmake .. -DCMAKE_BUILD_TYPE=Release || exit 5
 fi
 

@@ -39,8 +39,6 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
   comm_interface_ =
       std::make_unique<CommunicationInterface>(params_, lcm_publish_rate_);
 
-  // for pause logic:
-  franka_time_ = 0.0;
   max_accels_ = params.robot_max_accelerations;
 
   assert(!params_.urdf_filepath.empty()
@@ -388,7 +386,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
 }
 
 int FrankaPlanRunner::RunSim() {
-  dexai::log()->info("Starting sim robot.");
+  dexai::log()->info("Starting sim robot and entering run loop...");
   comm_interface_->PublishDriverStatus(true);
 
   // first, set some parameters
@@ -410,6 +408,9 @@ int FrankaPlanRunner::RunSim() {
   status_ = RobotStatus::Running;  // define robot as running at start
 
   while (true) {
+    // The actual callback control loop runs at 1 kHz, here it's pegged to
+    // the lcm_publish_rate_ to avoid excessive CPU usage in simulations.
+    // The loop frequency here in no way reflects the real-world frequency.
     std::this_thread::sleep_for(std::chrono::milliseconds(
         static_cast<int>(1000.0 / lcm_publish_rate_)));
 
@@ -490,6 +491,8 @@ double FrankaPlanRunner::TimeToAdvanceWhilePausing(double period,
   return time_to_advance;
 }
 
+// TODO(@anyone): rewrite this with steady_clock to make
+// franka_t agree exactly with wall clock
 void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     const std::array<double, 7>& vel, double period_in_seconds) {
   // get pause data from the communication interface
@@ -621,9 +624,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // get the current plan from the communication interface
     comm_interface_->TakePlan(plan_, plan_utime_);
 
-    // first time step of plan, reset time:
+    // first time step of plan, reset time and start conf
     franka_time_ = 0.0;
-
     start_conf_plan_ = plan_->value(franka_time_);
 
     if (!LimitJoints(start_conf_plan_)) {
@@ -650,7 +652,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       dexai::log()->error(
           "JointPositionCallback: Discarding plan, mismatched start position."
           " Max distance: {} > {}",
-          max_ang_distance, params_.kTightJointDistance);
+          max_ang_distance, params_.kMediumJointDistance);
       return franka::MotionFinished(output_to_franka);
     } else if (max_ang_distance > params_.kTightJointDistance) {
       dexai::log()->warn(
@@ -706,57 +708,71 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
   output_to_franka = utils::EigenToArray(output_to_franka_eigen);
 
-  if (franka_time_ > plan_->end_time()) {
-    // Maximum change in joint angle between two confs
-    double error_final =
-        utils::max_angular_distance(end_conf_plan_, current_conf_franka);
-    auto current_dq = utils::v_to_e(ArrayToVector(cannonical_robot_state.dq));
+  if (franka_time_ > plan_->end_time()) {  // check convergence
+    // The following two constants must be tuned together.
+    // A higher speed threshold may result in the benign libfranka exception:
+    //    Motion finished commanded, but the robot is still moving!
+    //    ["joint_motion_generator_acceleration_discontinuity"]
+    static const double CONV_ANGLE_THRESHOLD {0.001};  // rad, empirical
+    static const double CONV_SPEED_THRESHOLD {0.009};  // rad/s, L2 norm
 
-    if (error_final < allowable_max_angle_error_
-        && current_dq.norm() < allowable_max_angle_error_) {
-      dexai::log()->info(
-          "JointPositionCallback: Finished plan {}, exiting controller @ "
-          "err={} &, dq={}",
-          plan_utime_, error_final, current_dq.transpose());
+    // Maximum change in joint angle between two confs
+    const double max_joint_err {
+        utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
+    const double max_joint_speed {
+        utils::v_to_e(ArrayToVector(cannonical_robot_state.dq))
+            .cwiseAbs()
+            .maxCoeff()};
+    // auto dq_norm {
+    //     utils::v_to_e(ArrayToVector(cannonical_robot_state.dq)).norm()};
+    dexai::log()->warn(
+        "JointPositionCallback: plan {} overtime, "
+        "franka_t: {:.3f}, max joint err = {:.4f}, max joint speed = {:.4f}",
+        plan_utime_, franka_time_, max_joint_err, max_joint_speed);
+    // check convergence, return finished if two conditions are met
+    if (max_joint_err <= CONV_ANGLE_THRESHOLD
+        && max_joint_speed <= CONV_SPEED_THRESHOLD) {
+      dexai::log()->warn(
+          "JointPositionCallback: plan {} overtime by {:.3f} s, "
+          "converged within grace period, finished; "
+          "plan duration: {:.3f} s, franka_t: {:.3f} s",
+          plan_utime_, franka_time_ - plan_end_time, plan_end_time,
+          franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
-      // releasing finished plan:
-      plan_.release();
+      plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(output_to_franka);
-    } else {
+    }
+    // proceed below when not converged
+    {  // print joints positions that have diverged
       auto error_eigen = (end_conf_plan_ - current_conf_franka).cwiseAbs();
-      for (size_t joint_idx = 0; joint_idx < dof_; joint_idx++) {
-        if (error_eigen(joint_idx) > allowable_max_angle_error_) {
+      for (std::decay_t<decltype(dof_)> i {}; i < dof_; i++) {
+        if (error_eigen(i) > CONV_ANGLE_THRESHOLD) {
           dexai::log()->warn(
-              "JointPositionCallback: Overtimed plan {}: robot diverged, joint "
-              "{} "
-              "error: {} - {} = {} > max allowable: {}",
-              plan_utime_, joint_idx, end_conf_plan_(joint_idx),
-              current_conf_franka(joint_idx), error_eigen(joint_idx),
-              allowable_max_angle_error_);
+              "JointPositionCallback: plan {} overtime, diverged, joint {} "
+              "error: {:.4f} - {:.4f} = {:.4f} > max allowable: {}",
+              plan_utime_, i, end_conf_plan_(i), current_conf_franka(i),
+              error_eigen(i), CONV_ANGLE_THRESHOLD);
         }
       }
-      if (franka_time_ > (plan_->end_time() + 0.5)) {  // 500ms additional time
-        dexai::log()->info(
-            "t overtime: {}, JointPositionCallback: current_conf_franka: {}",
-            franka_time_ - (plan_->end_time() + 0.5),
-            current_conf_franka.transpose());
-        dexai::log()->info(
-            "t overtime: {}, JointPositionCallback: next_conf_franka: {}",
-            franka_time_ - (plan_->end_time() + 0.5),
-            next_conf_franka.transpose());
-        dexai::log()->info(
-            "t overtime: {}, JointPositionCallback: next_conf_plan: {}",
-            franka_time_ - (plan_->end_time() + 0.5),
-            next_conf_plan_.transpose());
-        comm_interface_->PublishPlanComplete(plan_utime_, false /*  = failed*/,
-                                             "diverged");
-        // releasing finished plan:
-        plan_.release();
-        plan_utime_ = -1;  // reset plan to -1
-        return franka::MotionFinished(output_to_franka);
-      }
     }
+    // terminate plan if grace period has ended and still not converged
+    if (franka_time_ > (plan_->end_time() + 0.2)) {  // 200 ms
+      dexai::log()->error(
+          "JointPositionCallback: plan {} overtime by {:.3f} s, grace period "
+          "exceeded, "
+          "motion aborted; plan duration: {:.3f} s, franka_t: {:.3f} s",
+          plan_utime_, franka_time_ - plan_end_time, plan_end_time,
+          franka_time_);
+      comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
+      plan_.release();   // reset unique ptr
+      plan_utime_ = -1;  // reset plan to -1
+      return franka::MotionFinished(output_to_franka);
+    }
+    dexai::log()->warn(
+        "JointPositionCallback: plan {} overtime, diverged or still moving, "
+        "within allowed grace period",
+        plan_utime_);
   }
   return output_to_franka;
 }

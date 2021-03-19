@@ -29,14 +29,10 @@ inline bool load_params(std::string& yaml_full_path, RobotParameters& params,
 
 /// The current way of making a mock constraint_solver is to make a real one,
 /// albeit using local (CLI-specified) or test (default) config and URDF files.
-inline ConstraintSolver* make_constraint_solver(
-    RobotParameters& params  // output
-    ,
-    std::string& yaml_full_path  // input & output
-    ,
-    const int verbose = 0  // input
-    ,
-    const int threads = 6  // max threads for OMPL
+ConstraintSolver* make_constraint_solver(
+    RobotParameters& params,      // output
+    std::string& yaml_full_path,  // input & output
+    const int verbose = 0         // input
 ) {
   ConstraintSolver* constraint_solver = nullptr;
   if (load_params(yaml_full_path, params, verbose)) {

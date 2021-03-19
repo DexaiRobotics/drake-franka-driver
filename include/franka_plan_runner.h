@@ -100,15 +100,25 @@ class FrankaPlanRunner {
       joint_position_callback_;
 
   // keeping track of time along plan:
-  double franka_time_;
+  double franka_time_ {};
   // pause related:
   utils::RobotStatus status_;
   long timestep_ = 1;
   float target_stop_time_;
   float stop_duration_;
   float stop_margin_counter_ = 0;
-  int cur_plan_number_ = -1;               // for ensuring the plan is new
-  const double lcm_publish_rate_ = 200.0;  // Hz
+  int cur_plan_number_ = -1;  // for ensuring the plan is new
+
+  // We control the robot at 1 kHz using the callback function
+  // which gets called by the robot at 1 kHz over direct eithernet.
+  // But we publish robot status via LCM over another ethernet connection
+  // at 200 Hz which is frequent enough.
+  // One considertion is that typically robots have resonance ~20 Hz
+  // in the mechanical structure.
+  // 10x the mechanical closed loop response frequency is a rule of thumb.
+  // This way we don't alias in other frequencies, and are able to synthesize
+  // frequency components in the region we care about with high fidelity
+  const double lcm_publish_rate_ {200.0};  // Hz
 
   Eigen::MatrixXd joint_limits_;
   float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
@@ -128,7 +138,6 @@ class FrankaPlanRunner {
   Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
-  double allowable_max_angle_error_ = 0.001;  // empirically proven
 
   // Collision torque thresholds for each joint in [Nm].
   const std::array<double, 7> kHighTorqueThreshold {100.0, 100.0, 100.0, 100.0,
