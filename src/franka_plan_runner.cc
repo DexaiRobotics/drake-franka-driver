@@ -491,7 +491,8 @@ double FrankaPlanRunner::TimeToAdvanceWhilePausing(double period,
   return time_to_advance;
 }
 
-// TODO(@dyt): rewrite this to use steady_clock
+// TODO(@anyone): rewrite this with steady_clock to make
+// franka_t agree exactly with wall clock
 void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     const std::array<double, 7>& vel, double period_in_seconds) {
   // get pause data from the communication interface
