@@ -724,15 +724,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     //     utils::v_to_e(ArrayToVector(cannonical_robot_state.dq)).norm()};
     dexai::log()->warn(
         "JointPositionCallback: plan {} overtime, "
-        "franka_t = {:.4f}, max joint err = {:.4f}, max joint speed = {:.4f}",
+        "franka_t: {:.3f}, max joint err = {:.4f}, max joint speed = {:.4f}",
         plan_utime_, franka_time_, max_joint_err, max_joint_speed);
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
         && max_joint_speed <= CONV_SPEED_THRESHOLD) {
       dexai::log()->warn(
-          "JointPositionCallback: plan {} overtime by {} s, "
+          "JointPositionCallback: plan {} overtime by {:.3f} s, "
           "converged within grace period, finished; "
-          "plan duration: {:.4f} s, frank_t: {:.4f} s",
+          "plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, franka_time_ - plan_end_time, plan_end_time,
           franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
@@ -756,11 +756,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // terminate plan if grace period has ended and still not converged
     if (franka_time_ > (plan_->end_time() + 0.2)) {  // 200ms
       dexai::log()->error(
-          "JointPositionCallback: plan {} overtime, grace period exceeded, "
-          "motion aborted; plan duration: {:.4f}, frank_t: {:.4f}, overtime: "
-          "{:.4f}",
-          plan_utime_, plan_end_time, franka_time_,
-          franka_time_ - plan_end_time);
+          "JointPositionCallback: plan {} overtime by {:.3f} s, grace period "
+          "exceeded, "
+          "motion aborted; plan duration: {:.3f} s, franka_t: {:.3f} s",
+          plan_utime_, franka_time_ - plan_end_time, plan_end_time,
+          franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
       plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
