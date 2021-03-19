@@ -671,30 +671,35 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     return franka::MotionFinished(output_to_franka);
   }
 
-  const auto plan_end_time = plan_->end_time();
-  const auto plan_completion_fraction =
-      std::min(1.0, std::max(0.0, franka_time_ / plan_end_time));
-
   // read out plan for current franka time from plan:
   next_conf_plan_ = plan_->value(franka_time_);
   comm_interface_->TryToSetRobotData(cannonical_robot_state, next_conf_plan_);
 
-  // delta between conf at start of plan to conft at current time of plan:
-  Eigen::VectorXd delta_conf_plan = next_conf_plan_ - start_conf_plan_;
+  const auto plan_end_time = plan_->end_time();
+  Eigen::VectorXd next_conf_combined(7);  // derive the next conf for return
+  {
+    // We don't track the last callback and delta from it
+    // So we always calculate delta from the start of the plan
+    // For both the plan itself and the franks, since they don't start from
+    // the exact same position.
+    // delta between conf at start of plan to conft at current time of plan:
+    Eigen::VectorXd delta_conf_plan {next_conf_plan_ - start_conf_plan_};
+    Eigen::VectorXd next_conf_franka {start_conf_franka_ + delta_conf_plan};
 
-  // add delta to current robot state to achieve a continuous motion:
-  Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
-
-  // Linear interpolation between next conf with offset and the actual next conf
-  // based on received plan
-  Eigen::VectorXd next_conf_combined =
-      (1.0 - plan_completion_fraction) * next_conf_franka
-      + plan_completion_fraction * next_conf_plan_;
-
-  for (size_t i = 0; i < 7; i++) {
-    next_conf_combined[i] =
-        franka::lowpassFilter(period.toSec(), next_conf_combined[i],
-                              cannonical_robot_state.q_d[i], 30.0);
+    // Expotentially weigh the next plan and franka confs for faster convergence
+    // plan_completion_frac is in [0, 1] despite possibly being overtime
+    const double plan_completion_frac {
+        std::min(1.0, franka_time_ / plan_end_time)};
+    // weight term goes from 1 to nearly 0 as frac goes from 0 to 1
+    const double weight_e {std::exp(-15 * plan_completion_frac)};
+    next_conf_combined =
+        weight_e * next_conf_franka + (1 - weight_e) * next_conf_plan_;
+    // apply low-pass filter at 30 Hz
+    for (size_t i {}; i < 7; i++) {
+      next_conf_combined[i] =
+          franka::lowpassFilter(period.toSec(), next_conf_combined[i],
+                                cannonical_robot_state.q_d[i], 30.0);
+    }
   }
 
   // overwrite the output_to_franka of this callback:
