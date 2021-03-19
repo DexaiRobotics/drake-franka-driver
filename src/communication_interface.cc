@@ -409,10 +409,9 @@ void CommunicationInterface::HandlePause(
     const robot_msgs::pause_cmd* pause_cmd_msg) {
   std::lock_guard<std::mutex> lock(pause_mutex_);
   // check if paused = true or paused = false was received:
-  bool desired_pause {pause_cmd_msg->data};
   auto source {pause_cmd_msg->source};
 
-  if (desired_pause) {
+  if (pause_cmd_msg->data) {
     dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received pause command from {}",
         source);
