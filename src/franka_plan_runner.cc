@@ -668,6 +668,18 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         "controller...");
     comm_interface_->TryToSetRobotData(cannonical_robot_state,
                                        start_conf_franka_);
+    comm_interface_->ClearCancelPlanRequest();
+
+    return franka::MotionFinished(output_to_franka);
+  }
+
+  if (comm_interface_->CancelPlanRequested()) {
+    dexai::log()->warn("Canceling plan!");
+    comm_interface_->ClearCancelPlanRequest();
+    comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
+    // releasing finished plan:
+    plan_.release();
+    plan_utime_ = -1;  // reset plan to -1
     return franka::MotionFinished(output_to_franka);
   }
 
