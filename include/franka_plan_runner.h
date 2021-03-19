@@ -100,7 +100,7 @@ class FrankaPlanRunner {
       joint_position_callback_;
 
   // keeping track of time along plan:
-  double franka_time_;
+  double franka_time_ {};
   // pause related:
   utils::RobotStatus status_;
   long timestep_ = 1;
@@ -128,7 +128,7 @@ class FrankaPlanRunner {
   Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
-  double allowable_max_angle_error_ = 0.001;  // empirically proven
+  const double allowable_max_angle_error_ = 0.001;  // empirically proven
 
   // Collision torque thresholds for each joint in [Nm].
   const std::array<double, 7> kHighTorqueThreshold {100.0, 100.0, 100.0, 100.0,
