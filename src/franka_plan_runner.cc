@@ -709,9 +709,12 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   output_to_franka = utils::EigenToArray(output_to_franka_eigen);
 
   if (franka_time_ > plan_->end_time()) {  // check convergence
-    // the following two constants must be tuned together
+    // The following two constants must be tuned together.
+    // A higher speed threshold may result in the benign libfranka exception:
+    //    Motion finished commanded, but the robot is still moving!
+    //    ["joint_motion_generator_acceleration_discontinuity"]
     static const double CONV_ANGLE_THRESHOLD {0.001};  // rad, empirical
-    static const double CONV_SPEED_THRESHOLD {0.010};  // rad/s, L2 norm
+    static const double CONV_SPEED_THRESHOLD {0.009};  // rad/s, L2 norm
 
     // Maximum change in joint angle between two confs
     const double max_joint_err {
@@ -747,14 +750,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         if (error_eigen(i) > CONV_ANGLE_THRESHOLD) {
           dexai::log()->warn(
               "JointPositionCallback: plan {} overtime, diverged, joint {} "
-              "error: {} - {} = {} > max allowable: {}",
+              "error: {:.4f} - {:.4f} = {:.4f} > max allowable: {}",
               plan_utime_, i, end_conf_plan_(i), current_conf_franka(i),
               error_eigen(i), CONV_ANGLE_THRESHOLD);
         }
       }
     }
     // terminate plan if grace period has ended and still not converged
-    if (franka_time_ > (plan_->end_time() + 0.2)) {  // 200ms
+    if (franka_time_ > (plan_->end_time() + 0.2)) {  // 200 ms
       dexai::log()->error(
           "JointPositionCallback: plan {} overtime by {:.3f} s, grace period "
           "exceeded, "
