@@ -109,9 +109,13 @@ class FrankaPlanRunner {
   float stop_margin_counter_ = 0;
   int cur_plan_number_ = -1;  // for ensuring the plan is new
 
-  // Franka supports up to 1 kHz, but here we use 200 Hz, because cobots
-  // typically have resonance ~20 Hz in the mechanical structure.
-  // As a rule of thumb, we choose 10x the mechanical closed loop response freq.
+  // We control the robot at 1 kHz using the callback function
+  // which gets called by the robot at 1 kHz over direct eithernet.
+  // But we publish robot status via LCM over another ethernet connection
+  // at 200 Hz which is frequent enough.
+  // One considertion is that typically robots have resonance ~20 Hz
+  // in the mechanical structure.
+  // 10x the mechanical closed loop response frequency is a rule of thumb.
   // This way we don't alias in other frequencies, and are able to synthesize
   // frequency components in the region we care about with high fidelity
   const double lcm_publish_rate_ {200.0};  // Hz

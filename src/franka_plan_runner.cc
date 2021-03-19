@@ -408,6 +408,9 @@ int FrankaPlanRunner::RunSim() {
   status_ = RobotStatus::Running;  // define robot as running at start
 
   while (true) {
+    // The actual callback control loop runs at 1 kHz, here it's pegged to
+    // the lcm_publish_rate_ to avoid excessive CPU usage in simulations.
+    // The loop frequency here in no way reflects the real-world frequency.
     std::this_thread::sleep_for(std::chrono::milliseconds(
         static_cast<int>(1000.0 / lcm_publish_rate_)));
 
