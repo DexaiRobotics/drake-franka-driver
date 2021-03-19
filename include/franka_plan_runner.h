@@ -107,8 +107,8 @@ class FrankaPlanRunner {
   float target_stop_time_;
   float stop_duration_;
   float stop_margin_counter_ = 0;
-  int cur_plan_number_ = -1;               // for ensuring the plan is new
-  const double lcm_publish_rate_ = 200.0;  // Hz
+  int cur_plan_number_ = -1;                // for ensuring the plan is new
+  const double lcm_publish_rate_ = 1000.0;  // Hz
 
   Eigen::MatrixXd joint_limits_;
   float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
@@ -128,7 +128,10 @@ class FrankaPlanRunner {
   Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
-  const double allowable_max_angle_error_ {0.001};  // empirically proven
+
+  // the following two constants must be tuned together
+  static const double allowable_max_angle_error_ {0.001};  // rad, empirical
+  static const double allowable_max_speed_error_ {0.003};  // rad/s, L2 norm
 
   // Collision torque thresholds for each joint in [Nm].
   const std::array<double, 7> kHighTorqueThreshold {100.0, 100.0, 100.0, 100.0,

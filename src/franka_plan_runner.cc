@@ -386,7 +386,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
 }
 
 int FrankaPlanRunner::RunSim() {
-  dexai::log()->info("Starting sim robot.");
+  dexai::log()->info("Starting sim robot and entering run loop...");
   comm_interface_->PublishDriverStatus(true);
 
   // first, set some parameters
@@ -712,14 +712,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         utils::v_to_e(ArrayToVector(cannonical_robot_state.dq)).norm()};
     dexai::log()->warn(
         "JointPositionCallback: plan {} overtime, "
-        "franka_t = {}, max joint err = {}, dq norm = {}",
+        "franka_t = {:.4f}, max joint err = {:.4f}, dq norm = {:.4f}",
         plan_utime_, franka_time_, max_joint_err, dq_norm);
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= allowable_max_angle_error_
-        && dq_norm <= allowable_max_angle_error_) {
-      dexai::log()->info(
-          "JointPositionCallback: plan {} overtime, converged, exiting "
-          "controller");
+        && dq_norm <= allowable_max_speed_error_) {
+      dexai::log()->warn(
+          "JointPositionCallback: plan {} overtime, "
+          "converged within grace period, motion finished cleanly",
+          plan_utime_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
       plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
@@ -740,17 +741,19 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     }
     // terminate plan if grace period has ended and still not converged
     if (franka_time_ > (plan_->end_time() + 0.5)) {  // 500ms
-      dexai::log()->warn(
-          "JointPositionCallback: plan {} overtime, aborted after grace "
-          "period");
+      dexai::log()->error(
+          "JointPositionCallback: plan {} overtime, grace period exceeded, "
+          "motion aborted",
+          plan_utime_);
       comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
       plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(output_to_franka);
     }
-    dexai::log()->info(
+    dexai::log()->warn(
         "JointPositionCallback: plan {} overtime, diverged or still moving, "
-        "within allowed grace period");
+        "within allowed grace period",
+        plan_utime_);
   }
   return output_to_franka;
 }
