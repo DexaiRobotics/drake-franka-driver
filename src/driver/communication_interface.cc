@@ -250,16 +250,8 @@ void CommunicationInterface::PublishRobotStatus() {
 
     lcm_.publish(params_.lcm_status_channel, &franka_status);
 
-    // publish true to user_stop_channel if U-stop is simulated
-    if(sim_u_stop){
-      PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
-                           true);
-    }
-    // otherwise publish current franka U-stop status
-    else{
-      PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
+    PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
                            current_mode == franka::RobotMode::kUserStopped);
-    }
 
     PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
                          current_mode == franka::RobotMode::kOther);
@@ -487,8 +479,6 @@ void CommunicationInterface::HandlePause(
           source);
       break;
   }
-  // set previous pause state for pause logging
-  prev_pause_state = paused;
 
   // if the set of pause sources is empty, then
   // the robot is not paused anymore:
