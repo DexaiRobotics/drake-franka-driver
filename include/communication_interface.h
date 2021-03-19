@@ -57,6 +57,13 @@ class CommunicationInterface {
   void StartInterface();
   void StopInterface();
 
+  bool SimControlExceptionTriggered() const {
+    return sim_control_exception_triggered_;
+  };
+  void ClearSimControlExceptionTrigger() {
+    sim_control_exception_triggered_ = false;
+  };
+
   bool HasNewPlan();
   void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
 
@@ -106,9 +113,17 @@ class CommunicationInterface {
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
                    const robot_msgs::pause_cmd* pause_cmd_msg);
 
+  /// Handler for control exception and u-stop triggers for simulated driver so
+  /// we can test full spectrum of driver states.
+  void HandleSimDriverEventTrigger(
+      const ::lcm::ReceiveBuffer*, const std::string&,
+      const robot_msgs::pause_cmd* trigger_cmd_msg);
+
  private:
   RobotParameters params_;
   std::atomic_bool running_ {false};
+  std::atomic<bool> sim_control_exception_triggered_ {false};
+
   ::lcm::LCM lcm_;
 
   RobotPiecewisePolynomial robot_plan_;
@@ -127,6 +142,7 @@ class CommunicationInterface {
   std::string lcm_pause_status_channel_;
   std::string lcm_user_stop_channel_;
   std::string lcm_brakes_locked_channel_;
+  std::string lcm_sim_driver_event_trigger_channel_;
 
   double lcm_publish_rate_;  // Hz
 };
