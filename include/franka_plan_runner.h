@@ -57,6 +57,7 @@ class FrankaPlanRunner {
   int RunFranka();
 
   bool RecoverFromControlException(franka::Robot& robot);
+  bool RecoverFromControlException();
 
   int RunSim();
 

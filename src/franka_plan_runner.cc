@@ -364,10 +364,13 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   //   }
   //   dexai::log()->info("RunFranka: Finished reversing!");
   // }
-
   dexai::log()->info("RunFranka: Turning Safety on again!");
   SetCollisionBehaviorSafetyOn(robot);
   dexai::log()->info("RunFranka: Turned Safety on again!");
+  return RecoverFromControlException();
+}
+
+bool FrankaPlanRunner::RecoverFromControlException() {
   status_ = RobotStatus::Running;
   if (plan_) {
     dexai::log()->warn(
@@ -406,7 +409,7 @@ int FrankaPlanRunner::RunSim() {
 
   status_ = RobotStatus::Running;  // define robot as running at start
 
-  while (1) {
+  while (true) {
     std::this_thread::sleep_for(std::chrono::milliseconds(
         static_cast<int>(1000.0 / lcm_publish_rate_)));
 
@@ -603,6 +606,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // set current_conf
   Eigen::VectorXd current_conf_franka =
       utils::v_to_e(ArrayToVector(cannonical_robot_state.q_d));
+
+  if (comm_interface_->SimControlExceptionTriggered()) {
+    dexai::log()->warn("Simulating control exception!");
+    RecoverFromControlException();
+    comm_interface_->ClearSimControlExceptionTrigger();
+    // return current joint positions instead of running plan through to
+    // completion
+    franka::JointPositions joint_pos = robot_state.q;
+    return franka::MotionFinished(joint_pos);
+  }
 
   if (comm_interface_->HasNewPlan()) {
     // get the current plan from the communication interface
