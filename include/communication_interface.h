@@ -116,8 +116,6 @@ class CommunicationInterface {
                   const lcmtypes::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
                    const robot_msgs::pause_cmd* pause_cmd_msg);
-  void HandleUserStop(const ::lcm::ReceiveBuffer*, const std::string&,
-                      const robot_msgs::bool_t* user_stop_msg);
 
   /// Handler for control exception and u-stop triggers for simulated driver so
   /// we can test full spectrum of driver states.
@@ -150,9 +148,6 @@ class CommunicationInterface {
   std::string lcm_sim_driver_event_trigger_channel_;
 
   std::string lcm_user_stop_channel_;
-  std::string sim_u_stop_source;
-  bool sim_u_stop {false};
-  bool prev_pause_state {false};
 
   double lcm_publish_rate_;  // Hz
 };
