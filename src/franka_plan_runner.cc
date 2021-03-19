@@ -553,6 +553,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       // allowed to continue
       stop_margin_counter_ += period_in_seconds;
     } else {
+      // transition to paused state
       comm_interface_->SetPauseStatus(true);
       status_ = RobotStatus::Paused;
       dexai::log()->warn(
@@ -561,6 +562,29 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
           " and stop_margin_counter_: {}",
           utils::RobotStatusToString(status_), delta_franka_time,
           stop_duration_, stop_margin_counter_);
+      if (comm_interface_->CancelPlanRequested()) {
+        dexai::log()->info(
+            "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Received "
+            "cancel plan request");
+        comm_interface_->ClearCancelPlanRequest();
+        if (plan_) {
+          comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
+          // releasing finished plan:
+          plan_.release();
+          plan_utime_ = -1;  // reset plan to -1
+        }
+        if (comm_interface_->GetPauseSources().empty()) {
+          dexai::log()->info(
+              "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pause source "
+              "set empty after canceling plan, changed state back to running");
+          comm_interface_->SetPauseStatus(false);
+          status_ = RobotStatus::Running;
+        }
+      } else {
+        dexai::log()->info(
+            "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Cancel plan "
+            "not requested");
+      }
     }
   } else if (status_ == RobotStatus::Unpausing) {
     if (timestep_ >= 0) {
@@ -666,18 +690,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         "controller...");
     comm_interface_->TryToSetRobotData(cannonical_robot_state,
                                        start_conf_franka_);
-    comm_interface_->ClearCancelPlanRequest();
 
-    return franka::MotionFinished(output_to_franka);
-  }
-
-  if (comm_interface_->CancelPlanRequested()) {
-    dexai::log()->warn("Canceling plan!");
-    comm_interface_->ClearCancelPlanRequest();
-    comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
-    // releasing finished plan:
-    plan_.release();
-    plan_utime_ = -1;  // reset plan to -1
     return franka::MotionFinished(output_to_franka);
   }
 

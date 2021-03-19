@@ -65,7 +65,11 @@ class CommunicationInterface {
   };
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; };
-  void ClearCancelPlanRequest() { cancel_plan_requested_ = false; };
+  void ClearCancelPlanRequest() {
+    std::scoped_lock<std::mutex> lock {pause_mutex_};
+    cancel_plan_requested_ = false;
+    pause_data_.pause_sources_set_.erase("cancel_plan");
+  };
 
   bool HasNewPlan();
   void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
@@ -84,6 +88,9 @@ class CommunicationInterface {
                          const Eigen::VectorXd& robot_plan_next_conf);
 
   bool GetPauseStatus();
+  std::set<std::string> GetPauseSources() const {
+    return pause_data_.pause_sources_set_;
+  };
   void SetPauseStatus(bool paused);
 
   void PublishPlanComplete(const int64_t& plan_utime, bool success = true,
