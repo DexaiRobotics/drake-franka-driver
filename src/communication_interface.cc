@@ -411,7 +411,7 @@ void CommunicationInterface::HandlePlan(
 void CommunicationInterface::HandlePause(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::pause_cmd* pause_cmd_msg) {
-  std::lock_guard<std::mutex> lock(pause_mutex_);
+  std::lock_guard<std::mutex> lock {pause_mutex_};
   // check if paused = true or paused = false was received:
   auto source {pause_cmd_msg->source};
 
@@ -420,7 +420,7 @@ void CommunicationInterface::HandlePause(
 
   switch (pause_type) {
     case PauseCommandType::CANCEL_PLAN: {
-      std::scoped_lock<std::mutex> lock(robot_plan_mutex_);
+      std::scoped_lock<std::mutex> plan_lock {robot_plan_mutex_};
       if (robot_plan_.has_plan_data) {
         dexai::log()->error(
             "CommInterface:HandlePause: Received cancel plan request!");
