@@ -20,6 +20,7 @@
 #include "robot_msgs/pause_cmd.hpp"  // for pause_cmd
 #include "robot_msgs/trigger_t.hpp"  // for trigger_t
 #include "util_conv.h"               // ConvertToLcmStatus
+
 // following is deprecated, see:
 // https://github.com/DexaiRobotics/drake-franka-driver/issues/54
 #include <chrono>  // for steady_clock, for duration
@@ -27,6 +28,8 @@
 #include "polynomial_encode_decode.h"  // for decodePiecewisePolynomial
 
 using namespace franka_driver;
+
+using PauseCommandType = utils::PauseCommandType;
 
 CommunicationInterface::CommunicationInterface(const RobotParameters params,
                                                double lcm_publish_rate)
@@ -71,9 +74,9 @@ void CommunicationInterface::ResetData() {
 
   // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
-  robot_plan_.has_plan_data_ = false;  // no new plan
-  robot_plan_.plan_.release();         // unique ptr points to no plan
-  robot_plan_.utime = -1;              // utime set to -1 at start
+  robot_plan_.has_plan_data = false;  // no new plan
+  robot_plan_.plan.release();         // unique ptr points to no plan
+  robot_plan_.utime = -1;             // utime set to -1 at start
   lock_plan.unlock();
 
   // initialize pause as false:
@@ -115,17 +118,17 @@ void CommunicationInterface::StopInterface() {
 };
 
 bool CommunicationInterface::HasNewPlan() {
-  return robot_plan_.has_plan_data_;  // is atomic
+  return robot_plan_.has_plan_data;  // is atomic
 }
 
 void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
                                       int64_t& plan_utime) {
   std::lock_guard<std::mutex> lock(robot_plan_mutex_);
-  if (!HasNewPlan() || !(robot_plan_.plan_)) {
+  if (!HasNewPlan() || !(robot_plan_.plan)) {
     throw std::runtime_error("TakePlan: No plan to take over!");
   }
-  robot_plan_.has_plan_data_ = false;
-  plan = std::move(robot_plan_.plan_);
+  robot_plan_.has_plan_data = false;
+  plan = std::move(robot_plan_.plan);
   if (!plan) {
     throw std::runtime_error("TakePlan: Failed to take plan!");
   }
@@ -168,8 +171,8 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
 
 void CommunicationInterface::PublishPlanComplete(
     const int64_t& plan_utime, bool success, std::string plan_status_string) {
-  robot_plan_.plan_.release();
-  robot_plan_.has_plan_data_ = false;
+  robot_plan_.plan.release();
+  robot_plan_.has_plan_data = false;
   PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
                           success, plan_status_string);
 }
@@ -385,8 +388,8 @@ void CommunicationInterface::HandlePlan(
         "CommunicationInterface::HandlePlan: "
         "Discarding plan {}, mismatched start position with delta: {}.",
         robot_spline->utime, joint_delta.transpose());
-    robot_plan_.has_plan_data_ = false;
-    robot_plan_.plan_.release();
+    robot_plan_.has_plan_data = false;
+    robot_plan_.plan.release();
     lock.unlock();
     PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
                         "mismatched_start_position");
@@ -394,11 +397,11 @@ void CommunicationInterface::HandlePlan(
   }
 
   // plan is valid, so release old one first
-  robot_plan_.has_plan_data_ = false;
-  robot_plan_.plan_.release();
+  robot_plan_.has_plan_data = false;
+  robot_plan_.plan.release();
   // assign new plan:
-  robot_plan_.plan_ = std::make_unique<PPType>(piecewise_polynomial);
-  robot_plan_.has_plan_data_ = true;
+  robot_plan_.plan = std::make_unique<PPType>(piecewise_polynomial);
+  robot_plan_.has_plan_data = true;
   lock.unlock();
 
   dexai::log()->debug("CommunicationInterface::HandlePlan: Finished!");

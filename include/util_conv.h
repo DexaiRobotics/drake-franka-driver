@@ -17,8 +17,11 @@ enum class RobotStatus {
   Pausing,
   Paused,
   Unpausing,
-  Reversing
+  Reversing,
+  Canceling
 };
+
+enum PauseCommandType { CONTINUE = 0, PAUSE = 1, CANCEL_PLAN = 2 };
 
 // Status Conversions:
 

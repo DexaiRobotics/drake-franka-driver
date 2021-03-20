@@ -44,9 +44,9 @@ struct PauseData {
 };
 
 struct RobotPiecewisePolynomial {
-  std::atomic<bool> has_plan_data_;
+  std::atomic<bool> has_plan_data;
   int64_t utime;
-  std::unique_ptr<PPType> plan_;
+  std::unique_ptr<PPType> plan;
 };
 
 class CommunicationInterface {
