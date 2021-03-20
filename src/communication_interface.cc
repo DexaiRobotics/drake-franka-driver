@@ -419,11 +419,19 @@ void CommunicationInterface::HandlePause(
       static_cast<PauseCommandType>(pause_cmd_msg->data)};
 
   switch (pause_type) {
-    case PauseCommandType::CANCEL_PLAN:
-      dexai::log()->error(
-          "CommInterface:HandlePause: Received cancel plan request!");
-      cancel_plan_requested_ = true;
+    case PauseCommandType::CANCEL_PLAN: {
+      std::scoped_lock<std::mutex> lock(robot_plan_mutex_);
+      if (robot_plan_.has_plan_data) {
+        dexai::log()->error(
+            "CommInterface:HandlePause: Received cancel plan request!");
+        cancel_plan_requested_ = true;
+      } else {
+        dexai::log()->error(
+            "CommInterface:HandlePause: Received cancel plan request with no "
+            "active plan!");
+      }
       return;
+    }
     case PauseCommandType::PAUSE:
       dexai::log()->warn(
           "CommInterface:HandlePause: Received pause command from '{}'",
