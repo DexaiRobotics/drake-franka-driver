@@ -90,8 +90,7 @@ void CommunicationInterface::StartInterface() {
   // Initialize data as empty for exchange with robot driver
   ResetData();
   // start LCM threads; independent of sim vs. real robot
-  dexai::log()->info(
-      "CommunicationInterface::StartInterface: Start LCM threads");
+  dexai::log()->info("CommInterface:StartInterface: Start LCM threads");
   running_ = true;  // sets the lcm threads to active.
   lcm_publish_status_thread_ =
       std::thread(&CommunicationInterface::PublishLcmAndPauseStatus, this);
@@ -99,21 +98,19 @@ void CommunicationInterface::StartInterface() {
 };
 
 void CommunicationInterface::StopInterface() {
-  dexai::log()->info(
-      "CommunicationInterface::StopInterface: Before LCM threads join");
+  dexai::log()->info("CommInterface:StopInterface: Before LCM threads join");
   // clean-up threads if they're still alive.
   running_ = false;  // sets the lcm threads to inactive.
   while (!lcm_handle_thread_.joinable()
          || !lcm_publish_status_thread_.joinable()) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     dexai::log()->warn(
-        "CommunicationInterface::StopInterface: Waiting for LCM threads to be "
+        "CommInterface:StopInterface: Waiting for LCM threads to be "
         "joinable...");
   }
   lcm_publish_status_thread_.join();
   lcm_handle_thread_.join();
-  dexai::log()->info(
-      "CommunicationInterface::StopInterface: After LCM thread join");
+  dexai::log()->info("CommInterface:StopInterface: After LCM thread join");
   ResetData();
 };
 
@@ -171,6 +168,10 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
 
 void CommunicationInterface::PublishPlanComplete(
     const int64_t& plan_utime, bool success, std::string plan_status_string) {
+  log()->warn(
+      "CommInterface:PublishPlanComplete: Publishing success: {} for plan {} "
+      "with status: {}",
+      success, plan_utime, plan_status_string);
   robot_plan_.plan.release();
   robot_plan_.has_plan_data = false;
   PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
@@ -208,7 +209,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
       std::chrono::milliseconds time_elapsed_ms =
           std::chrono::duration_cast<std::chrono::milliseconds>(time_elapsed);
       dexai::log()->warn(
-          "CommunicationInterface::PublishLcmAndPauseStatus:"
+          "CommInterface:PublishLcmAndPauseStatus:"
           " publish took too long with {} ms > {} ms!",
           time_elapsed_ms.count(), 1000.0 / lcm_publish_rate_);
     }
@@ -320,7 +321,7 @@ bool CommunicationInterface::CanReceiveCommands(
 void CommunicationInterface::HandlePlan(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const lcmtypes::robot_spline_t* robot_spline) {
-  dexai::log()->info("CommunicationInterface::HandlePlan: Received new plan {}",
+  dexai::log()->info("CommInterface:HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
   const auto current_mode {GetRobotMode()};
@@ -330,7 +331,7 @@ void CommunicationInterface::HandlePlan(
     const auto err_msg {fmt::format(
         "Discarding plan with utime: {}, robot is in wrong mode: {}!",
         robot_spline->utime, utils::RobotModeToString(current_mode))};
-    dexai::log()->error("CommunicationInterface::HandlePlan: {}", err_msg);
+    dexai::log()->error("CommInterface:HandlePlan: {}", err_msg);
     PublishDriverStatus(false, err_msg);
     return;
   }
@@ -338,7 +339,7 @@ void CommunicationInterface::HandlePlan(
   std::unique_lock<std::mutex> lock(robot_plan_mutex_, std::defer_lock);
   while (!lock.try_lock()) {
     dexai::log()->warn(
-        "CommunicationInterface::HandlePlan: trying to get a lock on the "
+        "CommInterface:HandlePlan: trying to get a lock on the "
         "robot_plan_mutex_. Sleeping 1 ms and trying again.");
     std::this_thread::sleep_for(
         std::chrono::milliseconds(static_cast<int>(1.0)));
@@ -348,7 +349,7 @@ void CommunicationInterface::HandlePlan(
   // publish confirmation that plan was received with same utime
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
   dexai::log()->info(
-      "CommunicationInterface::HandlePlan: "
+      "CommInterface:HandlePlan: "
       "Published confirmation of received plan {}",
       robot_spline->utime);
 
@@ -357,15 +358,15 @@ void CommunicationInterface::HandlePlan(
 
   if (piecewise_polynomial.get_number_of_segments() < 1) {
     dexai::log()->error(
-        "CommunicationInterface::HandlePlan: "
+        "CommInterface:HandlePlan: "
         "Discarding plan, invalid piecewise polynomial.");
     lock.unlock();
     return;
   }
 
   dexai::log()->info(
-      "CommunicationInterface::HandlePlan: "
-      "plan {}: start time: {}, end time: {}",
+      "CommInterface:HandlePlan: "
+      "plan {}: start time: {:.2f}, end time: {:.2f}",
       robot_spline->utime, piecewise_polynomial.start_time(),
       piecewise_polynomial.end_time());
 
@@ -385,7 +386,7 @@ void CommunicationInterface::HandlePlan(
     // discard the plan if we are too far away from current robot start
     Eigen::VectorXd joint_delta = q_eigen - commanded_start;
     dexai::log()->error(
-        "CommunicationInterface::HandlePlan: "
+        "CommInterface:HandlePlan: "
         "Discarding plan {}, mismatched start position with delta: {}.",
         robot_spline->utime, joint_delta.transpose());
     robot_plan_.has_plan_data = false;
@@ -404,7 +405,7 @@ void CommunicationInterface::HandlePlan(
   robot_plan_.has_plan_data = true;
   lock.unlock();
 
-  dexai::log()->debug("CommunicationInterface::HandlePlan: Finished!");
+  dexai::log()->debug("CommInterface:HandlePlan: Finished!");
 };
 
 void CommunicationInterface::HandlePause(
@@ -427,16 +428,14 @@ void CommunicationInterface::HandlePause(
 
   if (desired_pause) {
     dexai::log()->warn(
-        "CommunicationInterface::HandlePause: Received pause command from {}",
-        source);
+        "CommInterface:HandlePause: Received pause command from {}", source);
     if (pause_data_.pause_sources.insert(source).second == false) {
       dexai::log()->warn(
-          "CommunicationInterface::HandlePause: Already paused by source: {}",
-          source);
+          "CommInterface:HandlePause: Already paused by source: {}", source);
     }
   } else {
     dexai::log()->warn(
-        "CommunicationInterface::HandlePause: Received continue command from "
+        "CommInterface:HandlePause: Received continue command from "
         "{}",
         source);
     if (pause_data_.pause_sources.find(source)
@@ -470,13 +469,13 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
   // simulate control exception
   if (desired_event == "control_exception") {
     dexai::log()->error(
-        "CommunicationInterface:HandleSimDriverEventTrigger: received command "
+        "CommInterface:HandleSimDriverEventTrigger: received command "
         "to simulate control exception!");
     sim_control_exception_triggered_ = true;
     return;
   } else {
     dexai::log()->error(
-        "CommunicationInterface:HandleSimDriverEventTrigger: Unrecognized "
+        "CommInterface:HandleSimDriverEventTrigger: Unrecognized "
         "trigger {}!",
         desired_event);
   }
