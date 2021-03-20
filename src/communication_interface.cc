@@ -417,7 +417,6 @@ void CommunicationInterface::HandlePause(
 
   PauseCommandType desired_pause {
       static_cast<PauseCommandType>(pause_cmd_msg->data)};
-  auto source {pause_cmd_msg->source};
 
   if (desired_pause == PauseCommandType::CANCEL_PLAN) {
     dexai::log()->error(

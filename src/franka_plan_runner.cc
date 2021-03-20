@@ -595,8 +595,9 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
   } else if (status_ == RobotStatus::Paused) {
     // do nothing
     if (cancel_plan_requested) {
-      dexai::log()->info(
-          "IncreaseFrankaTimeBasedOnStatus: Cancel plan requested");
+      dexai::log()->warn(
+          "IncreaseFrankaTimeBasedOnStatus: Paused successfully after "
+          "canceling plan.");
       comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
       plan_.release();
       plan_utime_ = -1;  // reset plan to -1
