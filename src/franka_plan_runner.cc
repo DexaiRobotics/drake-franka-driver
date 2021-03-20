@@ -592,15 +592,19 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     // } else if (status_ == RobotStatus::Reversing) {
     //   // walk back in time
     //   franka_time_ -= period_in_seconds;
-  } else if (status_ == RobotStatus::Paused) {
+  }
+
+  if (status_ == RobotStatus::Paused) {
     // do nothing
     if (cancel_plan_requested) {
-      dexai::log()->warn(
-          "IncreaseFrankaTimeBasedOnStatus: Paused successfully after "
-          "canceling plan.");
-      comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
-      plan_.release();
-      plan_utime_ = -1;  // reset plan to -1
+      if (plan_) {
+        dexai::log()->warn(
+            "IncreaseFrankaTimeBasedOnStatus: Paused successfully after "
+            "canceling plan.");
+        comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
+        plan_.release();
+        plan_utime_ = -1;  // reset plan to -1
+      }
       comm_interface_->ClearCancelPlanRequest();
       // check if robot is paused by other sources, or only pausing because the
       // plan was canceled. if the plan was canceled, and the robot is not
@@ -697,8 +701,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         "controller...");
     comm_interface_->TryToSetRobotData(cannonical_robot_state,
                                        start_conf_franka_);
-    comm_interface_->ClearCancelPlanRequest();
-
     return franka::MotionFinished(output_to_franka);
   }
 
