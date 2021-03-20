@@ -33,14 +33,14 @@ namespace franka_driver {
 
 // TODO: remove this franka specific state and make it generic:
 struct RobotData {
-  std::atomic<bool> has_robot_data_;
+  std::atomic<bool> has_robot_data;
   franka::RobotState robot_state;
   Eigen::VectorXd robot_plan_next_conf;
 };
 
 struct PauseData {
-  std::atomic<bool> paused_;
-  std::set<std::string> pause_sources_set_;
+  std::atomic<bool> paused;
+  std::set<std::string> pause_sources;
 };
 
 struct RobotPiecewisePolynomial {

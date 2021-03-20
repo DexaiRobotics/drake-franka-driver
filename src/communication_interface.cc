@@ -65,7 +65,7 @@ CommunicationInterface::CommunicationInterface(const RobotParameters params,
 
 void CommunicationInterface::ResetData() {
   std::unique_lock<std::mutex> lock_data(robot_data_mutex_);
-  robot_data_.has_robot_data_ = false;
+  robot_data_.has_robot_data = false;
   robot_data_.robot_state = franka::RobotState();
   lock_data.unlock();
 
@@ -78,8 +78,8 @@ void CommunicationInterface::ResetData() {
 
   // initialize pause as false:
   std::unique_lock<std::mutex> lock_pause(pause_mutex_);
-  pause_data_.paused_ = false;             // not paused at start
-  pause_data_.pause_sources_set_.clear();  // no pause sources at start
+  pause_data_.paused = false;         // not paused at start
+  pause_data_.pause_sources.clear();  // no pause sources at start
   lock_pause.unlock();
 }
 
@@ -141,7 +141,7 @@ void CommunicationInterface::SetRobotData(
     const franka::RobotState& robot_state,
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::lock_guard<std::mutex> lock(robot_data_mutex_);
-  robot_data_.has_robot_data_ = true;
+  robot_data_.has_robot_data = true;
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
 }
@@ -151,7 +151,7 @@ void CommunicationInterface::TryToSetRobotData(
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
   if (lock.try_lock()) {
-    robot_data_.has_robot_data_ = true;
+    robot_data_.has_robot_data = true;
     robot_data_.robot_state = robot_state;
     robot_data_.robot_plan_next_conf = robot_plan_next_conf;
     lock.unlock();
@@ -159,11 +159,11 @@ void CommunicationInterface::TryToSetRobotData(
 }
 
 bool CommunicationInterface::GetPauseStatus() {
-  return pause_data_.paused_;  // this is atomic
+  return pause_data_.paused;  // this is atomic
 }
 
 void CommunicationInterface::SetPauseStatus(bool paused) {
-  pause_data_.paused_ = paused;  // this is atomic
+  pause_data_.paused = paused;  // this is atomic
 }
 
 void CommunicationInterface::PublishPlanComplete(
@@ -216,12 +216,12 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
 void CommunicationInterface::PublishRobotStatus() {
   // Try to lock data to avoid read write collisions.
   std::unique_lock<std::mutex> lock(robot_data_mutex_);
-  if (robot_data_.has_robot_data_) {
+  if (robot_data_.has_robot_data) {
     drake::lcmt_iiwa_status franka_status =
         utils::ConvertToLcmStatus(robot_data_);
     // publish data over lcm
     franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
-    robot_data_.has_robot_data_ = false;
+    robot_data_.has_robot_data = false;
     lock.unlock();
 
     lcm_.publish(params_.lcm_status_channel, &franka_status);
@@ -238,10 +238,10 @@ void CommunicationInterface::PublishPauseStatus() {
   robot_msgs::trigger_t msg;
   msg.utime = utils::get_current_utime();
   std::unique_lock<std::mutex> lock(pause_mutex_);
-  msg.success = pause_data_.paused_;
+  msg.success = pause_data_.paused;
   msg.message = "";
-  if (pause_data_.paused_) {
-    for (auto elem : pause_data_.pause_sources_set_) {
+  if (pause_data_.paused) {
+    for (auto elem : pause_data_.pause_sources) {
       msg.message.append(elem);
       msg.message.append(",");
     }
@@ -426,7 +426,7 @@ void CommunicationInterface::HandlePause(
     dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received pause command from {}",
         source);
-    if (pause_data_.pause_sources_set_.insert(source).second == false) {
+    if (pause_data_.pause_sources.insert(source).second == false) {
       dexai::log()->warn(
           "CommunicationInterface::HandlePause: Already paused by source: {}",
           source);
@@ -436,9 +436,9 @@ void CommunicationInterface::HandlePause(
         "CommunicationInterface::HandlePause: Received continue command from "
         "{}",
         source);
-    if (pause_data_.pause_sources_set_.find(source)
-        != pause_data_.pause_sources_set_.end()) {
-      pause_data_.pause_sources_set_.erase(source);
+    if (pause_data_.pause_sources.find(source)
+        != pause_data_.pause_sources.end()) {
+      pause_data_.pause_sources.erase(source);
     } else {
       dexai::log()->warn(
           "Unpausing command rejected: No matching "
@@ -449,10 +449,10 @@ void CommunicationInterface::HandlePause(
 
   // if the set of pause sources is empty, then
   // the robot is not paused anymore:
-  if (pause_data_.pause_sources_set_.size() == 0) {
-    pause_data_.paused_ = false;
+  if (pause_data_.pause_sources.size() == 0) {
+    pause_data_.paused = false;
   } else {
-    pause_data_.paused_ = true;
+    pause_data_.paused = true;
   }
 }
 
