@@ -602,6 +602,22 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       plan_.release();
       plan_utime_ = -1;  // reset plan to -1
       comm_interface_->ClearCancelPlanRequest();
+      // check if robot is paused by other sources, or only pausing because the
+      // plan was canceled. if the plan was canceled, and the robot is not
+      // paused, we want to go back to regular running mode. if the robot was
+      // already paused and the plan was canceled, we want to remain paused
+      if (comm_interface_->GetPauseSources().empty()) {
+        dexai::log()->warn(
+            "IncreaseFrankaTimeBasedOnStatus: Plan canceled successfully, "
+            "transitioning to idle.");
+        // transition to idle
+        comm_interface_->SetPauseStatus(false);
+        status_ = RobotStatus::Running;
+      } else {
+        dexai::log()->warn(
+            "IncreaseFrankaTimeBasedOnStatus: Plan canceled successfully, "
+            "but robot is still paused.");
+      }
     }
   }
 }

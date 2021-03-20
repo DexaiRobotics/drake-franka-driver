@@ -85,6 +85,9 @@ class CommunicationInterface {
 
   bool GetPauseStatus();
   void SetPauseStatus(bool paused);
+  std::set<std::string> GetPauseSources() const {
+    return pause_data_.pause_sources;
+  };
 
   void PublishPlanComplete(const int64_t& plan_utime, bool success = true,
                            std::string driver_status_string = "");
