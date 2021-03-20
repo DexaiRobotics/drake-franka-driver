@@ -617,6 +617,9 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
         dexai::log()->warn(
             "IncreaseFrankaTimeBasedOnStatus: Plan canceled successfully, "
             "but robot is still paused.");
+        // reset since the previous plan was canceled, we can unpause instantly
+        target_stop_time_ = 0;
+        stop_duration_ = 0;
       }
     }
   }
