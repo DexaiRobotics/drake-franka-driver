@@ -33,19 +33,19 @@ namespace franka_driver {
 
 // TODO: remove this franka specific state and make it generic:
 struct RobotData {
-  std::atomic<bool> has_robot_data_;
+  std::atomic<bool> has_robot_data;
   franka::RobotState robot_state;
   Eigen::VectorXd robot_plan_next_conf;
 };
 
 struct PauseData {
-  std::atomic<bool> paused_;
-  std::set<std::string> pause_sources_set_;
+  std::atomic<bool> paused;
+  std::set<std::string> pause_sources;
 };
 
 struct RobotPiecewisePolynomial {
   int64_t utime;
-  std::unique_ptr<PPType> plan_;
+  std::unique_ptr<PPType> plan;
 };
 
 class CommunicationInterface {
@@ -62,6 +62,9 @@ class CommunicationInterface {
   void ClearSimControlExceptionTrigger() {
     sim_control_exception_triggered_ = false;
   };
+
+  bool CancelPlanRequested() const { return cancel_plan_requested_; };
+  void ClearCancelPlanRequest() { cancel_plan_requested_ = false; };
 
   bool HasNewPlan();
   std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
@@ -81,6 +84,9 @@ class CommunicationInterface {
 
   bool GetPauseStatus();
   void SetPauseStatus(bool paused);
+  std::set<std::string> GetPauseSources() const {
+    return pause_data_.pause_sources;
+  };
 
   void PublishPlanComplete(const int64_t& plan_utime, bool success = true,
                            std::string driver_status_string = "");
@@ -122,6 +128,7 @@ class CommunicationInterface {
   RobotParameters params_;
   std::atomic_bool running_ {false};
   std::atomic<bool> sim_control_exception_triggered_ {false};
+  std::atomic<bool> cancel_plan_requested_ {false};
 
   ::lcm::LCM lcm_;
 

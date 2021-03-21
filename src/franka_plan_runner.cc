@@ -262,6 +262,10 @@ int FrankaPlanRunner::RunFranka() {
                                   this, std::placeholders::_1,
                                   std::placeholders::_2));
         } else {
+          if (comm_interface_->CancelPlanRequested()) {
+            log()->error("Cancel plan requested with no active plan!");
+            comm_interface_->ClearCancelPlanRequest();
+          }
           // no plan available or paused
           // print out status if there's any change or every 10 sec
           if (auto t_now {std::chrono::steady_clock::now()};
@@ -465,11 +469,11 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     const std::array<double, 7>& vel, double period_in_seconds) {
   // get pause data from the communication interface
   auto paused = comm_interface_->GetPauseStatus();
-
+  auto cancel_plan_requested = comm_interface_->CancelPlanRequested();
   // robot can be in four states: running, pausing, paused, unpausing
 
   // check if robot is supposed to be paused
-  if (paused && status_ == RobotStatus::Running) {
+  if ((paused || cancel_plan_requested) && status_ == RobotStatus::Running) {
     timestep_ = 1;             // set time step back to 1
     stop_duration_ = 0;        // reset stop duration
     stop_margin_counter_ = 0;  // reset margin counter
@@ -489,8 +493,8 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     target_stop_time_ = temp_target_stop_time_;
     status_ = RobotStatus::Pausing;
     dexai::log()->warn(
-        "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: "
-        "{} with target_stop_time_: {}",
+        "IncreaseFrankaTimeBasedOnStatus: "
+        "{} with target_stop_time_: {:.2f}",
         utils::RobotStatusToString(status_), target_stop_time_);
   }
 
@@ -500,7 +504,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     timestep_ = -1 * stop_duration_;
     status_ = RobotStatus::Unpausing;
     dexai::log()->warn(
-        "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: "
+        "IncreaseFrankaTimeBasedOnStatus: "
         "{} with new timestep_: {}",
         utils::RobotStatusToString(status_), timestep_);
   }
@@ -510,7 +514,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
         period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += delta_franka_time;
     dexai::log()->debug(
-        "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Pausing: "
+        "IncreaseFrankaTimeBasedOnStatus: Pausing: "
         "delta_franka_time: {}",
         delta_franka_time);
     timestep_++;
@@ -524,12 +528,13 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       // allowed to continue
       stop_margin_counter_ += period_in_seconds;
     } else {
+      // transition to paused state
       comm_interface_->SetPauseStatus(true);
       status_ = RobotStatus::Paused;
       dexai::log()->warn(
-          "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: "
-          "{} with delta_franka_time: {}, stop_duration_: {}"
-          " and stop_margin_counter_: {}",
+          "IncreaseFrankaTimeBasedOnStatus: "
+          "{} with delta_franka_time: {}, stop_duration_: {:.1f}"
+          " and stop_margin_counter_: {:.2f}",
           utils::RobotStatusToString(status_), delta_franka_time,
           stop_duration_, stop_margin_counter_);
     }
@@ -540,7 +545,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       comm_interface_->SetPauseStatus(false);
       status_ = RobotStatus::Running;
       dexai::log()->warn(
-          "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: "
+          "IncreaseFrankaTimeBasedOnStatus: "
           "{} with final timestep_: {}",
           utils::RobotStatusToString(status_), timestep_);
     }
@@ -548,7 +553,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
         period_in_seconds, target_stop_time_, timestep_);
     franka_time_ += delta_franka_time;
     dexai::log()->info(
-        "FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus: Unpausing "
+        "IncreaseFrankaTimeBasedOnStatus: Unpausing "
         "delta_franka_time: {}",
         delta_franka_time);
     timestep_++;
@@ -559,8 +564,40 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     // } else if (status_ == RobotStatus::Reversing) {
     //   // walk back in time
     //   franka_time_ -= period_in_seconds;
-  } else if (status_ == RobotStatus::Paused) {
+  }
+
+  if (status_ == RobotStatus::Paused) {
     // do nothing
+    if (cancel_plan_requested) {
+      if (plan_) {
+        dexai::log()->warn(
+            "IncreaseFrankaTimeBasedOnStatus: Paused successfully after "
+            "canceling plan.");
+        comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
+        plan_.release();
+        plan_utime_ = -1;  // reset plan to -1
+      }
+      comm_interface_->ClearCancelPlanRequest();
+      // check if robot is paused by other sources, or only pausing because the
+      // plan was canceled. if the plan was canceled, and the robot is not
+      // paused, we want to go back to regular running mode. if the robot was
+      // already paused and the plan was canceled, we want to remain paused
+      if (comm_interface_->GetPauseSources().empty()) {
+        dexai::log()->warn(
+            "IncreaseFrankaTimeBasedOnStatus: Plan canceled successfully, "
+            "transitioning to idle.");
+        // transition to idle
+        comm_interface_->SetPauseStatus(false);
+        status_ = RobotStatus::Running;
+      } else {
+        dexai::log()->warn(
+            "IncreaseFrankaTimeBasedOnStatus: Plan canceled successfully, "
+            "but robot is still paused.");
+        // reset since the previous plan was canceled, we can unpause instantly
+        target_stop_time_ = 0;
+        stop_duration_ = 0;
+      }
+    }
   }
 }
 
