@@ -44,7 +44,6 @@ struct PauseData {
 };
 
 struct RobotPiecewisePolynomial {
-  std::atomic<bool> has_plan_data_;
   int64_t utime;
   std::unique_ptr<PPType> plan_;
 };
@@ -65,7 +64,7 @@ class CommunicationInterface {
   };
 
   bool HasNewPlan();
-  void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
+  std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
 
   // TODO: remove franka specific RobotState type and replace with std::array
   franka::RobotState GetRobotState();
@@ -77,8 +76,8 @@ class CommunicationInterface {
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf);
   /// Non-blocking call that sets the robot state if possible
-  void TryToSetRobotData(const franka::RobotState& robot_state,
-                         const Eigen::VectorXd& robot_plan_next_conf);
+  void SetRobotDataNonblocking(const franka::RobotState& robot_state,
+                               const Eigen::VectorXd& robot_plan_next_conf);
 
   bool GetPauseStatus();
   void SetPauseStatus(bool paused);
@@ -126,6 +125,9 @@ class CommunicationInterface {
 
   ::lcm::LCM lcm_;
 
+  // This is a buffer storing the new plan received. Capacility is only 1.
+  // Once this plan is popped (taken), this buffer is emptied and avialable
+  // to store a new plan, while the current plan may be running.
   RobotPiecewisePolynomial robot_plan_;
   std::mutex robot_plan_mutex_;
 

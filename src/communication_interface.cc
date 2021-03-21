@@ -71,9 +71,8 @@ void CommunicationInterface::ResetData() {
 
   // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
-  robot_plan_.has_plan_data_ = false;  // no new plan
-  robot_plan_.plan_.release();         // unique ptr points to no plan
-  robot_plan_.utime = -1;              // utime set to -1 at start
+  robot_plan_.plan_.release();  // unique ptr points to no plan
+  robot_plan_.utime = -1;       // utime set to -1 at start
   lock_plan.unlock();
 
   // initialize pause as false:
@@ -115,38 +114,35 @@ void CommunicationInterface::StopInterface() {
 };
 
 bool CommunicationInterface::HasNewPlan() {
-  return robot_plan_.has_plan_data_;  // is atomic
+  return !(robot_plan_.plan_ == nullptr);
 }
 
-void CommunicationInterface::TakePlan(std::unique_ptr<PPType>& plan,
-                                      int64_t& plan_utime) {
-  std::lock_guard<std::mutex> lock(robot_plan_mutex_);
-  if (!HasNewPlan() || !(robot_plan_.plan_)) {
-    throw std::runtime_error("TakePlan: No plan to take over!");
+std::tuple<std::unique_ptr<PPType>, int64_t>
+CommunicationInterface::PopNewPlan() {
+  std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
+  if (!HasNewPlan()) {
+    throw std::runtime_error(
+        "PopNewPlan: no buffered new plan available to pop!");
   }
-  robot_plan_.has_plan_data_ = false;
-  plan = std::move(robot_plan_.plan_);
-  if (!plan) {
-    throw std::runtime_error("TakePlan: Failed to take plan!");
-  }
-  plan_utime = robot_plan_.utime;
+  // std::move nullifies the unique ptr robot_plan_.plan_
+  return {std::move(robot_plan_.plan_), robot_plan_.utime};
 }
 
 franka::RobotState CommunicationInterface::GetRobotState() {
-  std::lock_guard<std::mutex> lock(robot_data_mutex_);
+  std::scoped_lock<std::mutex> lock {robot_data_mutex_};
   return robot_data_.robot_state;
 }
 
 void CommunicationInterface::SetRobotData(
     const franka::RobotState& robot_state,
     const Eigen::VectorXd& robot_plan_next_conf) {
-  std::lock_guard<std::mutex> lock(robot_data_mutex_);
+  std::scoped_lock<std::mutex> lock {robot_data_mutex_};
   robot_data_.has_robot_data_ = true;
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
 }
 
-void CommunicationInterface::TryToSetRobotData(
+void CommunicationInterface::SetRobotDataNonblocking(
     const franka::RobotState& robot_state,
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
@@ -169,7 +165,6 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
 void CommunicationInterface::PublishPlanComplete(
     const int64_t& plan_utime, bool success, std::string plan_status_string) {
   robot_plan_.plan_.release();
-  robot_plan_.has_plan_data_ = false;
   PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
                           success, plan_status_string);
 }
@@ -285,9 +280,8 @@ bool CommunicationInterface::CanReceiveCommands(
       return true;
     case franka::RobotMode::kMove:
       dexai::log()->warn(
-          "CanReceiveCommands: "
-          "Allowing to receive commands while in {}"
-          ", but this needs more testing!",
+          "CanReceiveCommands: allowing to receive commands while in "
+          "Move mode, but this needs more testing!",
           utils::RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kGuiding:
@@ -295,9 +289,8 @@ bool CommunicationInterface::CanReceiveCommands(
       return false;
     case franka::RobotMode::kReflex:
       dexai::log()->warn(
-          "CanReceiveCommands: "
-          "Allowing to receive commands while in {},"
-          " but this needs more testing!",
+          "CanReceiveCommands: allowing to receive commands while in "
+          "Reflex mode, but this needs more testing!",
           utils::RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kUserStopped:
@@ -332,15 +325,7 @@ void CommunicationInterface::HandlePlan(
     return;
   }
 
-  std::unique_lock<std::mutex> lock(robot_plan_mutex_, std::defer_lock);
-  while (!lock.try_lock()) {
-    dexai::log()->warn(
-        "CommunicationInterface::HandlePlan: trying to get a lock on the "
-        "robot_plan_mutex_. Sleeping 1 ms and trying again.");
-    std::this_thread::sleep_for(
-        std::chrono::milliseconds(static_cast<int>(1.0)));
-  }
-
+  std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   robot_plan_.utime = robot_spline->utime;
   // publish confirmation that plan was received with same utime
   PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
@@ -349,14 +334,13 @@ void CommunicationInterface::HandlePlan(
       "Published confirmation of received plan {}",
       robot_spline->utime);
 
-  PPType piecewise_polynomial =
-      decodePiecewisePolynomial(robot_spline->piecewise_polynomial);
+  PPType piecewise_polynomial {
+      decodePiecewisePolynomial(robot_spline->piecewise_polynomial)};
 
   if (piecewise_polynomial.get_number_of_segments() < 1) {
     dexai::log()->error(
         "CommunicationInterface::HandlePlan: "
         "Discarding plan, invalid piecewise polynomial.");
-    lock.unlock();
     return;
   }
 
@@ -367,7 +351,6 @@ void CommunicationInterface::HandlePlan(
       piecewise_polynomial.end_time());
 
   // Start position == goal position check
-  // TODO: add end position==goal position check (upstream)
   // TODO: change to append initial position and respline here
   Eigen::VectorXd commanded_start =
       piecewise_polynomial.value(piecewise_polynomial.start_time());
@@ -385,23 +368,15 @@ void CommunicationInterface::HandlePlan(
         "CommunicationInterface::HandlePlan: "
         "Discarding plan {}, mismatched start position with delta: {}.",
         robot_spline->utime, joint_delta.transpose());
-    robot_plan_.has_plan_data_ = false;
     robot_plan_.plan_.release();
-    lock.unlock();
     PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
                         "mismatched_start_position");
     return;
   }
-
-  // plan is valid, so release old one first
-  robot_plan_.has_plan_data_ = false;
-  robot_plan_.plan_.release();
-  // assign new plan:
   robot_plan_.plan_ = std::make_unique<PPType>(piecewise_polynomial);
-  robot_plan_.has_plan_data_ = true;
-  lock.unlock();
-
-  dexai::log()->debug("CommunicationInterface::HandlePlan: Finished!");
+  dexai::log()->info(
+      "CommunicationInterface::HandlePlan: populated buffer with new plan {}",
+      robot_plan_.utime);
 };
 
 void CommunicationInterface::HandlePause(
