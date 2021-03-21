@@ -76,8 +76,8 @@ void CommunicationInterface::ResetData() {
 
   // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
-  robot_plan_.plan_.release();  // unique ptr points to no plan
-  robot_plan_.utime = -1;       // utime set to -1 at start
+  robot_plan_.plan.release();  // unique ptr points to no plan
+  robot_plan_.utime = -1;      // utime set to -1 at start
   lock_plan.unlock();
 
   // initialize pause as false:
@@ -117,7 +117,7 @@ void CommunicationInterface::StopInterface() {
 
 bool CommunicationInterface::HasNewPlan() {
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
-  return !(robot_plan_.plan_ == nullptr);
+  return !(robot_plan_.plan == nullptr);
 }
 
 std::tuple<std::unique_ptr<PPType>, int64_t>
@@ -128,7 +128,7 @@ CommunicationInterface::PopNewPlan() {
         "PopNewPlan: no buffered new plan available to pop!");
   }
   // std::move nullifies the unique ptr robot_plan_.plan_
-  return {std::move(robot_plan_.plan_), robot_plan_.utime};
+  return {std::move(robot_plan_.plan), robot_plan_.utime};
 }
 
 franka::RobotState CommunicationInterface::GetRobotState() {
@@ -140,7 +140,6 @@ void CommunicationInterface::SetRobotData(
     const franka::RobotState& robot_state,
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::scoped_lock<std::mutex> lock {robot_data_mutex_};
-  robot_data_.has_robot_data_ = true;
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
 }
@@ -150,7 +149,6 @@ void CommunicationInterface::SetRobotDataNonblocking(
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
   if (lock.try_lock()) {
-    robot_data_.has_robot_data = true;
     robot_data_.robot_state = robot_state;
     robot_data_.robot_plan_next_conf = robot_plan_next_conf;
     lock.unlock();
@@ -388,7 +386,7 @@ void CommunicationInterface::HandlePlan(
                         "mismatched_start_position");
     return;
   }
-  robot_plan_.plan_ = std::make_unique<PPType>(piecewise_polynomial);
+  robot_plan_.plan = std::make_unique<PPType>(piecewise_polynomial);
   lock.unlock();
   dexai::log()->info(
       "CommunicationInterface::HandlePlan: populated buffer with new plan {}",
