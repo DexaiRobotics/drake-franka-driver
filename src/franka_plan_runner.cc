@@ -371,12 +371,10 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   status_ = RobotStatus::Running;
   if (plan_) {
     dexai::log()->warn(
-        "RunFranka: Active plan at franka_time: {}"
-        " was not finished because of the caught control exception!",
+        "RunFranka: active plan at franka_t: {} was not finished because of "
+        " control exception caught, aborting and recovering...",
         franka_time_);
-    std::string msg = "control_exception," + std::to_string(franka_time_);
-    dexai::log()->warn("RunFranka: PublishPlanComplete({}, false, '{}')",
-                       franka_time_, msg);
+    std::string msg {"control_exception," + std::to_string(franka_time_)};
     comm_interface_->PublishPlanComplete(plan_utime_, false, msg);
     plan_.release();
     plan_utime_ = -1;  // reset plan utime to -1
@@ -610,13 +608,13 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       utils::v_to_e(ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->SimControlExceptionTriggered()) {
-    dexai::log()->warn("Simulating control exception!");
+    dexai::log()->warn(
+        "JointPositionCallback: simulated control exception triggered");
     RecoverFromControlException();
     comm_interface_->ClearSimControlExceptionTrigger();
     // return current joint positions instead of running plan through to
     // completion
-    franka::JointPositions joint_pos = robot_state.q;
-    return franka::MotionFinished(joint_pos);
+    return franka::MotionFinished(franka::JointPositions(robot_state.q));
   }
 
   if (comm_interface_->HasNewPlan()) {
@@ -662,7 +660,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
 
   if (!plan_) {
-    dexai::log()->debug(
+    dexai::log()->info(
         "JointPositionCallback: No plan exists (anymore), exiting "
         "controller...");
     comm_interface_->TryToSetRobotData(cannonical_robot_state,
@@ -759,8 +757,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     if (franka_time_ > (plan_->end_time() + 0.2)) {  // 200 ms
       dexai::log()->error(
           "JointPositionCallback: plan {} overtime by {:.3f} s, grace period "
-          "exceeded, "
-          "motion aborted; plan duration: {:.3f} s, franka_t: {:.3f} s",
+          "exceeded, aborted; plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, franka_time_ - plan_end_time, plan_end_time,
           franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
