@@ -108,7 +108,6 @@ class FrankaPlanRunner {
   float target_stop_time_;
   float stop_duration_;
   float stop_margin_counter_ = 0;
-  int cur_plan_number_ = -1;  // for ensuring the plan is new
 
   // last run loopo status update
   std::chrono::time_point<std::chrono::steady_clock> t_last_main_loop_log_ {};

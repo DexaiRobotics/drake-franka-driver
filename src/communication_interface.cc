@@ -50,16 +50,18 @@ CommunicationInterface::CommunicationInterface(const RobotParameters params,
   lcm_.subscribe(lcm_sim_driver_event_trigger_channel_,
                  &CommunicationInterface::HandleSimDriverEventTrigger, this);
 
-  dexai::log()->info("Plan channel:          {}", params_.lcm_plan_channel);
-  dexai::log()->info("Stop channel:          {}", params_.lcm_stop_channel);
-  dexai::log()->info("Plan received channel: {}",
+  dexai::log()->info("Plan channel:\t\t\t\t{}", params_.lcm_plan_channel);
+  dexai::log()->info("Stop channel:\t\t\t\t{}", params_.lcm_stop_channel);
+  dexai::log()->info("Plan received channel:\t\t\t{}",
                      params_.lcm_plan_received_channel);
-  dexai::log()->info("Plan complete channel: {}",
+  dexai::log()->info("Plan complete channel:\t\t\t{}",
                      params_.lcm_plan_complete_channel);
-  dexai::log()->info("Status channel:        {}", params_.lcm_status_channel);
-  dexai::log()->info("Driver status channel: {}", lcm_driver_status_channel_);
-  dexai::log()->info("Pause status channel:  {}", lcm_pause_status_channel_);
-  dexai::log()->info("Sim driver event trigger channel:  {}",
+  dexai::log()->info("Status channel:\t\t\t{}", params_.lcm_status_channel);
+  dexai::log()->info("Driver status channel:\t\t\t{}",
+                     lcm_driver_status_channel_);
+  dexai::log()->info("Pause status channel:\t\t\t{}",
+                     lcm_pause_status_channel_);
+  dexai::log()->info("Sim driver event trigger channel:\t{}",
                      lcm_sim_driver_event_trigger_channel_);
 };
 

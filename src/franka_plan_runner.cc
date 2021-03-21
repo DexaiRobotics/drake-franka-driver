@@ -389,16 +389,14 @@ int FrankaPlanRunner::RunSim() {
     VectorToArray(next_conf_vec, robot_state.q_d);
     VectorToArray(vel, robot_state.dq);
 
-    auto cmd_pos = JointPositionCallback(robot_state, period);
-
     prev_conf = next_conf.replicate(1, 1);
-
-    next_conf = utils::v_to_e(ArrayToVector(cmd_pos.q));
+    next_conf = utils::v_to_e(
+        ArrayToVector(JointPositionCallback(robot_state, period).q));
 
     next_conf_vec = utils::e_to_v(next_conf);
     std::vector<double> prev_conf_vec = utils::e_to_v(prev_conf);
 
-    for (int i = 0; i < dof_; i++) {
+    for (int i {}; i < dof_; i++) {
       vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double)period.toSec();
     }
 
