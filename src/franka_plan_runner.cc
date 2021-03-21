@@ -245,8 +245,8 @@ int FrankaPlanRunner::RunFranka() {
     while (true) {
       try {
         auto paused_by_lcm {comm_interface_->GetPauseStatus()};
-        RobotStatus new_status {paused_by_lcm ? RobotStatus::Paused
-                                              : RobotStatus::Running};
+        auto new_status {paused_by_lcm ? RobotStatus::Paused
+                                       : RobotStatus::Running};
         // check if status has changed
         if (status_ != new_status) {
           status_has_changed = true;

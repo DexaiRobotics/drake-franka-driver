@@ -109,7 +109,7 @@ class FrankaPlanRunner {
   float stop_duration_;
   float stop_margin_counter_ = 0;
 
-  // last run loopo status update
+  // last run loop status update
   std::chrono::time_point<std::chrono::steady_clock> t_last_main_loop_log_ {};
 
   // We control the robot at 1 kHz using the callback function
