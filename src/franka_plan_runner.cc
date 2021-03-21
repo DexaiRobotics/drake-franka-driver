@@ -273,6 +273,10 @@ int FrankaPlanRunner::RunFranka() {
           // here:
           robot.control(joint_position_callback_);
         } else {
+          if (comm_interface_->CancelPlanRequested()) {
+            log()->error("Cancel plan requested with no active plan!");
+            comm_interface_->ClearCancelPlanRequest();
+          }
           // no plan available or paused
           // print out status after (lcm_publish_rate_ * 40) times:
           if (status_has_changed) {
