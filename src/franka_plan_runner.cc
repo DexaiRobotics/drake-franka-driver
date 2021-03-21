@@ -252,13 +252,9 @@ int FrankaPlanRunner::RunFranka() {
     while (true) {
       // std::cout << "top of loop: Executing motion." << std::endl;
       try {
-        auto paused_by_lcm = comm_interface_->GetPauseStatus();
-        RobotStatus new_status;
-        if (paused_by_lcm) {
-          new_status = RobotStatus::Paused;
-        } else {
-          new_status = RobotStatus::Running;
-        }
+        auto paused_by_lcm {comm_interface_->GetPauseStatus()};
+        RobotStatus new_status {paused_by_lcm ? RobotStatus::Paused
+                                              : RobotStatus::Running};
         // check if status has changed
         if (status_ != new_status) {
           status_has_changed = true;
@@ -274,8 +270,10 @@ int FrankaPlanRunner::RunFranka() {
           robot.control(joint_position_callback_);
         } else {
           // no plan available or paused
-          // print out status after (lcm_publish_rate_ * 40) times:
-          if (status_has_changed) {
+          // print out status if there's any change or every 10 sec
+          if (auto t_now {std::chrono::steady_clock::now()};
+              status_has_changed
+              || t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
             if (status_ == RobotStatus::Running) {
               dexai::log()->info(
                   "RunFranka: Robot is {} and waiting for plan...",
@@ -291,6 +289,7 @@ int FrankaPlanRunner::RunFranka() {
                   utils::RobotStatusToString(status_));
             }
             status_has_changed = false;  // reset
+            t_last_main_loop_log_ = t_now;
           }
           // only publish robot_status, do that twice as fast as the lcm publish
           // rate ...
@@ -671,35 +670,30 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     return franka::MotionFinished(output_to_franka);
   }
 
+  const auto plan_end_time = plan_->end_time();
+  const auto plan_completion_fraction =
+      std::min(1.0, std::max(0.0, franka_time_ / plan_end_time));
+
   // read out plan for current franka time from plan:
   next_conf_plan_ = plan_->value(franka_time_);
   comm_interface_->TryToSetRobotData(cannonical_robot_state, next_conf_plan_);
 
-  const auto plan_end_time = plan_->end_time();
-  Eigen::VectorXd next_conf_combined(7);  // derive the next conf for return
-  {
-    // We don't track the last callback and delta from it
-    // So we always calculate delta from the start of the plan
-    // For both the plan itself and the franks, since they don't start from
-    // the exact same position.
-    // delta between conf at start of plan to conft at current time of plan:
-    Eigen::VectorXd delta_conf_plan {next_conf_plan_ - start_conf_plan_};
-    Eigen::VectorXd next_conf_franka {start_conf_franka_ + delta_conf_plan};
+  // delta between conf at start of plan to conft at current time of plan:
+  Eigen::VectorXd delta_conf_plan = next_conf_plan_ - start_conf_plan_;
 
-    // Expotentially weigh the next plan and franka confs for faster convergence
-    // plan_completion_frac is in [0, 1] despite possibly being overtime
-    const double plan_completion_frac {
-        std::min(1.0, franka_time_ / plan_end_time)};
-    // weight term goes from 1 to nearly 0 as frac goes from 0 to 1
-    const double weight_e {std::exp(-15 * plan_completion_frac)};
-    next_conf_combined =
-        weight_e * next_conf_franka + (1 - weight_e) * next_conf_plan_;
-    // apply low-pass filter at 30 Hz
-    for (size_t i {}; i < 7; i++) {
-      next_conf_combined[i] =
-          franka::lowpassFilter(period.toSec(), next_conf_combined[i],
-                                cannonical_robot_state.q_d[i], 30.0);
-    }
+  // add delta to current robot state to achieve a continuous motion:
+  Eigen::VectorXd next_conf_franka = start_conf_franka_ + delta_conf_plan;
+
+  // Linear interpolation between next conf with offset and the actual next conf
+  // based on received plan
+  Eigen::VectorXd next_conf_combined =
+      (1.0 - plan_completion_fraction) * next_conf_franka
+      + plan_completion_fraction * next_conf_plan_;
+
+  for (size_t i = 0; i < 7; i++) {
+    next_conf_combined[i] =
+        franka::lowpassFilter(period.toSec(), next_conf_combined[i],
+                              cannonical_robot_state.q_d[i], 30.0);
   }
 
   // overwrite the output_to_franka of this callback:
@@ -718,8 +712,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // A higher speed threshold may result in the benign libfranka exception:
     //    Motion finished commanded, but the robot is still moving!
     //    ["joint_motion_generator_acceleration_discontinuity"]
-    static const double CONV_ANGLE_THRESHOLD {0.001};  // rad, empirical
-    static const double CONV_SPEED_THRESHOLD {0.009};  // rad/s, L2 norm
+    static const double CONV_ANGLE_THRESHOLD {0.0010};  // rad, empirical
+    static const double CONV_SPEED_THRESHOLD {0.0085};  // rad/s, L2 norm
 
     // Maximum change in joint angle between two confs
     const double max_joint_err {
