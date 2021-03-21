@@ -85,16 +85,16 @@ class FrankaPlanRunner {
       const franka::RobotState& robot_state, franka::Duration period);
 
  private:
-  const int dof_;                // degrees of freedom of franka
-  const std::string home_addr_;  // home address of robot
-  const bool safety_off_;        // torque and force limits to max
+  const int dof_;          // degrees of freedom of franka
+  const bool safety_off_;  // torque and force limits to max
+  RobotParameters params_;
+  std::string ip_addr_;
+  const bool is_sim_;
+
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
   std::unique_ptr<ConstraintSolver> constraint_solver_;
-  RobotParameters params_;
-
-  std::string ip_addr_;
 
   std::function<franka::JointPositions(const franka::RobotState&,
                                        franka::Duration)>

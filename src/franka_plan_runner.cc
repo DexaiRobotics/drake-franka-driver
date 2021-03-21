@@ -27,11 +27,11 @@ using namespace franka_driver;
 using namespace utils;
 
 FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
-    : dof_(FRANKA_DOF),
-      home_addr_("192.168.1.1"),
-      safety_off_(utils::getenv_var("FRANKA_SAFETY_OFF") == "true"),
-      params_(params),
-      ip_addr_(params.robot_ip) {
+    : dof_ {FRANKA_DOF},
+      safety_off_ {utils::getenv_var("FRANKA_SAFETY_OFF") == "true"},
+      params_ {params},
+      ip_addr_ {params.robot_ip},
+      is_sim_ {ip_addr_ == "192.168.1.1"} {
   // define robot's state as uninitialized at start:
   status_ = RobotStatus::Uninitialized;
 
@@ -91,20 +91,13 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
     upper_torque_threshold_ = kMediumTorqueThreshold;
     upper_force_threshold_ = kMediumForceThreshold;
   }
-
-  // define the joint_position_callback_ needed for the robot control loop:
-  joint_position_callback_ =
-      [&, this](const franka::RobotState& robot_state,
-                franka::Duration period) -> franka::JointPositions {
-    return this->FrankaPlanRunner::JointPositionCallback(robot_state, period);
-  };
 }
 
 int FrankaPlanRunner::Run() {
   comm_interface_->StartInterface();
 
   int return_value = 1;  //
-  if (ip_addr_ == home_addr_) {
+  if (is_sim_) {
     return_value = RunSim();
   } else {
     return_value = RunFranka();
@@ -264,9 +257,10 @@ int FrankaPlanRunner::RunFranka() {
         if (comm_interface_->HasNewPlan() && status_ == RobotStatus::Running) {
           dexai::log()->info("RunFranka: Got a new plan, attaching callback!");
           status_has_changed = true;
-          // joint_position_callback_ or impedance_control_callback_ can be used
-          // here:
-          robot.control(joint_position_callback_);
+          // Use either joint position or impedance control callback here
+          robot.control(std::bind(&FrankaPlanRunner::JointPositionCallback,
+                                  this, std::placeholders::_1,
+                                  std::placeholders::_2));
         } else {
           // no plan available or paused
           // print out status if there's any change or every 10 sec
@@ -340,23 +334,6 @@ bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
     robot.automaticErrorRecovery();
   }
   dexai::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery!");
-
-  /// TODO: add reverse capability if needed
-  /// uncomment the following to unleash the capabilitiy and add the proper
-  ///  timing for reversing into the joint control loop
-  // if(plan_) {
-  //   dexai::log()->info("RunFranka: Attaching callback to reverse!");
-  //   try {
-  //     robot.control(joint_position_callback_);
-  //   } catch (const franka::ControlException& ce) {
-  //       dexai::log()->error("RunFranka: While reversing, caught control
-  //       exception: {}.",
-  //                          ce.what());
-  //       comm_interface_->PublishDriverStatus(false, ce.what());
-  //       return false;
-  //   }
-  //   dexai::log()->info("RunFranka: Finished reversing!");
-  // }
   dexai::log()->info("RunFranka: Turning Safety on again!");
   SetCollisionBehaviorSafetyOn(robot);
   dexai::log()->info("RunFranka: Turned Safety on again!");
@@ -383,12 +360,12 @@ int FrankaPlanRunner::RunSim() {
   comm_interface_->PublishDriverStatus(true);
 
   // first, set some parameters
-  Eigen::VectorXd next_conf = Eigen::VectorXd::Zero(dof_);  // output state
+  Eigen::VectorXd next_conf(dof_);  // output state
+  // set robot in a starting position which is not in collision
   next_conf << -0.9577375507190063, -0.7350638062912122, 0.880988748620542,
       -2.5114236381136448, 0.6720116891296624, 1.9928838396072361,
-      -1.2954019628351783;  // set robot in a starting position which is not in
-                            // collision
-  Eigen::VectorXd prev_conf;
+      -1.2954019628351783;
+  Eigen::VectorXd prev_conf(dof_);
   std::vector<double> vel(7, 1);
   franka::RobotState robot_state;  // internal state; mapping to franka state
   robot_state.robot_mode = franka::RobotMode::kIdle;
@@ -412,7 +389,7 @@ int FrankaPlanRunner::RunSim() {
     VectorToArray(next_conf_vec, robot_state.q_d);
     VectorToArray(vel, robot_state.dq);
 
-    franka::JointPositions cmd_pos = JointPositionCallback(robot_state, period);
+    auto cmd_pos = JointPositionCallback(robot_state, period);
 
     prev_conf = next_conf.replicate(1, 1);
 
@@ -617,7 +594,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
     dexai::log()->info(
         "JointPositionCallback: found and popped new plan {} from buffer, "
-        "setting up...",
+        "setting up for initial timestep",
         plan_utime_);
     // first time step of plan, reset time and start conf
     franka_time_ = 0.0;
@@ -652,9 +629,13 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
 
   if (!plan_) {
-    dexai::log()->info(
-        "JointPositionCallback: No plan exists (anymore), exiting "
-        "controller...");
+    if (!is_sim_) {
+      // only in sim is JointPositionCallback spam-called
+      // but we want to avoid spamming the terminal and logs
+      dexai::log()->info(
+          "JointPositionCallback: No plan exists (anymore), exiting "
+          "controller...");
+    }
     comm_interface_->SetRobotDataNonblocking(cannonical_robot_state,
                                              start_conf_franka_);
     return franka::MotionFinished(output_to_franka);
