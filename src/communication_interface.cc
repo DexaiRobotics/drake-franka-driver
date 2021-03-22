@@ -150,9 +150,10 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
 
 void CommunicationInterface::PublishPlanComplete(
     const int64_t& plan_utime, bool success, std::string plan_status_string) {
-  log()->warn(
-      "CommInterface:PublishPlanComplete: plan: {}, successful: {}, status: {}",
-      success, plan_utime, plan_status_string);
+  log()->info(
+      "CommInterface:PublishPlanComplete: plan: {}, successful: {}, "
+      "optional status (if failed): {}",
+      plan_utime, success, plan_status_string);
   robot_plan_.plan.release();
   PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
                           success, plan_status_string);

@@ -255,7 +255,8 @@ int FrankaPlanRunner::RunFranka() {
 
         // prevent the plan from being started if robot is not running...
         if (comm_interface_->HasNewPlan() && status_ == RobotStatus::Running) {
-          dexai::log()->info("RunFranka: Got a new plan, attaching callback!");
+          dexai::log()->info(
+              "RunFranka: found a new plan, attaching callback...");
           status_has_changed = true;
           // Use either joint position or impedance control callback here
           robot.control(std::bind(&FrankaPlanRunner::JointPositionCallback,
@@ -263,7 +264,9 @@ int FrankaPlanRunner::RunFranka() {
                                   std::placeholders::_2));
         } else {
           if (comm_interface_->CancelPlanRequested()) {
-            log()->error("Cancel plan requested with no active plan!");
+            log()->error(
+                "RunFranka: plan cancellation requested but there is no active "
+                "plan");
             comm_interface_->ClearCancelPlanRequest();
           }
           // no plan available or paused
@@ -629,7 +632,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
     dexai::log()->info(
         "JointPositionCallback: found and popped new plan {} from buffer, "
-        "setting up for initial timestep",
+        "starting initial timestep...",
         plan_utime_);
     // first time step of plan, reset time and start conf
     franka_time_ = 0.0;
@@ -744,7 +747,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
         && max_joint_speed <= CONV_SPEED_THRESHOLD) {
       dexai::log()->warn(
-          "JointPositionCallback: plan {} overtime by {:.3f} s, "
+          "JointPositionCallback: plan {} overtime by {:.4f} s, "
           "converged within grace period, finished; "
           "plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, franka_time_ - plan_end_time, plan_end_time,
@@ -770,7 +773,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // terminate plan if grace period has ended and still not converged
     if (franka_time_ > (plan_->end_time() + 0.2)) {  // 200 ms
       dexai::log()->error(
-          "JointPositionCallback: plan {} overtime by {:.3f} s, grace period "
+          "JointPositionCallback: plan {} overtime by {:.4f} s, grace period "
           "exceeded, aborted; plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, franka_time_ - plan_end_time, plan_end_time,
           franka_time_);
