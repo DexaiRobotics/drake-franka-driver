@@ -150,10 +150,13 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
 
 void CommunicationInterface::PublishPlanComplete(
     const int64_t& plan_utime, bool success, std::string plan_status_string) {
-  log()->info(
-      "CommInterface:PublishPlanComplete: plan: {}, successful: {}, "
-      "optional status (if failed): {}",
-      plan_utime, success, plan_status_string);
+  std::string log_msg {
+      fmt::format("CommInterface:PublishPlanComplete: plan: {} {}", plan_utime,
+                  success ? "successful" : "failed")};
+  if (!success) {
+    log_msg += fmt::format(", error status: {}", plan_status_string);
+  }
+  dexai::log()->info(log_msg);
   robot_plan_.plan.release();
   PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
                           success, plan_status_string);
