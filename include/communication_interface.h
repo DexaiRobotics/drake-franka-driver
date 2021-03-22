@@ -66,7 +66,11 @@ class CommunicationInterface {
   bool CancelPlanRequested() const { return cancel_plan_requested_; };
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; };
 
-  bool HasNewPlan();
+  bool HasNewPlan() {
+    std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
+    return !(robot_plan_.plan == nullptr);
+  }
+
   std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
 
   // TODO: remove franka specific RobotState type and replace with std::array

@@ -115,18 +115,13 @@ void CommunicationInterface::StopInterface() {
   ResetData();
 };
 
-bool CommunicationInterface::HasNewPlan() {
-  std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
-  return !(robot_plan_.plan == nullptr);
-}
-
 std::tuple<std::unique_ptr<PPType>, int64_t>
 CommunicationInterface::PopNewPlan() {
-  std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   if (!HasNewPlan()) {
     throw std::runtime_error(
         "PopNewPlan: no buffered new plan available to pop!");
   }
+  std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr robot_plan_.plan_
   return {std::move(robot_plan_.plan), robot_plan_.utime};
 }
@@ -376,6 +371,9 @@ void CommunicationInterface::HandlePlan(
   }
   robot_plan_.plan = std::make_unique<PPType>(piecewise_polynomial);
   lock.unlock();
+  dexai::log()->info(
+      "CommunicationInterface::HandlePlan: populated buffer with new plan {}",
+      robot_plan_.utime);
   dexai::log()->info(
       "CommunicationInterface::HandlePlan: populated buffer with new plan {}",
       robot_plan_.utime);
