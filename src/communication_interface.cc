@@ -362,7 +362,7 @@ void CommunicationInterface::HandlePlan(
     Eigen::VectorXd joint_delta = q_eigen - commanded_start;
     dexai::log()->error(
         "CommInterface:HandlePlan: "
-        "Discarding plan {}, mismatched start position with delta: {}.",
+        "discarding plan {}, mismatched start position with delta: {}.",
         robot_spline->utime, joint_delta.transpose());
     robot_plan_.plan.release();
     lock.unlock();
@@ -373,10 +373,7 @@ void CommunicationInterface::HandlePlan(
   robot_plan_.plan = std::make_unique<PPType>(piecewise_polynomial);
   lock.unlock();
   dexai::log()->info(
-      "CommunicationInterface::HandlePlan: populated buffer with new plan {}",
-      robot_plan_.utime);
-  dexai::log()->info(
-      "CommunicationInterface::HandlePlan: populated buffer with new plan {}",
+      "CommInterface::HandlePlan: populated buffer with new plan {}",
       robot_plan_.utime);
   dexai::log()->debug("CommInterface:HandlePlan: Finished!");
 };

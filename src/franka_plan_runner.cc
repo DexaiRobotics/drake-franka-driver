@@ -351,8 +351,8 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   status_ = RobotStatus::Running;
   if (plan_) {
     dexai::log()->warn(
-        "RunFranka: active plan at franka_t: {} was not finished because of "
-        " control exception caught, aborting and recovering...",
+        "RunFranka: control exception caught during active plan {plan_utime_} "
+        "at franka_t: {:.4f}, aborting and recovering...",
         franka_time_);
     std::string msg {"control_exception," + std::to_string(franka_time_)};
     comm_interface_->PublishPlanComplete(plan_utime_, false, msg);
@@ -631,7 +631,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
     std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
     dexai::log()->info(
-        "JointPositionCallback: found and popped new plan {} from buffer, "
+        "JointPositionCallback: popped new plan {} from buffer, "
         "starting initial timestep...",
         plan_utime_);
     // first time step of plan, reset time and start conf
@@ -771,7 +771,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       }
     }
     // terminate plan if grace period has ended and still not converged
-    if (franka_time_ > (plan_->end_time() + 0.2)) {  // 200 ms
+    if (franka_time_ > (plan_->end_time() + 0.1)) {  // 100 ms
       dexai::log()->error(
           "JointPositionCallback: plan {} overtime by {:.4f} s, grace period "
           "exceeded, aborted; plan duration: {:.3f} s, franka_t: {:.3f} s",
