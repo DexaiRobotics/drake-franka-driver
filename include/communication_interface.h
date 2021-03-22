@@ -50,8 +50,8 @@ struct RobotPiecewisePolynomial {
 
 class CommunicationInterface {
  public:
-  CommunicationInterface(const RobotParameters params,
-                         double lcm_publish_rate = 200.0 /* Hz */);
+  explicit CommunicationInterface(const RobotParameters& params,
+                                  double lcm_publish_rate = 200.0 /* Hz */);
   ~CommunicationInterface() {};
   void StartInterface();
   void StopInterface();

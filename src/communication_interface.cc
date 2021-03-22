@@ -31,11 +31,11 @@ using namespace franka_driver;
 
 using PauseCommandType = utils::PauseCommandType;
 
-CommunicationInterface::CommunicationInterface(const RobotParameters params,
+CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                                                double lcm_publish_rate)
-    : params_(params),
-      lcm_(params_.lcm_url),
-      lcm_publish_rate_(lcm_publish_rate) {
+    : params_ {params},
+      lcm_ {params_.lcm_url},
+      lcm_publish_rate_ {lcm_publish_rate} {
   lcm_.subscribe(params_.lcm_plan_channel, &CommunicationInterface::HandlePlan,
                  this);
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
