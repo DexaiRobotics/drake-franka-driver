@@ -75,12 +75,9 @@ class CommunicationInterface {
   // acquire mutex lock and return robot mode
   franka::RobotMode GetRobotMode();
 
-  /// Blocking call that sets the robot state
+  // Set the robot state, blocking
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf);
-  /// Non-blocking call that sets the robot state if possible
-  void SetRobotDataNonblocking(const franka::RobotState& robot_state,
-                               const Eigen::VectorXd& robot_plan_next_conf);
 
   bool GetPauseStatus();
   void SetPauseStatus(bool paused);

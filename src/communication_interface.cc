@@ -142,17 +142,7 @@ void CommunicationInterface::SetRobotData(
   std::scoped_lock<std::mutex> lock {robot_data_mutex_};
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
-}
-
-void CommunicationInterface::SetRobotDataNonblocking(
-    const franka::RobotState& robot_state,
-    const Eigen::VectorXd& robot_plan_next_conf) {
-  std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
-  if (lock.try_lock()) {
-    robot_data_.robot_state = robot_state;
-    robot_data_.robot_plan_next_conf = robot_plan_next_conf;
-    lock.unlock();
-  }
+  robot_data_.has_robot_data = true;
 }
 
 bool CommunicationInterface::GetPauseStatus() {
@@ -214,10 +204,10 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
 
 void CommunicationInterface::PublishRobotStatus() {
   // Try to lock data to avoid read write collisions.
-  std::unique_lock<std::mutex> lock(robot_data_mutex_);
-  if (robot_data_.has_robot_data) {
-    drake::lcmt_iiwa_status franka_status =
-        utils::ConvertToLcmStatus(robot_data_);
+  if (std::unique_lock<std::mutex> lock {robot_data_mutex_};
+      robot_data_.has_robot_data) {
+    drake::lcmt_iiwa_status franka_status {
+        utils::ConvertToLcmStatus(robot_data_)};
     // publish data over lcm
     franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
     robot_data_.has_robot_data = false;
@@ -228,8 +218,6 @@ void CommunicationInterface::PublishRobotStatus() {
                          current_mode == franka::RobotMode::kUserStopped);
     PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
                          current_mode == franka::RobotMode::kOther);
-  } else {
-    lock.unlock();
   }
 }
 

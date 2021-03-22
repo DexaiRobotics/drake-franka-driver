@@ -671,16 +671,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: No plan exists (anymore), exiting "
           "controller...");
     }
-    comm_interface_->SetRobotDataNonblocking(cannonical_robot_state,
-                                             start_conf_franka_);
+    comm_interface_->SetRobotData(cannonical_robot_state, start_conf_franka_);
     return franka::MotionFinished(output_to_franka);
   }
 
   // read out plan for current franka time from plan:
   next_conf_plan_ = plan_->value(franka_time_);
-  comm_interface_->SetRobotDataNonblocking(cannonical_robot_state,
-                                           next_conf_plan_);
-
+  // async in another thread, nonblocking
+  std::thread {[&]() {
+    comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_);
+  }}.detach();
   const auto plan_end_time = plan_->end_time();
   Eigen::VectorXd next_conf_combined(7);  // derive the next conf for return
   {
