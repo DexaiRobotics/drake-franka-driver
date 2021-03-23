@@ -68,7 +68,7 @@ class CommunicationInterface {
 
   bool HasNewPlan() {
     std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
-    return !(robot_plan_.plan == nullptr);
+    return !(new_plan_buffer_.plan == nullptr);
   }
 
   std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
@@ -136,7 +136,7 @@ class CommunicationInterface {
   // This is a buffer storing the new plan received. Capacility is only 1.
   // Once this plan is popped (taken), this buffer is emptied and avialable
   // to store a new plan, while the current plan may be running.
-  RobotPiecewisePolynomial robot_plan_;
+  RobotPiecewisePolynomial new_plan_buffer_;
   std::mutex robot_plan_mutex_;
 
   RobotData robot_data_;

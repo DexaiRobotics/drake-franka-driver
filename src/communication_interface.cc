@@ -76,8 +76,8 @@ void CommunicationInterface::ResetData() {
 
   // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
-  robot_plan_.plan.release();  // unique ptr points to no plan
-  robot_plan_.utime = -1;      // utime set to -1 at start
+  new_plan_buffer_.plan.release();  // unique ptr points to no plan
+  new_plan_buffer_.utime = -1;      // utime set to -1 at start
   lock_plan.unlock();
 
   // initialize pause as false:
@@ -123,7 +123,7 @@ CommunicationInterface::PopNewPlan() {
   }
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr robot_plan_.plan_
-  return {std::move(robot_plan_.plan), robot_plan_.utime};
+  return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime};
 }
 
 franka::RobotState CommunicationInterface::GetRobotState() {
@@ -157,7 +157,7 @@ void CommunicationInterface::PublishPlanComplete(
     log_msg += fmt::format(", error status: {}", plan_status_string);
   }
   dexai::log()->info(log_msg);
-  robot_plan_.plan.release();
+  new_plan_buffer_.plan.release();
   PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
                           success, plan_status_string);
 }
@@ -325,9 +325,10 @@ void CommunicationInterface::HandlePlan(
         std::chrono::milliseconds(static_cast<int>(1.0)));
   }
 
-  robot_plan_.utime = robot_spline->utime;
+  new_plan_buffer_.utime = robot_spline->utime;
   // publish confirmation that plan was received with same utime
-  PublishTriggerToChannel(robot_plan_.utime, params_.lcm_plan_received_channel);
+  PublishTriggerToChannel(new_plan_buffer_.utime,
+                          params_.lcm_plan_received_channel);
   dexai::log()->info(
       "CommInterface:HandlePlan: "
       "Published confirmation of received plan {}",
@@ -367,17 +368,17 @@ void CommunicationInterface::HandlePlan(
         "CommInterface:HandlePlan: "
         "discarding plan {}, mismatched start position with delta: {}.",
         robot_spline->utime, joint_delta.transpose());
-    robot_plan_.plan.release();
+    new_plan_buffer_.plan.release();
     lock.unlock();
     PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
                         "mismatched_start_position");
     return;
   }
-  robot_plan_.plan = std::make_unique<PPType>(piecewise_polynomial);
+  new_plan_buffer_.plan = std::make_unique<PPType>(piecewise_polynomial);
   lock.unlock();
   dexai::log()->info(
       "CommInterface::HandlePlan: populated buffer with new plan {}",
-      robot_plan_.utime);
+      new_plan_buffer_.utime);
   dexai::log()->debug("CommInterface:HandlePlan: Finished!");
 };
 
