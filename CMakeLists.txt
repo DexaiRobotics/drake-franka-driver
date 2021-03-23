@@ -76,7 +76,7 @@ add_executable(franka_driver
   src/franka_driver.cc
   src/franka_plan_runner.cc
   src/communication_interface.cc
-  src/examples_common.cpp
+  # src/examples_common.cpp
   src/util_conv.cc
   src/util_io.cc
   src/util_math.cc
