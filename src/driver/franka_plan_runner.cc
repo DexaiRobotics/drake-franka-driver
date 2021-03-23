@@ -707,8 +707,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
             .cwiseAbs()};
     dexai::log()->warn(
         "JointPositionCallback: plan {} overtime, "
-        "franka_t: {:.3f}, max joint err = {:.4f}",
-        plan_utime_, franka_time_, max_joint_err);
+        "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
+        plan_utime_, franka_time_, max_joint_err, dq_abs.norm());
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
         && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()
