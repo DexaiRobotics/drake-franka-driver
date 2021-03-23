@@ -92,7 +92,7 @@ repos:
         --verbose=0,
         --counting=toplevel,
         --recursive,
-        "--filter=-build/c++11,-runtime/references"]
+        "--filter=-build/c++11,-runtime/references,-whitespace/newline"]
       exclude: |
         (?x)^(
             externals/.*

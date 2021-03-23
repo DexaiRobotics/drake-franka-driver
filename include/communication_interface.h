@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2021 Dexai Robotics. All rights reserved. BSD 3-Clause License.
+ */
+
 #pragma once
 /// @file communication_interface
 ///
@@ -13,25 +17,28 @@
 /// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
 
-#include <cstdint>  // for int64_t
-#include <mutex>    // for mutex
-#include <thread>   // for thread
+#include <drake/common/trajectories/piecewise_polynomial.h>  // for Piecewis...
 
-#include <bits/stdint-intn.h>           // for int64_t
+#include <memory>
+#include <mutex>  // for mutex
+#include <set>
+#include <string>
+#include <thread>  // for thread
+#include <tuple>
+
 #include <lcm/lcm-cpp.hpp>              // for lcm
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
 #include <robot_msgs/pause_cmd.hpp>     // for pause_cmd
 
-#include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
-#include "franka/robot_state.h"                              // for RobotState
-#include "robot_parameters.h"  // for RobotParameters
+#include "franka/robot_state.h"  // for RobotState
+#include "robot_parameters.h"    // for RobotParameters
 
 using drake::trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
 
 namespace franka_driver {
 
-// TODO: remove this franka specific state and make it generic:
+// TODO(@anyone): remove this franka specific state and make it generic
 struct RobotData {
   std::atomic<bool> has_robot_data;
   franka::RobotState robot_state;
@@ -52,19 +59,18 @@ class CommunicationInterface {
  public:
   explicit CommunicationInterface(const RobotParameters& params,
                                   double lcm_publish_rate = 200.0 /* Hz */);
-  ~CommunicationInterface() {};
   void StartInterface();
   void StopInterface();
 
   bool SimControlExceptionTriggered() const {
     return sim_control_exception_triggered_;
-  };
+  }
   void ClearSimControlExceptionTrigger() {
     sim_control_exception_triggered_ = false;
-  };
+  }
 
-  bool CancelPlanRequested() const { return cancel_plan_requested_; };
-  void ClearCancelPlanRequest() { cancel_plan_requested_ = false; };
+  bool CancelPlanRequested() const { return cancel_plan_requested_; }
+  void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
 
   bool HasNewPlan() {
     std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
@@ -73,7 +79,8 @@ class CommunicationInterface {
 
   std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
 
-  // TODO: remove franka specific RobotState type and replace with std::array
+  // TODO(@anyone): remove franka specific RobotState type and
+  // replace with std::array
   franka::RobotState GetRobotState();
 
   // acquire mutex lock and return robot mode
@@ -87,7 +94,7 @@ class CommunicationInterface {
   void SetPauseStatus(bool paused);
   std::set<std::string> GetPauseSources() const {
     return pause_data_.pause_sources;
-  };
+  }
 
   void PublishPlanComplete(const int64_t& plan_utime, bool success = true,
                            std::string driver_status_string = "");
@@ -96,7 +103,7 @@ class CommunicationInterface {
   void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
                             bool data);
 
-  std::string GetUserStopChannelName() { return lcm_user_stop_channel_; };
+  std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
 
  protected:
   void ResetData();

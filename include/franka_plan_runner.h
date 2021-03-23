@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2021 Dexai Robotics. All rights reserved. BSD 3-Clause License.
+ */
+
 /// @file franka_plan_runner
 ///
 /// franka_plan_runner is designed to get a plan from the comm interface,
@@ -12,25 +16,25 @@
 #pragma once
 
 #include <Eigen/Dense>  // for Eigen::VectorXd
+#include <cnpy.h>       // to read joint position offsets
+#include <drake/common/trajectories/piecewise_polynomial.h>  // for Piecewis...
 
 #include <chrono>
-#include <cstdint>  // for int64_t
-#include <mutex>    // for mutex
-#include <thread>   // for thread
+#include <memory>  // for unique ptr
+#include <mutex>   // for mutex
+#include <string>
+#include <thread>  // for thread
 
-#include <bits/stdint-intn.h>           // for int64_t
-#include <cnpy.h>                       // to read joint position offsets
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
 
 #include "communication_interface.h"  // for CommunicationInterface
 #include "constraint_solver.h"        // for ConstraintSolver
-#include "drake/common/trajectories/piecewise_polynomial.h"  // for Piecewis...
-#include "franka/control_types.h"  // for franka::JointPositions
-#include "franka/duration.h"       // for franka::Duration
-#include "franka/robot.h"          // for franka::Robot
-#include "franka/robot_state.h"    // for franka::RobotState
-#include "robot_parameters.h"      // for RobotParameters
-#include "util_conv.h"             // for RobotStatus
+#include "franka/control_types.h"     // for franka::JointPositions
+#include "franka/duration.h"          // for franka::Duration
+#include "franka/robot.h"             // for franka::Robot
+#include "franka/robot_state.h"       // for franka::RobotState
+#include "robot_parameters.h"         // for RobotParameters
+#include "util_conv.h"                // for RobotStatus
 
 #define FRANKA_DOF 7
 
@@ -38,8 +42,7 @@ namespace franka_driver {
 
 class FrankaPlanRunner {
  public:
-  FrankaPlanRunner(const RobotParameters params);
-  ~FrankaPlanRunner() {};
+  explicit FrankaPlanRunner(const RobotParameters& params);
 
   /// This starts the franka driver
   int Run();
@@ -105,10 +108,10 @@ class FrankaPlanRunner {
   double franka_time_ {};
   // pause related:
   utils::RobotStatus status_;
-  long timestep_ = 1;
-  float target_stop_time_;
-  float stop_duration_;
-  float stop_margin_counter_ = 0;
+  int64_t timestep_ {1};
+  float target_stop_time_ {};
+  float stop_duration_ {};
+  float stop_margin_counter_ {};
 
   // last run loop status update
   std::chrono::time_point<std::chrono::steady_clock> t_last_main_loop_log_ {};
@@ -157,7 +160,6 @@ class FrankaPlanRunner {
 
   std::array<double, 7> upper_torque_threshold_;
   std::array<double, 6> upper_force_threshold_;
-
 };  // FrankaPlanRunner
 
 }  // namespace franka_driver

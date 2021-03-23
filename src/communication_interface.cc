@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2021 Dexai Robotics. All rights reserved. BSD 3-Clause License.
+ */
+
 /// @file communication_interface.cc
 ///
 /// communication_interface is designed to wait for LCM messages containing
@@ -14,22 +18,18 @@
 
 #include "communication_interface.h"
 
-#include "util_io.h"  // for get_current_utime
-// #include "drake/lcmt_iiwa_status.hpp"
+#include <chrono>  // for steady_clock, for duration
+
+#include "polynomial_encode_decode.h"  // for decodePiecewisePolynomial
 #include "robot_msgs/bool_t.hpp"
 #include "robot_msgs/pause_cmd.hpp"  // for pause_cmd
 #include "robot_msgs/trigger_t.hpp"  // for trigger_t
 #include "util_conv.h"               // ConvertToLcmStatus
+#include "util_io.h"                 // for get_current_utime
 
-// following is deprecated, see:
-// https://github.com/DexaiRobotics/drake-franka-driver/issues/54
-#include <chrono>  // for steady_clock, for duration
-
-#include "polynomial_encode_decode.h"  // for decodePiecewisePolynomial
-
-using namespace franka_driver;
-
-using PauseCommandType = utils::PauseCommandType;
+// using namespace franka_driver;
+using franka_driver::CommunicationInterface;
+using utils::PauseCommandType;
 
 CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                                                double lcm_publish_rate)
@@ -41,9 +41,9 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
 
-  // TODO: define this in parameters file
+  // TODO(@anyone): define this in parameters file
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
-  // TODO: remove these channels by combining it with the robot status channel
+  // TODO(@anyone): remove these channels and combine with robot status channel
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
   lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
   lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
@@ -96,7 +96,7 @@ void CommunicationInterface::StartInterface() {
   lcm_publish_status_thread_ =
       std::thread(&CommunicationInterface::PublishLcmAndPauseStatus, this);
   lcm_handle_thread_ = std::thread(&CommunicationInterface::HandleLcm, this);
-};
+}
 
 void CommunicationInterface::StopInterface() {
   dexai::log()->info("CommInterface:StopInterface: Before LCM threads join");
@@ -113,7 +113,7 @@ void CommunicationInterface::StopInterface() {
   lcm_handle_thread_.join();
   dexai::log()->info("CommInterface:StopInterface: After LCM thread join");
   ResetData();
-};
+}
 
 std::tuple<std::unique_ptr<PPType>, int64_t>
 CommunicationInterface::PopNewPlan() {
@@ -182,7 +182,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
   while (running_) {
     auto time_start = std::chrono::steady_clock::now();
     PublishRobotStatus();
-    // TODO: make pause status part of the robot status
+    // TODO(@anyone): make pause status part of the robot status
     PublishPauseStatus();
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
@@ -351,12 +351,12 @@ void CommunicationInterface::HandlePlan(
       piecewise_polynomial.end_time());
 
   // Start position == goal position check
-  // TODO: change to append initial position and respline here
+  // TODO(@anyone): change to append initial position and respline here
   Eigen::VectorXd commanded_start =
       piecewise_polynomial.value(piecewise_polynomial.start_time());
 
   auto q = this->GetRobotState().q;
-  // TODO: move this check to franka plan runner
+  // TODO(@anyone): move this check to franka plan runner
   Eigen::VectorXd q_eigen = utils::v_to_e(utils::ArrayToVector(q));
 
   auto max_angular_distance =
@@ -380,7 +380,7 @@ void CommunicationInterface::HandlePlan(
       "CommInterface::HandlePlan: populated buffer with new plan {}",
       new_plan_buffer_.utime);
   dexai::log()->debug("CommInterface:HandlePlan: Finished!");
-};
+}
 
 void CommunicationInterface::HandlePause(
     const ::lcm::ReceiveBuffer*, const std::string&,

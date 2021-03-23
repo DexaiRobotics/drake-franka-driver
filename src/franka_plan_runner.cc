@@ -1,3 +1,7 @@
+/*
+ * Copyright © 2021 Dexai Robotics. All rights reserved. BSD 3-Clause License.
+ */
+
 /// @file franka_plan_runner.cc
 ///
 /// franka_plan_runner is designed to wait for LCM messages containing
@@ -12,19 +16,18 @@
 
 #include "franka_plan_runner.h"
 
-#include <cmath>     // for exp
-#include <iostream>  // for size_t
+#include <cmath>  // for exp
 
-#include <bits/stdc++.h>  // INT_MAX
 #include <drake/lcmt_iiwa_status.hpp>
 
 #include "franka/exception.h"  // for Exception, ControlException
 #include "franka/robot.h"      // for Robot
 #include "util_math.h"
 
-using namespace franka_driver;
-using namespace utils;
+using franka_driver::FrankaPlanRunner;
+using utils::RobotStatus;
 
+// local function needed by initialisation in RunFranka()
 void SetDefaultBehavior(franka::Robot& robot) {
   robot.setCollisionBehavior({{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
                              {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
@@ -38,19 +41,16 @@ void SetDefaultBehavior(franka::Robot& robot) {
   robot.setCartesianImpedance({{3000, 3000, 3000, 300, 300, 300}});
 }
 
-FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
+FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
     : dof_ {FRANKA_DOF},
       safety_off_ {utils::getenv_var("FRANKA_SAFETY_OFF") == "true"},
       params_ {params},
       ip_addr_ {params.robot_ip},
-      is_sim_ {ip_addr_ == "192.168.1.1"} {
-  // define robot's state as uninitialized at start:
-  status_ = RobotStatus::Uninitialized;
-
+      is_sim_ {ip_addr_ == "192.168.1.1"},
+      status_ {RobotStatus::Uninitialized} {
   // setup communication interface
   comm_interface_ =
       std::make_unique<CommunicationInterface>(params_, lcm_publish_rate_);
-
   max_accels_ = params.robot_max_accelerations;
 
   assert(!params_.urdf_filepath.empty()
@@ -82,7 +82,8 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
         cnpy::npy_load("joint_pos_offset.npy");
     const std::array<double, FRANKA_DOF>& joint_pos_offset_array {
         *(joint_pos_offset_data.data<std::array<double, FRANKA_DOF>>())};
-    const auto joint_pos_offset_v {ArrayToVector(joint_pos_offset_array)};
+    const auto joint_pos_offset_v {
+        utils::ArrayToVector(joint_pos_offset_array)};
     joint_pos_offset_ = utils::v_to_e(joint_pos_offset_v);
     is_joint_pos_offset_available_ = true;
     dexai::log()->info("Loaded joint position offsets: {}",
@@ -310,10 +311,10 @@ int FrankaPlanRunner::RunFranka() {
       t_last_main_loop_log_ = t_now;
     }
     // only publish robot_status, twice as fast as the lcm publish rate
-    // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
+    // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
     robot_->read([this](const franka::RobotState& robot_state) {
       auto cannonical_robot_state {
-          ConvertToCannonical(robot_state, joint_pos_offset_)};
+          utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
       // publishing cannonical values over lcm
       comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_);
       std::this_thread::sleep_for(std::chrono::milliseconds(
@@ -322,7 +323,7 @@ int FrankaPlanRunner::RunFranka() {
     });
   }
   return 0;
-};
+}
 
 bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
   status_ = RobotStatus::Reversing;
@@ -391,19 +392,20 @@ int FrankaPlanRunner::RunSim() {
         static_cast<int>(1000.0 / lcm_publish_rate_)));
 
     std::vector<double> next_conf_vec = utils::e_to_v(next_conf);
-    VectorToArray(next_conf_vec, robot_state.q);
-    VectorToArray(next_conf_vec, robot_state.q_d);
-    VectorToArray(vel, robot_state.dq);
+    utils::VectorToArray(next_conf_vec, robot_state.q);
+    utils::VectorToArray(next_conf_vec, robot_state.q_d);
+    utils::VectorToArray(vel, robot_state.dq);
 
     prev_conf = next_conf.replicate(1, 1);
     next_conf = utils::v_to_e(
-        ArrayToVector(JointPositionCallback(robot_state, period).q));
+        utils::ArrayToVector(JointPositionCallback(robot_state, period).q));
 
     next_conf_vec = utils::e_to_v(next_conf);
     std::vector<double> prev_conf_vec = utils::e_to_v(prev_conf);
 
     for (int i {}; i < dof_; i++) {
-      vel[i] = (next_conf_vec[i] - prev_conf_vec[i]) / (double)period.toSec();
+      vel[i] = (next_conf_vec[i] - prev_conf_vec[i])
+               / static_cast<double>(period.toSec());
     }
 
     std::chrono::milliseconds current_ms =
@@ -418,10 +420,10 @@ int FrankaPlanRunner::RunSim() {
 
 /// Check and limit conf according to provided parameters for joint limits
 bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
-  // TODO: get limits from urdf (instead of parameter file)
-  // TODO: use eigen operator to do these operations
-  bool within_limits = true;
-  for (int j = 0; j < conf.size(); j++) {
+  // TODO(@anyone): get limits from urdf (instead of parameter file)
+  // TODO(@anyone): use eigen operator to do these operations
+  bool within_limits {true};
+  for (int j {}; j < conf.size(); j++) {
     if (conf(j) > joint_limits_(j, 1)) {
       conf(j) = joint_limits_(j, 1);
       within_limits = false;
@@ -622,10 +624,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   franka::JointPositions output_to_franka = robot_state.q_d;
   // scale to cannonical robot state
   auto cannonical_robot_state =
-      ConvertToCannonical(robot_state, joint_pos_offset_);
+      utils::ConvertToCannonical(robot_state, joint_pos_offset_);
   // set current_conf
   Eigen::VectorXd current_conf_franka =
-      utils::v_to_e(ArrayToVector(cannonical_robot_state.q_d));
+      utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
     std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
@@ -733,7 +735,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const double max_joint_err {
         utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
     const double max_joint_speed {
-        utils::v_to_e(ArrayToVector(cannonical_robot_state.dq))
+        utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
             .cwiseAbs()
             .maxCoeff()};
     // auto dq_norm {
