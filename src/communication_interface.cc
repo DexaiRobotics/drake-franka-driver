@@ -151,7 +151,7 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
 void CommunicationInterface::PublishPlanComplete(
     const int64_t& plan_utime, bool success, std::string plan_status_string) {
   std::string log_msg {
-      fmt::format("CommInterface:PublishPlanComplete: plan: {} {}", plan_utime,
+      fmt::format("CommInterface:PublishPlanComplete: plan {} {}", plan_utime,
                   success ? "successful" : "failed")};
   if (!success) {
     log_msg += fmt::format(", error status: {}", plan_status_string);
@@ -346,7 +346,7 @@ void CommunicationInterface::HandlePlan(
 
   dexai::log()->info(
       "CommInterface:HandlePlan: "
-      "plan {}: start time: {:.2f}, end time: {:.2f}",
+      "plan {}, start time: {:.2f}, end time: {:.2f}",
       robot_spline->utime, piecewise_polynomial.start_time(),
       piecewise_polynomial.end_time());
 
