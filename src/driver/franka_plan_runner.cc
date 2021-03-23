@@ -245,8 +245,8 @@ int FrankaPlanRunner::RunFranka() {
         if (plan_) {  // broadcast exception details over LCM
           dexai::log()->warn(
               "RunFranka: control exception during active plan "
-              "{plan_utime_} at franka_t: {:.4f}, aborting and recovering...",
-              franka_time_);
+              "{} at franka_t: {:.4f}, aborting and recovering...",
+              plan_utime_, franka_time_);
           comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
         } else {
           dexai::log()->warn("RunFranka: control exception in main loop: {}.",
@@ -688,13 +688,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
   output_to_franka = utils::EigenToArray(output_to_franka_eigen);
 
-  if (franka_time_ > plan_->end_time()) {  // check convergence
+  if (auto overtime {franka_time_ - plan_end_time};
+      overtime > 0) {  // check for convergence when overtime
     // The following two constants must be tuned together.
     // A higher speed threshold may result in the benign libfranka exception:
     //    Motion finished commanded, but the robot is still moving!
     //    ["joint_motion_generator_acceleration_discontinuity"]
     static const double CONV_ANGLE_THRESHOLD {0.0010};  // rad, empirical
-    static const double CONV_SPEED_THRESHOLD {0.0085};  // rad/s, L2 norm
+    static const double CONV_SPEED_THRESHOLD {0.0083};  // rad/s, empirical
 
     // Maximum change in joint angle between two confs
     const double max_joint_err {
@@ -712,12 +713,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
         && max_joint_speed <= CONV_SPEED_THRESHOLD) {
-      dexai::log()->warn(
+      dexai::log()->info(
           "JointPositionCallback: plan {} overtime by {:.4f} s, "
           "converged within grace period, finished; "
           "plan duration: {:.3f} s, franka_t: {:.3f} s",
-          plan_utime_, franka_time_ - plan_end_time, plan_end_time,
-          franka_time_);
+          plan_utime_, overtime, plan_end_time, franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
       plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
@@ -737,12 +737,26 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       }
     }
     // terminate plan if grace period has ended and still not converged
+    // in both position and speed after the deadline
     if (franka_time_ > (plan_->end_time() + 0.1)) {  // 100 ms
+      if (max_joint_err < 1e-4) {
+        // converged in position, publish success and don't wait for speed
+        dexai::log()->warn(
+            "JointPositionCallback: plan {} overtime by {:.4f} s, grace period "
+            "exceeded, position converged with small residual speed, aborted "
+            "and successful",
+            plan_utime_, overtime);
+        comm_interface_->PublishPlanComplete(
+            plan_utime_, true, "position converged with small residual speed");
+        plan_.release();   // reset unique ptr
+        plan_utime_ = -1;  // reset plan to -1
+        return franka::MotionFinished(output_to_franka);
+      }
+      // position hasn't converged, truly diverged, unsuccessful
       dexai::log()->error(
           "JointPositionCallback: plan {} overtime by {:.4f} s, grace period "
-          "exceeded, aborted; plan duration: {:.3f} s, franka_t: {:.3f} s",
-          plan_utime_, franka_time_ - plan_end_time, plan_end_time,
-          franka_time_);
+          "exceeded, still divergent, aborted and unsuccessful",
+          plan_utime_, overtime);
       comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
       plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
