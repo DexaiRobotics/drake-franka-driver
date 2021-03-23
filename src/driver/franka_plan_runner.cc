@@ -211,7 +211,7 @@ int FrankaPlanRunner::RunFranka() {
 
   try {  // initilization
     dexai::log()->info("RunFranka: setting default behavior...");
-    SetDefaultBehavior();
+    SetDefaultBehaviorForInit();
     dexai::log()->info("RunFranka: ready.");
     comm_interface_->PublishDriverStatus(true);
     // Set collision behavior:

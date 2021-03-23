@@ -77,7 +77,10 @@ class FrankaPlanRunner {
   int Run();
 
  protected:
-  void SetDefaultBehavior() {
+  // used only during robot init
+  // collision behaviour is set by SetCollisionBehaviorSafetyOn
+  // and SetCollisionBehaviorSafetyOff
+  void SetDefaultBehaviorForInit() {
     robot_->setCollisionBehavior(
         // lower_torque_thresholds_acceleration
         {20, 20, 20, 20, 10, 10, 10},
