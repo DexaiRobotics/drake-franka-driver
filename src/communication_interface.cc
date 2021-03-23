@@ -152,9 +152,11 @@ void CommunicationInterface::TryToSetRobotData(
     const franka::RobotState& robot_state,
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::unique_lock<std::mutex> lock(robot_data_mutex_, std::defer_lock);
+  const auto current_mode {GetRobotMode()};
   if (lock.try_lock()) {
     robot_data_.has_robot_data_ = true;
     robot_data_.robot_state = robot_state;
+    robot_data_.robot_state.robot_mode = current_mode;
     robot_data_.robot_plan_next_conf = robot_plan_next_conf;
     lock.unlock();
   }
@@ -225,7 +227,7 @@ void CommunicationInterface::PublishRobotStatus() {
     franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
     robot_data_.has_robot_data_ = false;
     lock.unlock();
-    dexai::log()->info("current mode: {} ", utils::RobotModeToString(robot_data_.robot_state.robot_mode));
+    // dexai::log()->info("current mode: {} ", utils::RobotModeToString(robot_data_.robot_state.robot_mode));
     lcm_.publish(params_.lcm_status_channel, &franka_status);
 
     PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
@@ -435,19 +437,20 @@ void CommunicationInterface::HandlePause(
 
   if (desired_pause) {
     if(pause_data_.pause_sources_set_.find(source)
-        != pause_data_.pause_sources_set_.end()){
+        == pause_data_.pause_sources_set_.end()) {
       dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received pause command from {}",
         source);
-    }
-    if (pause_data_.pause_sources_set_.insert(source).second == false) {
-      dexai::log()->warn(
-          "CommunicationInterface::HandlePause: Already paused by source: {}",
-          source);
+    
+      if (pause_data_.pause_sources_set_.insert(source).second == false) {
+        dexai::log()->warn(
+            "CommunicationInterface::HandlePause: Already paused by source: {}",
+            source);
+      }
     }
   } else {
     if(pause_data_.pause_sources_set_.find(source)
-        != pause_data_.pause_sources_set_.end()){
+        != pause_data_.pause_sources_set_.end()) {
     dexai::log()->warn(
         "CommunicationInterface::HandlePause: Received continue command from "
         "{}",
@@ -458,7 +461,7 @@ void CommunicationInterface::HandlePause(
       pause_data_.pause_sources_set_.erase(source);
     } else {
       if(pause_data_.pause_sources_set_.find(source)
-        != pause_data_.pause_sources_set_.end()){
+        != pause_data_.pause_sources_set_.end()) {
       dexai::log()->warn(
           "Unpausing command rejected: No matching "
           "pause command by source: {}'",
