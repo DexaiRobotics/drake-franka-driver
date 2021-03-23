@@ -334,10 +334,9 @@ void CommunicationInterface::HandlePlan(
   dexai::log()->info("CommInterface:HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
-  const auto current_mode {GetRobotMode()};
-
   //$ check if in proper mode to receive commands
-  if (!CanReceiveCommands(current_mode)) {
+  if (const auto current_mode {GetRobotMode()};
+      !CanReceiveCommands(current_mode)) {
     const auto err_msg {fmt::format(
         "Discarding plan with utime: {}, robot is in wrong mode: {}!",
         robot_spline->utime, utils::RobotModeToString(current_mode))};

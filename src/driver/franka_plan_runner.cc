@@ -45,7 +45,9 @@
 
 #include "driver/franka_plan_runner.h"
 
-#include <cmath>  // for exp
+#include <algorithm>  // for min
+#include <cmath>      // for exp
+#include <vector>     // for vector
 
 #include <drake/lcmt_iiwa_status.hpp>
 
@@ -55,20 +57,6 @@
 
 using franka_driver::FrankaPlanRunner;
 using utils::RobotStatus;
-
-// local function needed by initialisation in RunFranka()
-void SetDefaultBehavior(franka::Robot& robot) {
-  robot.setCollisionBehavior({{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
-                             {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
-                             {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
-                             {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
-                             {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
-                             {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
-                             {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
-                             {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0}});
-  robot.setJointImpedance({{3000, 3000, 3000, 2500, 2500, 2000, 2000}});
-  robot.setCartesianImpedance({{3000, 3000, 3000, 300, 300, 300}});
-}
 
 FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
     : dof_ {FRANKA_DOF},
@@ -152,62 +140,13 @@ int FrankaPlanRunner::Run() {
   return return_value;
 }
 
-void FrankaPlanRunner::SetCollisionBehaviorSafetyOn(franka::Robot& robot) {
-  auto mode = GetRobotMode(robot);
-  if (mode == franka::RobotMode::kMove) {
-    throw std::runtime_error("robot is in mode: "
-                             + utils::RobotModeToString(mode)
-                             + " cannot change collision behavior!");
-  }
-
-  // Changes the collision behavior. Set separate torque and force boundaries
-  // for acceleration/deceleration and constant velocity movement phases.
-
-  // Forces or torques between lower and upper threshold are shown as contacts
-  // in the RobotState. Forces or torques above the upper threshold are
-  // registered as collision and cause the robot to stop moving.
-
-  // Params in order:
-  // lower_torque_thresholds_acceleration,
-  // upper_torque_thresholds_acceleration,
-  // lower_torque_thresholds_nominal,
-  // upper_torque_thresholds_nominal,
-  // lower_force_thresholds_acceleration,
-  // upper_force_thresholds_acceleration,
-  // lower_force_thresholds_nominal,
-  // upper_force_thresholds_nominal
-
-  // TODO(@syler): can we just set the lower threshold to something reasonable
-  // and get away with only increasing the upper threshold?
-
-  robot.setCollisionBehavior(upper_torque_threshold_, upper_torque_threshold_,
-                             upper_torque_threshold_, upper_torque_threshold_,
-                             upper_force_threshold_, upper_force_threshold_,
-                             upper_force_threshold_, upper_force_threshold_);
-}
-
-void FrankaPlanRunner::SetCollisionBehaviorSafetyOff(franka::Robot& robot) {
-  auto mode = GetRobotMode(robot);
-  if (mode == franka::RobotMode::kMove) {
-    throw std::runtime_error("robot is in mode: "
-                             + utils::RobotModeToString(mode)
-                             + " cannot change collision behavior!");
-  }
-  // Changes the collision behavior. Forces or torques above the upper threshold
-  // are registered as collision and cause the robot to stop moving.
-  robot.setCollisionBehavior(kHighTorqueThreshold, kHighTorqueThreshold,
-                             kHighTorqueThreshold, kHighTorqueThreshold,
-                             kHighForceThreshold, kHighForceThreshold,
-                             kHighForceThreshold, kHighForceThreshold);
-}
-
-franka::RobotMode FrankaPlanRunner::GetRobotMode(franka::Robot& robot) {
+franka::RobotMode FrankaPlanRunner::GetRobotMode() const {
   franka::RobotMode current_mode;
-  robot.read([&current_mode](const franka::RobotState& robot_state) {
+  robot_->read([&current_mode](const franka::RobotState& robot_state) {
     current_mode = robot_state.robot_mode;
     return false;
   });
-  dexai::log()->info("GetRobotMode: Franka's current mode is: {}",
+  dexai::log()->info("GetRobotMode: Franka is in mode: {}",
                      utils::RobotModeToString(current_mode));
   return current_mode;
 }
@@ -229,7 +168,7 @@ int FrankaPlanRunner::RunFranka() {
         continue;
       }
 
-      auto current_mode {GetRobotMode(*robot_)};
+      auto current_mode {GetRobotMode()};
       if (current_mode == franka::RobotMode::kReflex) {
         // if in reflex mode, attempt automatic error recovery
         dexai::log()->warn(
@@ -240,7 +179,7 @@ int FrankaPlanRunner::RunFranka() {
           dexai::log()->info(
               "RunFranka: automaticErrorRecovery succeeded, out of Reflex mode,"
               " now in mode: {}.",
-              utils::RobotModeToString(GetRobotMode(*robot_)));
+              utils::RobotModeToString(GetRobotMode()));
         } catch (const franka::ControlException& ce) {
           dexai::log()->warn(
               "RunFranka: control exception in initialisation during automatic "
@@ -267,11 +206,11 @@ int FrankaPlanRunner::RunFranka() {
 
   try {  // initilization
     dexai::log()->info("RunFranka: Setting Default Behavior...");
-    SetDefaultBehavior(*robot_);
+    SetDefaultBehavior();
     dexai::log()->info("RunFranka: Ready.");
     comm_interface_->PublishDriverStatus(true);
     // Set collision behavior:
-    SetCollisionBehaviorSafetyOn(*robot_);
+    SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
     dexai::log()->error(
         "RunFranka: caught expection during initilization, msg: {}", ex.what());
@@ -301,11 +240,19 @@ int FrankaPlanRunner::RunFranka() {
                                   std::placeholders::_2));
       } catch (const franka::ControlException& ce) {
         status_has_changed = true;
-        dexai::log()->warn("RunFranka: control exception in main loop: {}.",
-                           ce.what());
-        comm_interface_->PublishDriverStatus(false, ce.what());
-        if (!RecoverFromControlException(*robot_)) {
+        if (plan_) {  // broadcast exception details over LCM
+          dexai::log()->warn(
+              "RunFranka: control exception during active plan "
+              "{plan_utime_} at franka_t: {:.4f}, aborting and recovering...",
+              franka_time_);
+          comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
+        } else {
+          dexai::log()->warn("RunFranka: control exception in main loop: {}.",
+                             ce.what());
+        }
+        if (!RecoverFromControlException()) {  // plan_ is released/reset
           dexai::log()->error("RunFranka: RecoverFromControlException failed");
+          comm_interface_->PublishDriverStatus(false, ce.what());
           return 1;
         }
       }
@@ -354,37 +301,24 @@ int FrankaPlanRunner::RunFranka() {
   return 0;
 }
 
-bool FrankaPlanRunner::RecoverFromControlException(franka::Robot& robot) {
+bool FrankaPlanRunner::RecoverFromControlException() {
   status_ = RobotStatus::Reversing;
-  dexai::log()->warn("RunFranka: Turning Safety off!");
-  SetCollisionBehaviorSafetyOff(robot);
-  dexai::log()->warn("RunFranka: Turned Safety off!");
-  auto mode = GetRobotMode(robot);
-  if (mode == franka::RobotMode::kUserStopped) {
+  dexai::log()->warn("RunFranka: turning Safety off...");
+  SetCollisionBehaviorSafetyOff();
+  if (auto mode {GetRobotMode()}; mode == franka::RobotMode::kUserStopped) {
     dexai::log()->warn(
-        "RunFranka: Robot is {}, "
+        "RunFranka: Robot is in mode {}, "
         "can't run Franka's automaticErrorRecovery!",
         utils::RobotModeToString(mode));
   } else {
-    dexai::log()->warn("RunFranka: Running Franka's automaticErrorRecovery!");
-    robot.automaticErrorRecovery();
+    dexai::log()->warn("RunFranka: Running Franka's automaticErrorRecovery...");
+    robot_->automaticErrorRecovery();
+    dexai::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery");
   }
-  dexai::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery!");
-  dexai::log()->info("RunFranka: Turning Safety on again!");
-  SetCollisionBehaviorSafetyOn(robot);
-  dexai::log()->info("RunFranka: Turned Safety on again!");
-  return RecoverFromControlException();
-}
-
-bool FrankaPlanRunner::RecoverFromControlException() {
+  dexai::log()->info("RunFranka: Turning Safety on again");
+  SetCollisionBehaviorSafetyOn();
   status_ = RobotStatus::Running;
   if (plan_) {
-    dexai::log()->warn(
-        "RunFranka: control exception caught during active plan {plan_utime_} "
-        "at franka_t: {:.4f}, aborting and recovering...",
-        franka_time_);
-    std::string msg {"control_exception," + std::to_string(franka_time_)};
-    comm_interface_->PublishPlanComplete(plan_utime_, false, msg);
     plan_.release();
     plan_utime_ = -1;  // reset plan utime to -1
   }

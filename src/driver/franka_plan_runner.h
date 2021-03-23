@@ -77,19 +77,74 @@ class FrankaPlanRunner {
   int Run();
 
  protected:
+  void SetDefaultBehavior() {
+    robot_->setCollisionBehavior({{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
+                                 {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
+                                 {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
+                                 {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
+                                 {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
+                                 {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
+                                 {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
+                                 {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0}});
+    robot_->setJointImpedance({{3000, 3000, 3000, 2500, 2500, 2000, 2000}});
+    robot_->setCartesianImpedance({{3000, 3000, 3000, 300, 300, 300}});
+  }
+
   /// Sets collision behavior of robot: at what force threshold
   /// is Franka's Reflex triggered.
   /// Note: Never call this method in the realtime control loop!
   /// Only call this method during initialization. If robot was
   /// already initialized, this method will throw an exception!
-  void SetCollisionBehaviorSafetyOn(franka::Robot& robot);
-  void SetCollisionBehaviorSafetyOff(franka::Robot& robot);
 
-  franka::RobotMode GetRobotMode(franka::Robot& robot);
+  // Changes the collision behavior. Set separate torque and force boundaries
+  // for acceleration/deceleration and constant velocity movement phases.
+
+  // Forces or torques between lower and upper threshold are shown as contacts
+  // in the RobotState. Forces or torques above the upper threshold are
+  // registered as collision and cause the robot to stop moving.
+
+  // TODO(@syler): can we just set the lower threshold to something reasonable
+  // and get away with only increasing the upper threshold?
+  void SetCollisionBehaviorSafetyOn() {
+    if (const auto mode {GetRobotMode()}; mode == franka::RobotMode::kMove) {
+      throw std::runtime_error("robot is in mode: "
+                               + utils::RobotModeToString(mode)
+                               + " cannot change collision behavior!");
+    }
+    // Params in order:
+    // lower_torque_thresholds_acceleration,
+    // upper_torque_thresholds_acceleration,
+    // lower_torque_thresholds_nominal,
+    // upper_torque_thresholds_nominal,
+    // lower_force_thresholds_acceleration,
+    // upper_force_thresholds_acceleration,
+    // lower_force_thresholds_nominal,
+    // upper_force_thresholds_nominal
+    robot_->setCollisionBehavior(
+        upper_torque_threshold_, upper_torque_threshold_,
+        upper_torque_threshold_, upper_torque_threshold_,
+        upper_force_threshold_, upper_force_threshold_, upper_force_threshold_,
+        upper_force_threshold_);
+  }
+
+  void SetCollisionBehaviorSafetyOff() {
+    if (const auto mode {GetRobotMode()}; mode == franka::RobotMode::kMove) {
+      throw std::runtime_error("robot is in mode: "
+                               + utils::RobotModeToString(mode)
+                               + " cannot change collision behavior!");
+    }
+    // Forces or torques above the upper threshold
+    // are registered as collision and cause the robot to stop moving.
+    robot_->setCollisionBehavior(kHighTorqueThreshold, kHighTorqueThreshold,
+                                 kHighTorqueThreshold, kHighTorqueThreshold,
+                                 kHighForceThreshold, kHighForceThreshold,
+                                 kHighForceThreshold, kHighForceThreshold);
+  }
+
+  franka::RobotMode GetRobotMode() const;
 
   int RunFranka();
 
-  bool RecoverFromControlException(franka::Robot& robot);
   bool RecoverFromControlException();
 
   int RunSim();
