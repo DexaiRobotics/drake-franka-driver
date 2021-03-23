@@ -91,6 +91,7 @@ class FrankaPlanRunner {
   std::string ip_addr_;
   const bool is_sim_;
 
+  std::unique_ptr<franka::Robot> robot_ {};
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;

@@ -16,15 +16,27 @@
 #include <iostream>  // for size_t
 
 #include <bits/stdc++.h>  // INT_MAX
+#include <drake/lcmt_iiwa_status.hpp>
 
-#include "drake/lcmt_iiwa_status.hpp"
-#include "examples_common.h"   // for setDefaultBehavior
 #include "franka/exception.h"  // for Exception, ControlException
 #include "franka/robot.h"      // for Robot
 #include "util_math.h"
 
 using namespace franka_driver;
 using namespace utils;
+
+void SetDefaultBehavior(franka::Robot& robot) {
+  robot.setCollisionBehavior({{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
+                             {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
+                             {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
+                             {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
+                             {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
+                             {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
+                             {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
+                             {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0}});
+  robot.setJointImpedance({{3000, 3000, 3000, 2500, 2500, 2000, 2000}});
+  robot.setCartesianImpedance({{3000, 3000, 3000, 300, 300, 300}});
+}
 
 FrankaPlanRunner::FrankaPlanRunner(const RobotParameters params)
     : dof_ {FRANKA_DOF},
@@ -171,156 +183,143 @@ franka::RobotMode FrankaPlanRunner::GetRobotMode(franka::Robot& robot) {
 }
 
 int FrankaPlanRunner::RunFranka() {
-  bool connection_established {false};
-  // attempt connection to robot and read current mode
-  // and if it fails, keep trying instead of exiting the program
-  while (!connection_established) {
-    try {
-      franka::Robot robot(ip_addr_);
+  {  // connection and mode checking and handling
+    // attempt connection to robot and read current mode
+    // and if it fails, keep trying instead of exiting the program
+    bool connection_established {};
+    do {  // do-while(!connection_established) loop, execute once first
+      try {
+        robot_ = std::make_unique<franka::Robot>(ip_addr_);
+      } catch (franka::Exception const& e) {
+        // probably something wrong with networking
+        auto err_msg {fmt::format("Franka connection error: {}", e.what())};
+        dexai::log()->error("RunFranka: {}", err_msg);
+        comm_interface_->PublishDriverStatus(false, err_msg);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        continue;
+      }
 
-      auto current_mode {GetRobotMode(robot)};
-
-      // if in reflex mode, attempt automatic error recovery
+      auto current_mode {GetRobotMode(*robot_)};
       if (current_mode == franka::RobotMode::kReflex) {
+        // if in reflex mode, attempt automatic error recovery
         dexai::log()->warn(
-            "RunFranka: Robot in mode: {} at startup, trying to do "
-            "automaticErrorRecovery ...",
-            utils::RobotModeToString(current_mode));
+            "RunFranka: robot is in Reflex mode at startup, trying "
+            "automaticErrorRecovery...");
         try {
-          robot.automaticErrorRecovery();
+          robot_->automaticErrorRecovery();
           dexai::log()->info(
-              "RunFranka: automaticErrorRecovery() succeeded, "
-              "robot now in mode: {}.",
-              utils::RobotModeToString(current_mode));
+              "RunFranka: automaticErrorRecovery succeeded, out of Reflex mode,"
+              " now in mode: {}.",
+              utils::RobotModeToString(GetRobotMode(*robot_)));
         } catch (const franka::ControlException& ce) {
-          dexai::log()->warn("RunFranka: Caught control exception: {}.",
-                             ce.what());
-          dexai::log()->error("RunFranka: Error recovery did not work!");
+          dexai::log()->warn(
+              "RunFranka: control exception in initialisation during automatic "
+              "error recovery for Reflex mode: {}.",
+              ce.what());
           comm_interface_->PublishDriverStatus(false, ce.what());
-          continue;
         }
       } else if (current_mode != franka::RobotMode::kIdle) {
-        auto err_msg {fmt::format("Robot cannot receive commands in mode {}",
-                                  utils::RobotModeToString(current_mode))};
+        auto err_msg {
+            fmt::format("RunFranka: robot cannot receive commands in mode: {}",
+                        utils::RobotModeToString(current_mode))};
         dexai::log()->error("RunFranka: {}", err_msg);
         comm_interface_->PublishDriverStatus(false, err_msg);
       } else if (current_mode == franka::RobotMode::kUserStopped) {
-        dexai::log()->error("RunFranka: Robot User Stopped");
+        dexai::log()->error("RunFranka: robot is in User-Stopped mode");
         comm_interface_->PublishBoolToChannel(
             utils::get_current_utime(),
             comm_interface_->GetUserStopChannelName(), true);
-      } else {
-        // if we got this far, we are talking to the Franka and it is happy
+      } else {  // if we got this far, we are talking to Franka and it is happy
         connection_established = true;
       }
-    } catch (franka::Exception const& e) {
-      // if we hit this logic, there is probably something wrong with the
-      // networking
-      auto err_msg {fmt::format("Franka connection error: {}", e.what())};
-      dexai::log()->error("RunFranka: {}", err_msg);
-      comm_interface_->PublishDriverStatus(false, err_msg);
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    } while (!connection_established);
   }
 
-  try {
-    // Connect to robot.
-    franka::Robot robot(ip_addr_);
+  try {  // initilization
     dexai::log()->info("RunFranka: Setting Default Behavior...");
-    setDefaultBehavior(robot);
-
+    SetDefaultBehavior(*robot_);
     dexai::log()->info("RunFranka: Ready.");
     comm_interface_->PublishDriverStatus(true);
-
-    // Set additional parameters always before the control loop, NEVER in the
-    // control loop!
     // Set collision behavior:
-    SetCollisionBehaviorSafetyOn(robot);
+    SetCollisionBehaviorSafetyOn(*robot_);
+  } catch (const franka::Exception& ex) {
+    dexai::log()->error(
+        "RunFranka: caught expection during initilization, msg: {}", ex.what());
+    comm_interface_->PublishDriverStatus(false, ex.what());
+    return 1;  // bad things happened.
+  }
 
-    // Initilization is done, define robot as running:
-    status_ = RobotStatus::Running;
+  status_ = RobotStatus::Running;  // init done, define robot as running
+  bool status_has_changed {true};
 
-    bool status_has_changed = true;
-    //$ main control loop
-    while (true) {
-      try {
-        auto paused_by_lcm {comm_interface_->GetPauseStatus()};
-        auto new_status {paused_by_lcm ? RobotStatus::Paused
-                                       : RobotStatus::Running};
-        // check if status has changed
-        if (status_ != new_status) {
-          status_has_changed = true;
-          status_ = new_status;
-        }
+  while (true) {  // main control loop
+    auto new_status {comm_interface_->GetPauseStatus() ? RobotStatus::Paused
+                                                       : RobotStatus::Running};
+    if (new_status != status_) {  // check if status has changed
+      status_has_changed = true;
+      status_ = new_status;
+    }
 
-        // prevent the plan from being started if robot is not running...
-        if (comm_interface_->HasNewPlan() && status_ == RobotStatus::Running) {
-          dexai::log()->info(
-              "RunFranka: found a new plan, attaching callback...");
-          status_has_changed = true;
-          // Use either joint position or impedance control callback here
-          robot.control(std::bind(&FrankaPlanRunner::JointPositionCallback,
+    // prevent the plan from being started if robot is not running...
+    if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()) {
+      dexai::log()->info("RunFranka: found a new plan, attaching callback...");
+      status_has_changed = true;
+      try {  // Use either joint position or impedance control callback here
+        // blocking
+        robot_->control(std::bind(&FrankaPlanRunner::JointPositionCallback,
                                   this, std::placeholders::_1,
                                   std::placeholders::_2));
-        } else {
-          if (comm_interface_->CancelPlanRequested()) {
-            log()->error(
-                "RunFranka: plan cancellation requested but there is no active "
-                "plan");
-            comm_interface_->ClearCancelPlanRequest();
-          }
-          // no plan available or paused
-          // print out status if there's any change or every 10 sec
-          if (auto t_now {std::chrono::steady_clock::now()};
-              status_has_changed
-              || t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
-            if (status_ == RobotStatus::Running) {
-              dexai::log()->info(
-                  "RunFranka: Robot is running and waiting for a new plan...");
-            } else if (status_ == RobotStatus::Paused) {
-              dexai::log()->info(
-                  "RunFranka: Robot is paused, waiting to get unpaused...");
-            } else {
-              dexai::log()->error(
-                  "RunFranka: Robot is {}, this state should not have happened",
-                  utils::RobotStatusToString(status_));
-            }
-            status_has_changed = false;  // reset
-            t_last_main_loop_log_ = t_now;
-          }
-          // only publish robot_status, do that twice as fast as the lcm publish
-          // rate ...
-          // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
-          robot.read([this](const franka::RobotState& robot_state) {
-            auto cannonical_robot_state =
-                ConvertToCannonical(robot_state, joint_pos_offset_);
-            // publishing cannonical values over lcm
-            comm_interface_->SetRobotData(cannonical_robot_state,
-                                          next_conf_plan_);
-            std::this_thread::sleep_for(std::chrono::milliseconds(
-                static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
-            return false;
-          });
-        }
       } catch (const franka::ControlException& ce) {
         status_has_changed = true;
-        dexai::log()->warn("RunFranka: Caught control exception: {}.",
+        dexai::log()->warn("RunFranka: control exception in main loop: {}.",
                            ce.what());
-
-        if (!RecoverFromControlException(robot)) {
-          dexai::log()->error(
-              "RunFranka: RecoverFromControlException did not work!");
-          comm_interface_->PublishDriverStatus(false, ce.what());
+        comm_interface_->PublishDriverStatus(false, ce.what());
+        if (!RecoverFromControlException(*robot_)) {
+          dexai::log()->error("RunFranka: RecoverFromControlException failed");
           return 1;
         }
       }
+      continue;
     }
-
-  } catch (const franka::Exception& ex) {
-    dexai::log()->error(
-        "RunFranka: Caught expection during initilization, msg: {}", ex.what());
-    comm_interface_->PublishDriverStatus(false, ex.what());
-    return 1;  // bad things happened.
+    // no new plan available in the buffer or robot isn't running
+    if (comm_interface_->CancelPlanRequested()) {
+      log()->error(
+          "RunFranka: plan cancellation requested but there is no active "
+          "plan");
+      comm_interface_->ClearCancelPlanRequest();
+    }
+    // print out status if there's any change, or every 10 sec
+    if (auto t_now {std::chrono::steady_clock::now()};
+        status_has_changed
+        || t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
+      switch (status_) {
+        case RobotStatus::Running:
+          dexai::log()->info(
+              "RunFranka: robot is running and waiting for a new plan...");
+          break;
+        case RobotStatus::Paused:
+          dexai::log()->info(
+              "RunFranka: robot is paused, waiting to get unpaused...");
+          break;
+        default:
+          dexai::log()->error(
+              "RunFranka: robot status: {}, this should not have happened",
+              utils::RobotStatusToString(status_));
+      }
+      status_has_changed = false;  // reset
+      t_last_main_loop_log_ = t_now;
+    }
+    // only publish robot_status, twice as fast as the lcm publish rate
+    // TODO: add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
+    robot_->read([this](const franka::RobotState& robot_state) {
+      auto cannonical_robot_state {
+          ConvertToCannonical(robot_state, joint_pos_offset_)};
+      // publishing cannonical values over lcm
+      comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_);
+      std::this_thread::sleep_for(std::chrono::milliseconds(
+          static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
+      return false;
+    });
   }
   return 0;
 };
