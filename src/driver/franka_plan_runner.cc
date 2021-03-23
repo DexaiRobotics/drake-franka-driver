@@ -73,7 +73,7 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   assert(!params_.urdf_filepath.empty()
          && "FrankaPlanRunner ctor: bad params_.urdf_filepath");
   CONV_SPEED_THRESHOLD = Eigen::VectorXd(dof_);  // segfault without reallocate
-  CONV_SPEED_THRESHOLD << 0.0082, 0.0082, 0.0082, 0.0082, 0.0082, 0.0082,
+  CONV_SPEED_THRESHOLD << 0.0082, 0.0082, 0.0082, 0.0079, 0.0082, 0.0082,
       0.0082;
 
   // Create a ConstraintSolver, which creates a geometric model from parameters
@@ -590,7 +590,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec());
 
   // read out robot state
-  franka::JointPositions output_to_franka = robot_state.q_d;
+  franka::JointPositions output_to_franka {robot_state.q_d};
   // scale to cannonical robot state
   auto cannonical_robot_state =
       utils::ConvertToCannonical(robot_state, joint_pos_offset_);
@@ -627,7 +627,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: Discarding plan, mismatched start position."
           " Max distance: {} > {}",
           max_ang_distance, params_.kMediumJointDistance);
-      return franka::MotionFinished(output_to_franka);
+      plan_.release();
+      plan_utime_ = -1;  // reset plan to -1
+      comm_interface_->PublishPlanComplete(
+          plan_utime_, false, "discarded due to mismatched start conf");
+      return franka::MotionFinished(franka::JointPositions(robot_state.q));
     } else if (max_ang_distance > params_.kTightJointDistance) {
       dexai::log()->warn(
           "JointPositionCallback: max angular distance between franka and "
