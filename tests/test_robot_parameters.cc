@@ -1,8 +1,8 @@
 /// @file: test_yaml.cc -- part of a googletest suite
 #include <gtest/gtest.h>
 // #include "util_test.h"
-#include "constraint_solver.h"
-#include "robot_parameters.h"
+#include "driver/constraint_solver.h"
+#include "utils/robot_parameters.h"
 
 static std::string empty_string("");
 

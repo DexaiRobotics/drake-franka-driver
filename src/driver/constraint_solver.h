@@ -7,7 +7,7 @@
 #include <drake/systems/analysis/simulator.h>
 #include <drake/systems/framework/diagram_builder.h>
 
-#include "robot_parameters.h"
+#include "utils/robot_parameters.h"
 
 namespace franka_driver {
 

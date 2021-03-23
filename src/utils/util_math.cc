@@ -1,7 +1,7 @@
 ///@file: util_math.cc
-#include "util_math.h"
+#include "utils/util_math.h"
 
-#include "dexai_log.h"
+#include "utils/dexai_log.h"
 
 using drake::trajectories::PiecewisePolynomial;
 

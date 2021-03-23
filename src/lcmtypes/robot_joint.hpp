@@ -7,9 +7,9 @@
 #ifndef __lcmtypes_robot_joint_hpp__
 #define __lcmtypes_robot_joint_hpp__
 
-#include <string>
-
 #include <lcm/lcm_coretypes.h>
+
+#include <string>
 
 namespace lcmtypes {
 

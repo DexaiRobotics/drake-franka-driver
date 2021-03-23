@@ -1,8 +1,8 @@
 /// @file: test_make_dirs.cc -- part of a googletest suite
 #include <gtest/gtest.h>
 
-#include "util_io.h"
-#include "util_math.h"
+#include "utils/util_io.h"
+#include "utils/util_math.h"
 // #include "momap/file_formats.h"
 
 #include <limits.h>

@@ -27,14 +27,14 @@
 
 #include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
 
-#include "communication_interface.h"  // for CommunicationInterface
-#include "constraint_solver.h"        // for ConstraintSolver
-#include "franka/control_types.h"     // for franka::JointPositions
-#include "franka/duration.h"          // for franka::Duration
-#include "franka/robot.h"             // for franka::Robot
-#include "franka/robot_state.h"       // for franka::RobotState
-#include "robot_parameters.h"         // for RobotParameters
-#include "util_conv.h"                // for RobotStatus
+#include "driver/communication_interface.h"  // for CommunicationInterface
+#include "driver/constraint_solver.h"        // for ConstraintSolver
+#include "franka/control_types.h"            // for franka::JointPositions
+#include "franka/duration.h"                 // for franka::Duration
+#include "franka/robot.h"                    // for franka::Robot
+#include "franka/robot_state.h"              // for franka::RobotState
+#include "utils/robot_parameters.h"          // for RobotParameters
+#include "utils/util_conv.h"                 // for RobotStatus
 
 #define FRANKA_DOF 7
 

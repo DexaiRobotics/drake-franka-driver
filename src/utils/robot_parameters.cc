@@ -1,11 +1,11 @@
 // @file  robot_parameters.cc
-#include "robot_parameters.h"
+#include "utils/robot_parameters.h"
 
 #include <pwd.h>
 
 #include <stdexcept>
 
-#include "util_string.h"
+#include "utils/util_string.h"
 
 namespace franka_driver {
 

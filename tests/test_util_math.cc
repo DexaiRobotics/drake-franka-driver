@@ -1,7 +1,7 @@
 // @file: test_util_math.cc -- part of a googletest suite
 #include <gtest/gtest.h>
 
-#include "util_math.h"
+#include "utils/util_math.h"
 
 TEST(UtilMath, v_to_e_and_e_to_v) {
   Eigen::VectorXd e = Eigen::VectorXd::Zero(7);

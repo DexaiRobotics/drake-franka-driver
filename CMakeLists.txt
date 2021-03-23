@@ -21,8 +21,8 @@ find_package(drake REQUIRED)
 set(FRANKA_BUILD_DIR "${CMAKE_SOURCE_DIR}/externals/libfranka/build")
 list(APPEND CMAKE_PREFIX_PATH ${FRANKA_BUILD_DIR})
 find_package(Franka REQUIRED)
-message(STATUS "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
-message(STATUS "Franka_LIBRARIES: ${Franka_LIBRARIES}")
+message("Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
+message("Franka_LIBRARIES: ${Franka_LIBRARIES}")
 
 find_package(yaml-cpp REQUIRED COMPONENTS shared)
 find_package(GTest REQUIRED)
@@ -52,7 +52,7 @@ configure_file(tests/data/franka_test.yaml "${CMAKE_CURRENT_BINARY_DIR}" COPYONL
 
 # add include dir for Franka headers
 include_directories(
-  ${CMAKE_SOURCE_DIR}
+  ${CMAKE_SOURCE_DIR}/src
   ${SPDLOG_INCLUDE_DIR}
   ${YAML_INCLUDES}
   ${FILESYSTEM_INCLUDE_DIR}
@@ -73,18 +73,18 @@ target_link_libraries(send_stop
 # build the lcm driver that uses Franka Robot Interface (FRI)
 set(driver_name franka_driver)
 add_executable(franka_driver
-  src/franka_driver.cc
-  src/franka_plan_runner.cc
-  src/communication_interface.cc
-  # src/examples_common.cpp
-  src/util_conv.cc
-  src/util_io.cc
-  src/util_math.cc
-  src/util_string.cc
-  src/robot_parameters.cc
-  src/constraint_solver.cc
-  src/dexai_log.cc
-  src/polynomial_encode_decode.cc
+  src/driver/franka_driver.cc
+  src/driver/franka_plan_runner.cc
+  src/driver/communication_interface.cc
+  src/driver/constraint_solver.cc
+  # src/examples/examples_common.cpp
+  src/utils/util_conv.cc
+  src/utils/util_io.cc
+  src/utils/util_math.cc
+  src/utils/util_string.cc
+  src/utils/robot_parameters.cc
+  src/utils/dexai_log.cc
+  src/utils/polynomial_encode_decode.cc
 )
 
 target_link_libraries(franka_driver
@@ -124,13 +124,13 @@ set(TEST_INCLUDES
 )
 
 set(TEST_SOURCES
-  src/util_conv.cc
-  src/util_io.cc
-  src/util_math.cc
-  src/util_string.cc
-  src/robot_parameters.cc
-  src/constraint_solver.cc
-  src/dexai_log.cc
+  src/driver/constraint_solver.cc
+  src/utils/util_conv.cc
+  src/utils/util_io.cc
+  src/utils/util_math.cc
+  src/utils/util_string.cc
+  src/utils/robot_parameters.cc
+  src/utils/dexai_log.cc
 )
 
 set(TEST_LINK_LIBRARIES

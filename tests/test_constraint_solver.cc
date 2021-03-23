@@ -1,7 +1,7 @@
 // @file: test_constraint_solver.cc -- part of a googletest suite
 #include <gtest/gtest.h>
 
-#include "constraint_solver.h"
+#include "driver/constraint_solver.h"
 
 static std::string empty_string;
 using namespace franka_driver;

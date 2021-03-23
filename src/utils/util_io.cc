@@ -2,7 +2,7 @@
 
 /// @file: util_io.cc
 
-#include "include/util_io.h"
+#include "utils/util_io.h"
 
 #include <errno.h>
 #include <fcntl.h>
@@ -23,7 +23,7 @@
 #include <cstdint>
 #include <iomanip>
 
-#include "include/dexai_log.h"
+#include "utils/dexai_log.h"
 
 #ifndef OPEN_MAX
 #define OPEN_MAX 0  // Guess 256 if it must be determinate

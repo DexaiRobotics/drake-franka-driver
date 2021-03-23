@@ -16,16 +16,17 @@
 /// If a pause message is received, it will set the opause status to true and
 /// keep track of what source paused it.
 
-#include "communication_interface.h"
+#include "driver/communication_interface.h"
 
-#include <chrono>  // for steady_clock, for duration
+#include <chrono>   // for steady_clock, for duration
+#include <utility>  // for move
 
-#include "polynomial_encode_decode.h"  // for decodePiecewisePolynomial
 #include "robot_msgs/bool_t.hpp"
-#include "robot_msgs/pause_cmd.hpp"  // for pause_cmd
-#include "robot_msgs/trigger_t.hpp"  // for trigger_t
-#include "util_conv.h"               // ConvertToLcmStatus
-#include "util_io.h"                 // for get_current_utime
+#include "robot_msgs/pause_cmd.hpp"          // for pause_cmd
+#include "robot_msgs/trigger_t.hpp"          // for trigger_t
+#include "utils/polynomial_encode_decode.h"  // for decodePiecewisePolynomial
+#include "utils/util_conv.h"                 // ConvertToLcmStatus
+#include "utils/util_io.h"                   // for get_current_utime
 
 // using namespace franka_driver;
 using franka_driver::CommunicationInterface;

@@ -2,9 +2,9 @@
 #pragma once
 
 #include "Eigen/Geometry"
-#include "communication_interface.h"
 #include "drake/lcmt_iiwa_status.hpp"  // for lcmt_iiwa_status
-#include "franka/robot_state.h"        // for RobotState, RobotMode
+#include "driver/communication_interface.h"
+#include "franka/robot_state.h"  // for RobotState, RobotMode
 
 /// NOTE @sprax: I doubt there is still a need to organized these functions
 /// here. They could be elsewhere or be eliminated.

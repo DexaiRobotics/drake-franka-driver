@@ -1,10 +1,10 @@
 ///@file: util_conv.cc
-#include "util_conv.h"
+#include "utils/util_conv.h"
 
 #include <sys/time.h>  // for gettimeofday()
 
-#include "dexai_log.h"
-#include "util_math.h"
+#include "utils/dexai_log.h"
+#include "utils/util_math.h"
 
 namespace utils {
 

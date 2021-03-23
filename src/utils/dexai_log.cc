@@ -1,9 +1,9 @@
 // @file  dexai/log_dexai.cc
-#include "dexai_log.h"
+#include "utils/dexai_log.h"
 
 #include <iostream>
 
-#include "utils.h"
+#include "utils/utils.h"
 
 namespace {
 // static drake::never_destroyed<std::shared_ptr<slogger>> s_logger = nullptr;

@@ -7,10 +7,10 @@
 #ifndef __lcmtypes_robot_spline_t_hpp__
 #define __lcmtypes_robot_spline_t_hpp__
 
+#include <lcm/lcm_coretypes.h>
+
 #include <string>
 #include <vector>
-
-#include <lcm/lcm_coretypes.h>
 
 #include "bot_core/position_3d_t.hpp"
 #include "drake/lcmt_piecewise_polynomial.hpp"

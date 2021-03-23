@@ -26,12 +26,12 @@
 #include <thread>  // for thread
 #include <tuple>
 
-#include <lcm/lcm-cpp.hpp>              // for lcm
-#include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
-#include <robot_msgs/pause_cmd.hpp>     // for pause_cmd
+#include <lcm/lcm-cpp.hpp>  // for lcm
 
-#include "franka/robot_state.h"  // for RobotState
-#include "robot_parameters.h"    // for RobotParameters
+#include "franka/robot_state.h"         // for RobotState
+#include "lcmtypes/robot_spline_t.hpp"  // for robot_spline_t
+#include "robot_msgs/pause_cmd.hpp"     // for pause_cmd
+#include "utils/robot_parameters.h"     // for RobotParameters
 
 using drake::trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;

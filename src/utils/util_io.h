@@ -18,7 +18,7 @@
 #include <thread>
 #include <vector>
 
-#include "include/dexai_log.h"
+#include "utils/dexai_log.h"
 
 namespace fs = std::filesystem;
 

@@ -14,7 +14,7 @@
 /// If a stop message is received, it will immediately discard the
 /// current plan and wait until a new plan is received.
 
-#include "franka_plan_runner.h"
+#include "driver/franka_plan_runner.h"
 
 #include <cmath>  // for exp
 
@@ -22,7 +22,7 @@
 
 #include "franka/exception.h"  // for Exception, ControlException
 #include "franka/robot.h"      // for Robot
-#include "util_math.h"
+#include "utils/util_math.h"
 
 using franka_driver::FrankaPlanRunner;
 using utils::RobotStatus;

@@ -1,5 +1,5 @@
 // @file  constraint_solver.cc
-#include "constraint_solver.h"
+#include "driver/constraint_solver.h"
 
 #include <unistd.h>
 
@@ -13,7 +13,7 @@
 #include <filesystem>
 #include <limits>
 
-#include "utils.h"
+#include "utils/utils.h"
 
 namespace fs = std::filesystem;
 

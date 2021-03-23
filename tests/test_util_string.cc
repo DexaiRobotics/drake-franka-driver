@@ -1,7 +1,7 @@
 /// @file test_util_string.cc -- part of a googletest suite
 #include <gtest/gtest.h>
 
-#include "util_string.h"
+#include "utils/util_string.h"
 
 // TODO: Add test for hostname_string()
 

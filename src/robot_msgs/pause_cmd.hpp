@@ -7,9 +7,9 @@
 #ifndef __robot_msgs_pause_cmd_hpp__
 #define __robot_msgs_pause_cmd_hpp__
 
-#include <string>
-
 #include <lcm/lcm_coretypes.h>
+
+#include <string>
 
 namespace robot_msgs {
 

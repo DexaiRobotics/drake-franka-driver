@@ -2,8 +2,8 @@
 ///
 /// franka_driver runs an instance of franka_plan_runner
 
-#include "franka_plan_runner.h"
-#include "util_io.h"  // for lock_pid_file
+#include "driver/franka_plan_runner.h"
+#include "utils/util_io.h"  // for lock_pid_file
 
 namespace dru = utils;
 
