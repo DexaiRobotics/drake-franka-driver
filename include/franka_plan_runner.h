@@ -13,6 +13,7 @@
 
 #include <Eigen/Dense>  // for Eigen::VectorXd
 
+#include <chrono>
 #include <cstdint>  // for int64_t
 #include <mutex>    // for mutex
 #include <thread>   // for thread
@@ -84,16 +85,16 @@ class FrankaPlanRunner {
       const franka::RobotState& robot_state, franka::Duration period);
 
  private:
-  const int dof_;                // degrees of freedom of franka
-  const std::string home_addr_;  // home address of robot
-  const bool safety_off_;        // torque and force limits to max
+  const int dof_;          // degrees of freedom of franka
+  const bool safety_off_;  // torque and force limits to max
+  RobotParameters params_;
+  std::string ip_addr_;
+  const bool is_sim_;
+
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
   std::unique_ptr<ConstraintSolver> constraint_solver_;
-  RobotParameters params_;
-
-  std::string ip_addr_;
 
   std::function<franka::JointPositions(const franka::RobotState&,
                                        franka::Duration)>
@@ -107,7 +108,9 @@ class FrankaPlanRunner {
   float target_stop_time_;
   float stop_duration_;
   float stop_margin_counter_ = 0;
-  int cur_plan_number_ = -1;  // for ensuring the plan is new
+
+  // last run loop status update
+  std::chrono::time_point<std::chrono::steady_clock> t_last_main_loop_log_ {};
 
   // We control the robot at 1 kHz using the callback function
   // which gets called by the robot at 1 kHz over direct eithernet.

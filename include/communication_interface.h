@@ -44,15 +44,14 @@ struct PauseData {
 };
 
 struct RobotPiecewisePolynomial {
-  std::atomic<bool> has_plan_data;
   int64_t utime;
   std::unique_ptr<PPType> plan;
 };
 
 class CommunicationInterface {
  public:
-  CommunicationInterface(const RobotParameters params,
-                         double lcm_publish_rate = 200.0 /* Hz */);
+  explicit CommunicationInterface(const RobotParameters& params,
+                                  double lcm_publish_rate = 200.0 /* Hz */);
   ~CommunicationInterface() {};
   void StartInterface();
   void StopInterface();
@@ -67,8 +66,12 @@ class CommunicationInterface {
   bool CancelPlanRequested() const { return cancel_plan_requested_; };
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; };
 
-  bool HasNewPlan();
-  void TakePlan(std::unique_ptr<PPType>& plan, int64_t& plan_utime);
+  bool HasNewPlan() {
+    std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
+    return !(new_plan_buffer_.plan == nullptr);
+  }
+
+  std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
 
   // TODO: remove franka specific RobotState type and replace with std::array
   franka::RobotState GetRobotState();
@@ -76,12 +79,9 @@ class CommunicationInterface {
   // acquire mutex lock and return robot mode
   franka::RobotMode GetRobotMode();
 
-  /// Blocking call that sets the robot state
+  // Set the robot state, blocking
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf);
-  /// Non-blocking call that sets the robot state if possible
-  void TryToSetRobotData(const franka::RobotState& robot_state,
-                         const Eigen::VectorXd& robot_plan_next_conf);
 
   bool GetPauseStatus();
   void SetPauseStatus(bool paused);
@@ -133,7 +133,10 @@ class CommunicationInterface {
 
   ::lcm::LCM lcm_;
 
-  RobotPiecewisePolynomial robot_plan_;
+  // This is a buffer storing the new plan received. Capacility is only 1.
+  // Once this plan is popped (taken), this buffer is emptied and avialable
+  // to store a new plan, while the current plan may be running.
+  RobotPiecewisePolynomial new_plan_buffer_;
   std::mutex robot_plan_mutex_;
 
   RobotData robot_data_;
