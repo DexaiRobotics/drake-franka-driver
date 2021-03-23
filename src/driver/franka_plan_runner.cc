@@ -188,18 +188,20 @@ int FrankaPlanRunner::RunFranka() {
               "error recovery for Reflex mode: {}.",
               ce.what());
           comm_interface_->PublishDriverStatus(false, ce.what());
+          std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
       } else if (current_mode != franka::RobotMode::kIdle) {
-        auto err_msg {
-            fmt::format("RunFranka: robot cannot receive commands in mode: {}",
-                        utils::RobotModeToString(current_mode))};
+        auto err_msg {fmt::format("robot cannot receive commands in mode: {}",
+                                  utils::RobotModeToString(current_mode))};
         dexai::log()->error("RunFranka: {}", err_msg);
         comm_interface_->PublishDriverStatus(false, err_msg);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
       } else if (current_mode == franka::RobotMode::kUserStopped) {
         dexai::log()->error("RunFranka: robot is in User-Stopped mode");
         comm_interface_->PublishBoolToChannel(
             utils::get_current_utime(),
             comm_interface_->GetUserStopChannelName(), true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
       } else {  // if we got this far, we are talking to Franka and it is happy
         dexai::log()->info("RunFranka: connected to robot in {} mode",
                            utils::RobotModeToString(current_mode));
@@ -710,7 +712,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
         && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()
-        && dq_abs.norm() < CONV_SPEED_NORM_THRESHOLD) {
+        && dq_abs.norm() <= CONV_SPEED_NORM_THRESHOLD) {
       dexai::log()->info(
           "JointPositionCallback: plan {} overtime by {:.4f} s, "
           "converged within grace period, finished; "
