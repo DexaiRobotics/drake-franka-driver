@@ -31,17 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-// @file: test_util_math.cc -- part of a googletest suite
-#include <gtest/gtest.h>
+/// @file types.h
+#pragma once
 
-#include "utils/util_math.h"
+#include <Eigen/Dense>  // in: #include "drake/common/eigen_types.h"
 
-TEST(UtilMath, v_to_e_and_e_to_v) {
-  Eigen::VectorXd e = Eigen::VectorXd::Zero(7);
-  e << 10, 8, 10, 8, 8, 4, 9;
-  std::vector<double> v;
-  ASSERT_NO_THROW(v = utils::e_to_v(e));
-  Eigen::VectorXd e2;
-  ASSERT_NO_THROW(e2 = utils::v_to_e(v));
-  EXPECT_TRUE(utils::VectorEpsEq(e, e2));
-}
+#include <vector>
+
+typedef unsigned int uint;
+typedef Eigen::VectorXd robot_conf_t;
+typedef std::vector<robot_conf_t> robot_conf_vector_t;
+typedef robot_conf_vector_t conf_vector_t;  // shorter alias

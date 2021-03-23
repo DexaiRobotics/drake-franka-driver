@@ -31,17 +31,44 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-// @file: test_util_math.cc -- part of a googletest suite
-#include <gtest/gtest.h>
+/// @file util_conv.h
+#pragma once
 
-#include "utils/util_math.h"
+#include <Eigen/Geometry>
 
-TEST(UtilMath, v_to_e_and_e_to_v) {
-  Eigen::VectorXd e = Eigen::VectorXd::Zero(7);
-  e << 10, 8, 10, 8, 8, 4, 9;
-  std::vector<double> v;
-  ASSERT_NO_THROW(v = utils::e_to_v(e));
-  Eigen::VectorXd e2;
-  ASSERT_NO_THROW(e2 = utils::v_to_e(v));
-  EXPECT_TRUE(utils::VectorEpsEq(e, e2));
-}
+#include <string>
+
+#include <drake/lcmt_iiwa_status.hpp>  // for lcmt_iiwa_status
+
+#include "driver/communication_interface.h"
+#include "franka/robot_state.h"  // for RobotState, RobotMode
+
+namespace utils {
+
+// Enums for Defining Status
+enum class RobotStatus {
+  Uninitialized,
+  Running,
+  Pausing,
+  Paused,
+  Unpausing,
+  Reversing,
+};
+
+enum PauseCommandType { CONTINUE = 0, PAUSE = 1, CANCEL_PLAN = 2 };
+
+// Status Conversions:
+
+std::string RobotModeToString(franka::RobotMode mode);
+
+std::string RobotStatusToString(RobotStatus status);
+
+drake::lcmt_iiwa_status ConvertToLcmStatus(
+    const franka_driver::RobotData& robot_data);
+
+drake::lcmt_iiwa_status EigenToLcmStatus(Eigen::VectorXd robot_state);
+
+franka::RobotState ConvertToCannonical(const franka::RobotState& robot_state,
+                                       const Eigen::VectorXd& offsets);
+
+}  //  namespace utils

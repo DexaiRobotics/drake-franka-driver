@@ -31,17 +31,20 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-// @file: test_util_math.cc -- part of a googletest suite
-#include <gtest/gtest.h>
+/// @file util_string.h
+/// Namespaced utilities for strings
+#pragma once
 
-#include "utils/util_math.h"
+#include <sstream>
+#include <string>
+#include <vector>
 
-TEST(UtilMath, v_to_e_and_e_to_v) {
-  Eigen::VectorXd e = Eigen::VectorXd::Zero(7);
-  e << 10, 8, 10, 8, 8, 4, 9;
-  std::vector<double> v;
-  ASSERT_NO_THROW(v = utils::e_to_v(e));
-  Eigen::VectorXd e2;
-  ASSERT_NO_THROW(e2 = utils::v_to_e(v));
-  EXPECT_TRUE(utils::VectorEpsEq(e, e2));
-}
+namespace utils {
+
+/// return uppercase version of string
+std::string to_uppercase(const std::string& str);
+
+/// return hostname of computer this is being run on
+std::string hostname_string();
+
+}  //  namespace utils

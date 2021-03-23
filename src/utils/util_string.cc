@@ -31,17 +31,29 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-// @file: test_util_math.cc -- part of a googletest suite
-#include <gtest/gtest.h>
+// @file  util_string.cc
+#include "utils/util_string.h"
 
-#include "utils/util_math.h"
+#include <limits.h>
+#include <stdio.h>
+#include <unistd.h>
 
-TEST(UtilMath, v_to_e_and_e_to_v) {
-  Eigen::VectorXd e = Eigen::VectorXd::Zero(7);
-  e << 10, 8, 10, 8, 8, 4, 9;
-  std::vector<double> v;
-  ASSERT_NO_THROW(v = utils::e_to_v(e));
-  Eigen::VectorXd e2;
-  ASSERT_NO_THROW(e2 = utils::v_to_e(v));
-  EXPECT_TRUE(utils::VectorEpsEq(e, e2));
+#include <algorithm>
+
+namespace utils {
+
+std::string to_uppercase(const std::string& str) {
+  std::string s = str;
+  std::transform(s.begin(), s.end(), s.begin(),
+                 std::ptr_fun<int, int>(std::toupper));
+  return s;
 }
+
+std::string hostname_string() {
+  char hostname[HOST_NAME_MAX];
+  gethostname(hostname, HOST_NAME_MAX);
+  std::string hostname_str(hostname);
+  return hostname_str;
+}
+
+}  // namespace utils
