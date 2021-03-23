@@ -73,8 +73,7 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   assert(!params_.urdf_filepath.empty()
          && "FrankaPlanRunner ctor: bad params_.urdf_filepath");
   CONV_SPEED_THRESHOLD = Eigen::VectorXd(dof_);  // segfault without reallocate
-  CONV_SPEED_THRESHOLD << 0.0082, 0.0082, 0.0082, 0.0079, 0.0082, 0.0082,
-      0.0082;
+  CONV_SPEED_THRESHOLD << 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007;
 
   // Create a ConstraintSolver, which creates a geometric model from parameters
   // and URDF(s) and keeps it in a fully owned MultiBodyPlant.
@@ -710,7 +709,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         plan_utime_, franka_time_, max_joint_err);
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
-        && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()) {
+        && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()
+        && dq_abs.norm() < CONV_SPEED_NORM_THRESHOLD) {
       dexai::log()->info(
           "JointPositionCallback: plan {} overtime by {:.4f} s, "
           "converged within grace period, finished; "
@@ -720,7 +720,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       plan_.release();     // reset unique ptr
       plan_utime_ = -1;    // reset plan to -1
       dexai::log()->info(  // for control exception
-          "speeds at convergence:\n\tdq:\t{}\n\texcess:\t{}",
+          "Joint speeds at convergence:\n\tdq:\t{}\n\texcess:\t{}",
           dq_abs.transpose(),
           (dq_abs.array() - CONV_SPEED_THRESHOLD.array()).transpose());
       return franka::MotionFinished(output_to_franka);

@@ -261,7 +261,8 @@ class FrankaPlanRunner {
   // A higher speed threshold may result in the benign libfranka exception:
   //    Motion finished commanded, but the robot is still moving!
   //    ["joint_motion_generator_acceleration_discontinuity"]
-  const double CONV_ANGLE_THRESHOLD {0.0010};  // rad, empirical
+  const double CONV_ANGLE_THRESHOLD {1e-3};         // rad, empirical
+  const double CONV_SPEED_NORM_THRESHOLD {7.5e-3};  // rad/s, L2
   Eigen::VectorXd CONV_SPEED_THRESHOLD;
 };  // FrankaPlanRunner
 
