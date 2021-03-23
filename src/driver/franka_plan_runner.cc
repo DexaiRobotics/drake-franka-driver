@@ -171,7 +171,8 @@ int FrankaPlanRunner::RunFranka() {
       }
 
       auto current_mode {GetRobotMode()};
-      if (current_mode == franka::RobotMode::kReflex) {
+      if (auto t_now {std::chrono::steady_clock::now()};
+          current_mode == franka::RobotMode::kReflex) {
         // if in reflex mode, attempt automatic error recovery
         dexai::log()->warn(
             "RunFranka: robot is in Reflex mode at startup, trying "
@@ -183,25 +184,28 @@ int FrankaPlanRunner::RunFranka() {
               " now in mode: {}.",
               utils::RobotModeToString(GetRobotMode()));
         } catch (const franka::ControlException& ce) {
+          comm_interface_->PublishDriverStatus(false, ce.what());
           dexai::log()->warn(
               "RunFranka: control exception in initialisation during automatic "
               "error recovery for Reflex mode: {}.",
               ce.what());
-          comm_interface_->PublishDriverStatus(false, ce.what());
-          std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }
       } else if (current_mode != franka::RobotMode::kIdle) {
         auto err_msg {fmt::format("robot cannot receive commands in mode: {}",
                                   utils::RobotModeToString(current_mode))};
-        dexai::log()->error("RunFranka: {}", err_msg);
         comm_interface_->PublishDriverStatus(false, err_msg);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
+          dexai::log()->error("RunFranka: {}", err_msg);
+          t_last_main_loop_log_ = t_now;
+        }
       } else if (current_mode == franka::RobotMode::kUserStopped) {
-        dexai::log()->error("RunFranka: robot is in User-Stopped mode");
         comm_interface_->PublishBoolToChannel(
             utils::get_current_utime(),
             comm_interface_->GetUserStopChannelName(), true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
+          dexai::log()->error("RunFranka: robot is in User-Stopped mode");
+          t_last_main_loop_log_ = t_now;
+        }
       } else {  // if we got this far, we are talking to Franka and it is happy
         dexai::log()->info("RunFranka: connected to robot in {} mode",
                            utils::RobotModeToString(current_mode));
@@ -218,7 +222,7 @@ int FrankaPlanRunner::RunFranka() {
     // Set collision behavior:
     SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
-    dexai::log()->error(
+    dexai::log()->critical(
         "RunFranka: caught expection during initilization, msg: {}", ex.what());
     comm_interface_->PublishDriverStatus(false, ex.what());
     return 1;  // bad things happened.
@@ -258,7 +262,8 @@ int FrankaPlanRunner::RunFranka() {
                               ce.what());
         }
         if (!RecoverFromControlException()) {  // plan_ is released/reset
-          dexai::log()->error("RunFranka: RecoverFromControlException failed");
+          dexai::log()->critical(
+              "RunFranka: RecoverFromControlException failed");
           comm_interface_->PublishDriverStatus(false, ce.what());
           return 1;
         }
