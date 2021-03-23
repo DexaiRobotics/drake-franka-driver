@@ -64,6 +64,52 @@ repos:
     - id: requirements-txt-fixer
     - id: trailing-whitespace
       exclude: '.*[.](urdf|obj|lcm|lcmlog)$'
+-   repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.1.9
+    hooks:
+    - id: forbid-crlf
+    - id: remove-crlf
+    - id: forbid-tabs
+    - id: remove-tabs
+      args: [ '--whitespaces-count', '2' ]  # defaults to: 4
+    - id: insert-license
+      alias: insert-license-cpp
+      name: insert-license-cpp
+      files: '[.](cc|h)$'
+      exclude: |
+        (?x)^(
+            externals/
+            |src/examples/
+            |src/lcmtypes/
+        )$
+      args: [
+        --license-filepath,
+        LICENSE,
+        --comment-style,
+        /*| *| */,
+        --fuzzy-match-generates-todo,
+        --fuzzy-ratio-cut-off,
+        "50",
+        --detect-license-in-X-top-lines=10  # defaults to 5
+      ]
+    - id: insert-license
+      alias: insert-license-py/sh
+      name: insert-license-py/sh
+      files: '[.](py|sh)$'
+      exclude: |
+        (?x)^(
+            externals/
+        )$
+      args: [
+        --license-filepath,
+        LICENSE.txt,
+        --comment-style,
+        "#",
+        --fuzzy-match-generates-todo,
+        --fuzzy-ratio-cut-off,
+        "50",
+        --detect-license-in-X-top-lines=10  # defaults to 5
+      ]
 # below are C++ hooks ordered by speed, benchmark time on a single source file
 #   * clang-format    0.7 s
 #   * cpplint         0.7 s
