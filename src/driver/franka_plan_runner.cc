@@ -72,6 +72,9 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
 
   assert(!params_.urdf_filepath.empty()
          && "FrankaPlanRunner ctor: bad params_.urdf_filepath");
+  CONV_SPEED_THRESHOLD = Eigen::VectorXd(dof_);  // segfault without reallocate
+  CONV_SPEED_THRESHOLD << 0.0082, 0.0082, 0.0082, 0.0082, 0.0082, 0.0082,
+      0.0082;
 
   // Create a ConstraintSolver, which creates a geometric model from parameters
   // and URDF(s) and keeps it in a fully owned MultiBodyPlant.
@@ -233,7 +236,8 @@ int FrankaPlanRunner::RunFranka() {
 
     // prevent the plan from being started if robot is not running...
     if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()) {
-      dexai::log()->info("RunFranka: found a new plan, attaching callback...");
+      dexai::log()->info(
+          "RunFranka: found a new plan in buffer, attaching callback...");
       status_has_changed = true;
       try {  // Use either joint position or impedance control callback here
         // blocking
@@ -690,13 +694,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   if (auto overtime {franka_time_ - plan_end_time};
       overtime > 0) {  // check for convergence when overtime
-    // The following two constants must be tuned together.
-    // A higher speed threshold may result in the benign libfranka exception:
-    //    Motion finished commanded, but the robot is still moving!
-    //    ["joint_motion_generator_acceleration_discontinuity"]
-    static const double CONV_ANGLE_THRESHOLD {0.0010};  // rad, empirical
-    static const double CONV_SPEED_THRESHOLD {0.0082};  // rad/s, empirical
-
     // Maximum change in joint angle between two confs
     const double max_joint_err {
         utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
@@ -711,7 +708,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         plan_utime_, franka_time_, max_joint_err, max_joint_speed);
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
-        && max_joint_speed <= CONV_SPEED_THRESHOLD) {
+        && (dq.array() <= CONV_SPEED_THRESHOLD.array()).all()) {
       dexai::log()->info(
           "JointPositionCallback: plan {} overtime by {:.4f} s, "
           "converged within grace period, finished; "
@@ -722,7 +719,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       plan_utime_ = -1;    // reset plan to -1
       dexai::log()->info(  // for control exception
           "for possible speed control exception:\n\tdq:\t{}\n\texcess:\t{}",
-          dq.transpose(), (dq.array() - CONV_SPEED_THRESHOLD).transpose());
+          dq.transpose(),
+          (dq.array() - CONV_SPEED_THRESHOLD.array()).transpose());
       return franka::MotionFinished(output_to_franka);
     }
     // proceed below when not converged

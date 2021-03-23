@@ -253,6 +253,13 @@ class FrankaPlanRunner {
 
   std::array<double, 7> upper_torque_threshold_;
   std::array<double, 6> upper_force_threshold_;
+
+  // The following two constants must be tuned together.
+  // A higher speed threshold may result in the benign libfranka exception:
+  //    Motion finished commanded, but the robot is still moving!
+  //    ["joint_motion_generator_acceleration_discontinuity"]
+  const double CONV_ANGLE_THRESHOLD {0.0010};  // rad, empirical
+  Eigen::VectorXd CONV_SPEED_THRESHOLD;
 };  // FrankaPlanRunner
 
 }  // namespace franka_driver
