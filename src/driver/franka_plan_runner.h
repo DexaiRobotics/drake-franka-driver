@@ -78,14 +78,23 @@ class FrankaPlanRunner {
 
  protected:
   void SetDefaultBehavior() {
-    robot_->setCollisionBehavior({{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
-                                 {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
-                                 {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
-                                 {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
-                                 {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
-                                 {{20.0, 20.0, 20.0, 20.0, 20.0, 20.0}},
-                                 {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0}},
-                                 {{10.0, 10.0, 10.0, 10.0, 10.0, 10.0}});
+    robot_->setCollisionBehavior(
+        // lower_torque_thresholds_acceleration
+        {20, 20, 20, 20, 10, 10, 10},
+        // upper_torque_thresholds_acceleration
+        {87, 87, 87, 87, 12, 12, 12},
+        // lower_torque_thresholds_nominal
+        {10, 10, 10, 10, 10, 10, 10},
+        // upper_torque_thresholds_nominal
+        {87, 87, 87, 87, 12, 12, 12},
+        // lower_force_thresholds_acceleration
+        {20, 20, 20, 20, 20, 20},
+        // upper_force_thresholds_acceleration
+        {99, 99, 99, 99, 99, 99},
+        // lower_force_thresholds_nominal
+        {10, 10, 10, 10, 10, 10},
+        // upper_force_thresholds_nominal
+        {99, 99, 99, 99, 99, 99});
     robot_->setJointImpedance({{3000, 3000, 3000, 2500, 2500, 2000, 2000}});
     robot_->setCartesianImpedance({{3000, 3000, 3000, 300, 300, 300}});
   }

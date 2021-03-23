@@ -249,8 +249,8 @@ int FrankaPlanRunner::RunFranka() {
               plan_utime_, franka_time_);
           comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
         } else {
-          dexai::log()->warn("RunFranka: control exception in main loop: {}.",
-                             ce.what());
+          dexai::log()->error("RunFranka: control exception in main loop: {}.",
+                              ce.what());
         }
         if (!RecoverFromControlException()) {  // plan_ is released/reset
           dexai::log()->error("RunFranka: RecoverFromControlException failed");
@@ -695,15 +695,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     //    Motion finished commanded, but the robot is still moving!
     //    ["joint_motion_generator_acceleration_discontinuity"]
     static const double CONV_ANGLE_THRESHOLD {0.0010};  // rad, empirical
-    static const double CONV_SPEED_THRESHOLD {0.0083};  // rad/s, empirical
+    static const double CONV_SPEED_THRESHOLD {0.0082};  // rad/s, empirical
 
     // Maximum change in joint angle between two confs
     const double max_joint_err {
         utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
-    const double max_joint_speed {
-        utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
-            .cwiseAbs()
-            .maxCoeff()};
+    Eigen::VectorXd dq {
+        utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))};
+    const double max_joint_speed {dq.cwiseAbs().maxCoeff()};
     // auto dq_norm {
     //     utils::v_to_e(ArrayToVector(cannonical_robot_state.dq)).norm()};
     dexai::log()->warn(
@@ -719,8 +718,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, overtime, plan_end_time, franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
-      plan_.release();   // reset unique ptr
-      plan_utime_ = -1;  // reset plan to -1
+      plan_.release();     // reset unique ptr
+      plan_utime_ = -1;    // reset plan to -1
+      dexai::log()->info(  // for control exception
+          "for possible speed control exception:\n\tdq:\t{}\n\texcess:\t{}",
+          dq.transpose(), (dq.array() - CONV_SPEED_THRESHOLD).transpose());
       return franka::MotionFinished(output_to_franka);
     }
     // proceed below when not converged
