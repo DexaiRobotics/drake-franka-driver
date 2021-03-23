@@ -73,8 +73,7 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   assert(!params_.urdf_filepath.empty()
          && "FrankaPlanRunner ctor: bad params_.urdf_filepath");
   CONV_SPEED_THRESHOLD = Eigen::VectorXd(dof_);  // segfault without reallocate
-  CONV_SPEED_THRESHOLD << 0.0082, 0.0082, 0.0082, 0.0082, 0.0082, 0.0082,
-      0.0082;
+  CONV_SPEED_THRESHOLD << 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007;
 
   // Create a ConstraintSolver, which creates a geometric model from parameters
   // and URDF(s) and keeps it in a fully owned MultiBodyPlant.
@@ -172,7 +171,8 @@ int FrankaPlanRunner::RunFranka() {
       }
 
       auto current_mode {GetRobotMode()};
-      if (current_mode == franka::RobotMode::kReflex) {
+      if (auto t_now {std::chrono::steady_clock::now()};
+          current_mode == franka::RobotMode::kReflex) {
         // if in reflex mode, attempt automatic error recovery
         dexai::log()->warn(
             "RunFranka: robot is in Reflex mode at startup, trying "
@@ -184,23 +184,28 @@ int FrankaPlanRunner::RunFranka() {
               " now in mode: {}.",
               utils::RobotModeToString(GetRobotMode()));
         } catch (const franka::ControlException& ce) {
+          comm_interface_->PublishDriverStatus(false, ce.what());
           dexai::log()->warn(
               "RunFranka: control exception in initialisation during automatic "
               "error recovery for Reflex mode: {}.",
               ce.what());
-          comm_interface_->PublishDriverStatus(false, ce.what());
         }
       } else if (current_mode != franka::RobotMode::kIdle) {
-        auto err_msg {
-            fmt::format("RunFranka: robot cannot receive commands in mode: {}",
-                        utils::RobotModeToString(current_mode))};
-        dexai::log()->error("RunFranka: {}", err_msg);
+        auto err_msg {fmt::format("robot cannot receive commands in mode: {}",
+                                  utils::RobotModeToString(current_mode))};
         comm_interface_->PublishDriverStatus(false, err_msg);
+        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
+          dexai::log()->error("RunFranka: {}", err_msg);
+          t_last_main_loop_log_ = t_now;
+        }
       } else if (current_mode == franka::RobotMode::kUserStopped) {
-        dexai::log()->error("RunFranka: robot is in User-Stopped mode");
         comm_interface_->PublishBoolToChannel(
             utils::get_current_utime(),
             comm_interface_->GetUserStopChannelName(), true);
+        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
+          dexai::log()->error("RunFranka: robot is in User-Stopped mode");
+          t_last_main_loop_log_ = t_now;
+        }
       } else {  // if we got this far, we are talking to Franka and it is happy
         dexai::log()->info("RunFranka: connected to robot in {} mode",
                            utils::RobotModeToString(current_mode));
@@ -217,7 +222,7 @@ int FrankaPlanRunner::RunFranka() {
     // Set collision behavior:
     SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
-    dexai::log()->error(
+    dexai::log()->critical(
         "RunFranka: caught expection during initilization, msg: {}", ex.what());
     comm_interface_->PublishDriverStatus(false, ex.what());
     return 1;  // bad things happened.
@@ -257,7 +262,8 @@ int FrankaPlanRunner::RunFranka() {
                               ce.what());
         }
         if (!RecoverFromControlException()) {  // plan_ is released/reset
-          dexai::log()->error("RunFranka: RecoverFromControlException failed");
+          dexai::log()->critical(
+              "RunFranka: RecoverFromControlException failed");
           comm_interface_->PublishDriverStatus(false, ce.what());
           return 1;
         }
@@ -590,7 +596,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec());
 
   // read out robot state
-  franka::JointPositions output_to_franka = robot_state.q_d;
+  franka::JointPositions output_to_franka {robot_state.q_d};
   // scale to cannonical robot state
   auto cannonical_robot_state =
       utils::ConvertToCannonical(robot_state, joint_pos_offset_);
@@ -627,7 +633,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: Discarding plan, mismatched start position."
           " Max distance: {} > {}",
           max_ang_distance, params_.kMediumJointDistance);
-      return franka::MotionFinished(output_to_franka);
+      plan_.release();
+      plan_utime_ = -1;  // reset plan to -1
+      comm_interface_->PublishPlanComplete(
+          plan_utime_, false, "discarded due to mismatched start conf");
+      return franka::MotionFinished(franka::JointPositions(robot_state.q));
     } else if (max_ang_distance > params_.kTightJointDistance) {
       dexai::log()->warn(
           "JointPositionCallback: max angular distance between franka and "
@@ -697,18 +707,17 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // Maximum change in joint angle between two confs
     const double max_joint_err {
         utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
-    Eigen::VectorXd dq {
-        utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))};
-    const double max_joint_speed {dq.cwiseAbs().maxCoeff()};
-    // auto dq_norm {
-    //     utils::v_to_e(ArrayToVector(cannonical_robot_state.dq)).norm()};
+    Eigen::VectorXd dq_abs {
+        utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
+            .cwiseAbs()};
     dexai::log()->warn(
         "JointPositionCallback: plan {} overtime, "
-        "franka_t: {:.3f}, max joint err = {:.4f}, max joint speed = {:.4f}",
-        plan_utime_, franka_time_, max_joint_err, max_joint_speed);
+        "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
+        plan_utime_, franka_time_, max_joint_err, dq_abs.norm());
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
-        && (dq.array() <= CONV_SPEED_THRESHOLD.array()).all()) {
+        && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()
+        && dq_abs.norm() <= CONV_SPEED_NORM_THRESHOLD) {
       dexai::log()->info(
           "JointPositionCallback: plan {} overtime by {:.4f} s, "
           "converged within grace period, finished; "
@@ -718,9 +727,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       plan_.release();     // reset unique ptr
       plan_utime_ = -1;    // reset plan to -1
       dexai::log()->info(  // for control exception
-          "for possible speed control exception:\n\tdq:\t{}\n\texcess:\t{}",
-          dq.transpose(),
-          (dq.array() - CONV_SPEED_THRESHOLD.array()).transpose());
+          "Joint speeds at convergence:\n\tdq:\t{}\n\texcess:\t{}",
+          dq_abs.transpose(),
+          (dq_abs.array() - CONV_SPEED_THRESHOLD.array()).transpose());
       return franka::MotionFinished(output_to_franka);
     }
     // proceed below when not converged
