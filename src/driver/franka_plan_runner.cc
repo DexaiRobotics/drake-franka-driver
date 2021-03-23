@@ -697,18 +697,16 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // Maximum change in joint angle between two confs
     const double max_joint_err {
         utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
-    Eigen::VectorXd dq {
-        utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))};
-    const double max_joint_speed {dq.cwiseAbs().maxCoeff()};
-    // auto dq_norm {
-    //     utils::v_to_e(ArrayToVector(cannonical_robot_state.dq)).norm()};
+    Eigen::VectorXd dq_abs {
+        utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
+            .cwiseAbs()};
     dexai::log()->warn(
         "JointPositionCallback: plan {} overtime, "
-        "franka_t: {:.3f}, max joint err = {:.4f}, max joint speed = {:.4f}",
-        plan_utime_, franka_time_, max_joint_err, max_joint_speed);
+        "franka_t: {:.3f}, max joint err = {:.4f}",
+        plan_utime_, franka_time_, max_joint_err);
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
-        && (dq.array() <= CONV_SPEED_THRESHOLD.array()).all()) {
+        && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()) {
       dexai::log()->info(
           "JointPositionCallback: plan {} overtime by {:.4f} s, "
           "converged within grace period, finished; "
@@ -718,9 +716,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       plan_.release();     // reset unique ptr
       plan_utime_ = -1;    // reset plan to -1
       dexai::log()->info(  // for control exception
-          "for possible speed control exception:\n\tdq:\t{}\n\texcess:\t{}",
-          dq.transpose(),
-          (dq.array() - CONV_SPEED_THRESHOLD.array()).transpose());
+          "speeds at convergence:\n\tdq:\t{}\n\texcess:\t{}",
+          dq_abs.transpose(),
+          (dq_abs.array() - CONV_SPEED_THRESHOLD.array()).transpose());
       return franka::MotionFinished(output_to_franka);
     }
     // proceed below when not converged

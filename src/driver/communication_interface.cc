@@ -430,7 +430,7 @@ void CommunicationInterface::HandlePause(
     }
     case PauseCommandType::PAUSE:
       dexai::log()->warn(
-          "CommInterface:HandlePause: Received pause command from '{}'",
+          "CommInterface:HandlePause: received pause command from source: {}",
           source);
       if (pause_data_.pause_sources.insert(source).second == false) {
         dexai::log()->warn(
@@ -440,22 +440,23 @@ void CommunicationInterface::HandlePause(
       break;
     case PauseCommandType::CONTINUE:
       dexai::log()->warn(
-          "CommInterface:HandlePause: Received continue command from "
-          "'{}'",
+          "CommInterface:HandlePause: received continue command from source: "
+          "{}",
           source);
       if (pause_data_.pause_sources.find(source)
           != pause_data_.pause_sources.end()) {
         pause_data_.pause_sources.erase(source);
       } else {
         dexai::log()->warn(
-            "Unpausing command rejected: No matching "
-            "pause command by source: '{}'",
+            "CommInterface:HandlePause: ignoring continue command from "
+            "source: {}, as the robot has not been paused by it",
             source);
       }
       break;
     default:
       dexai::log()->error(
-          "Pause command rejected: Unknown pause command type from '{}'",
+          "CommInterface:HandlePause: ignoring unknown pause command type from "
+          "source: {}",
           source);
       break;
   }
