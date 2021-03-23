@@ -31,16 +31,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-///@file util_conv.h
+/// @file util_conv.h
 #pragma once
 
-#include "Eigen/Geometry"
-#include "drake/lcmt_iiwa_status.hpp"  // for lcmt_iiwa_status
+#include <Eigen/Geometry>
+
+#include <string>
+
+#include <drake/lcmt_iiwa_status.hpp>  // for lcmt_iiwa_status
+
 #include "driver/communication_interface.h"
 #include "franka/robot_state.h"  // for RobotState, RobotMode
 
-/// NOTE @sprax: I doubt there is still a need to organized these functions
-/// here. They could be elsewhere or be eliminated.
 namespace utils {
 
 // Enums for Defining Status

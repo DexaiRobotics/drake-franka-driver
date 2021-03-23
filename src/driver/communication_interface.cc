@@ -42,7 +42,7 @@
 /// available. The plan is moved from this communication interface to a franka
 /// plan runner when the MovePlan() is called.
 ///
-/// If a pause message is received, it will set the opause status to true and
+/// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
 
 #include "driver/communication_interface.h"

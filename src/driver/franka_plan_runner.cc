@@ -146,8 +146,8 @@ franka::RobotMode FrankaPlanRunner::GetRobotMode() const {
     current_mode = robot_state.robot_mode;
     return false;
   });
-  dexai::log()->info("GetRobotMode: Franka is in mode: {}",
-                     utils::RobotModeToString(current_mode));
+  dexai::log()->debug("GetRobotMode: Franka is in mode: {}",
+                      utils::RobotModeToString(current_mode));
   return current_mode;
 }
 
@@ -199,15 +199,17 @@ int FrankaPlanRunner::RunFranka() {
             utils::get_current_utime(),
             comm_interface_->GetUserStopChannelName(), true);
       } else {  // if we got this far, we are talking to Franka and it is happy
+        dexai::log()->info("RunFranka: connected to robot in {} mode",
+                           utils::RobotModeToString(current_mode));
         connection_established = true;
       }
     } while (!connection_established);
   }
 
   try {  // initilization
-    dexai::log()->info("RunFranka: Setting Default Behavior...");
+    dexai::log()->info("RunFranka: setting default behavior...");
     SetDefaultBehavior();
-    dexai::log()->info("RunFranka: Ready.");
+    dexai::log()->info("RunFranka: ready.");
     comm_interface_->PublishDriverStatus(true);
     // Set collision behavior:
     SetCollisionBehaviorSafetyOn();
