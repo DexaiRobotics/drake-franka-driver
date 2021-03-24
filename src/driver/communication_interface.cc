@@ -294,8 +294,6 @@ bool CommunicationInterface::CanReceiveCommands(
     const franka::RobotMode& current_mode) {
   switch (current_mode) {
     case franka::RobotMode::kOther:
-      dexai::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          utils::RobotModeToString(current_mode));
       return false;
     case franka::RobotMode::kIdle:
       return true;
@@ -306,7 +304,6 @@ bool CommunicationInterface::CanReceiveCommands(
           utils::RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kGuiding:
-      dexai::log()->error("CanReceiveCommands: Wrong mode!");
       return false;
     case franka::RobotMode::kReflex:
       dexai::log()->warn(
@@ -315,12 +312,8 @@ bool CommunicationInterface::CanReceiveCommands(
           utils::RobotModeToString(current_mode));
       return true;
     case franka::RobotMode::kUserStopped:
-      dexai::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          utils::RobotModeToString(current_mode));
       return false;
     case franka::RobotMode::kAutomaticErrorRecovery:
-      dexai::log()->error("CanReceiveCommands: Wrong mode: {}!",
-                          utils::RobotModeToString(current_mode));
       return false;
     default:
       dexai::log()->error("CanReceiveCommands: Mode unknown!");

@@ -301,7 +301,7 @@ int FrankaPlanRunner::RunFranka() {
       }
     } else {  // just print some msg if unable to receive commands
       if (auto t_now {std::chrono::steady_clock::now()};
-          t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
+          t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
         dexai::log()->error(
             "RunFranka: robot cannot receive commands in mode: {}, waiting...",
             mode);
