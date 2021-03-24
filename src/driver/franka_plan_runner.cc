@@ -299,12 +299,22 @@ int FrankaPlanRunner::RunFranka() {
             "plan");
         comm_interface_->ClearCancelPlanRequest();
       }
-    } else {  // just print some msg if unable to receive commands
+    } else {  // unable to receive commands because robot is in a wrong mode
+      if (comm_interface_->HasNewPlan()) {  // locked or u-stopped, clear plan
+        std::string err_msg {
+            fmt::format("buffered plan discarded because robot is now in mode "
+                        "{}, unable to receive plan",
+                        utils::RobotModeToString(mode))};
+        dexai::log()->warn("RunFranka: {}", err_msg);
+        comm_interface_->PublishPlanComplete(plan_utime_, false, err_msg);
+        plan_.release();
+        plan_utime_ = -1;  // reset plan to -1
+      }
       if (auto t_now {std::chrono::steady_clock::now()};
           t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
         dexai::log()->error(
             "RunFranka: robot cannot receive commands in mode: {}, waiting...",
-            mode);
+            utils::RobotModeToString(mode));
         t_last_main_loop_log_ = t_now;
       }
     }

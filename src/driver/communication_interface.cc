@@ -399,7 +399,7 @@ void CommunicationInterface::HandlePlan(
   new_plan_buffer_.plan = std::make_unique<PPType>(piecewise_polynomial);
   lock.unlock();
   dexai::log()->info(
-      "CommInterface::HandlePlan: populated buffer with new plan {}",
+      "CommInterface:HandlePlan: populated buffer with new plan {}",
       new_plan_buffer_.utime);
   dexai::log()->debug("CommInterface:HandlePlan: Finished!");
 }
