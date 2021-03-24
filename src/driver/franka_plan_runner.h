@@ -153,7 +153,16 @@ class FrankaPlanRunner {
                                  kHighForceThreshold, kHighForceThreshold);
   }
 
-  franka::RobotMode GetRobotMode() const;
+  franka::RobotMode GetRobotMode() const {
+    franka::RobotMode current_mode;
+    robot_->read([&current_mode](const franka::RobotState& robot_state) {
+      current_mode = robot_state.robot_mode;
+      return false;
+    });
+    dexai::log()->debug("GetRobotMode: Franka is in mode: {}",
+                        utils::RobotModeToString(current_mode));
+    return current_mode;
+  }
 
   int RunFranka();
 

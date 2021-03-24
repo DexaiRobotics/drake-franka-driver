@@ -121,11 +121,6 @@ int make_dirs(const std::string& path_str);
 
 bool file_stat(const std::string& path, struct stat& result);
 
-inline bool file_exists(const std::string& path) {
-  struct stat result {};
-  return stat(path.c_str(), &result) == 0;
-}
-
 /// Return the file name, stripped of any directory-like prefix.
 /// Uses filesystem::path::filename.
 fs::path file_name(const std::string& full_path);
@@ -134,6 +129,10 @@ time_t file_mod_time(const std::string& path);
 
 template <typename TimeT>
 TimeT expect_file_mod(const std::string& temp_file_path, TimeT max_seconds) {
+  if (!fs::exists(temp_file_path)) {
+    throw std::runtime_error("expect_file_mod: path does not exist: "
+                             + temp_file_path);
+  }
   auto time_mod {file_mod_time(temp_file_path)};
   auto time_dif {static_cast<TimeT>(std::time(nullptr) - time_mod)};
   if (time_dif > max_seconds) {
