@@ -215,6 +215,10 @@ int FrankaPlanRunner::RunFranka() {
     // Set collision behavior:
     SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
+    // try recovery here unFranka: caught expection during initilization, msg:
+    // libfranka: Set Joint Impedance command rejected: command not possible in
+    // the current mode!
+
     dexai::log()->critical(
         "RunFranka: caught exception during initilization, msg: {}", ex.what());
     comm_interface_->PublishDriverStatus(false, ex.what());
@@ -238,6 +242,7 @@ int FrankaPlanRunner::RunFranka() {
         t_last_main_loop_log_ = t_now;
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      continue;
     }
     // robot status only depends on the LCM pause command
     if (auto new_status {comm_interface_->GetPauseStatus()
