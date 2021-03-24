@@ -121,18 +121,18 @@ fi
 mkdir -p build; cd build
 if (( $build_debug > 0 )); then
     echo "Building in debug mode"
-    cmake .. -DCMAKE_BUILD_TYPE=Debug   || exit 4   # Build for debugging
+    cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Debug     || exit 4   # Build for debugging
 else
     echo "Building in release mode"
-    cmake .. -DCMAKE_BUILD_TYPE=Release || exit 5
+    cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Release   || exit 5
 fi
 
-make  -j $num_threads $target           || exit 6
+cmake --build . --target $target -- -j $num_threads || exit 6
 if (( $exec_ctests > 0 )); then
     if (( $skip_slower )); then
-        ctest -E $exclude_pat           || exit 7   # exclude tests matching the regex
+        ctest -E $exclude_pat                       || exit 7   # exclude tests matching the regex
     else
-        ctest                           || exit 8   # run all unit tests
+        ctest                                       || exit 8   # run all unit tests
     fi
 fi
 popd

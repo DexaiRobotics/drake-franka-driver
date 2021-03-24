@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19.5)
+cmake_minimum_required(VERSION 3.20)
 project(drake-franka-driver)
 
 set(CMAKE_CXX_STANDARD 17)
