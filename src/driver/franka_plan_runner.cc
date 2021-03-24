@@ -199,7 +199,8 @@ int FrankaPlanRunner::RunFranka() {
         }
       } else {  // if we got this far, we are talking to Franka and it is happy
         dexai::log()->info(
-            "RunFranka: connected to robot in {} mode at startup",
+            "RunFranka: connected to robot in {} mode at startup, proceeding "
+            "to initialisation",
             utils::RobotModeToString(current_mode));
         connection_established = true;
       }
@@ -215,7 +216,7 @@ int FrankaPlanRunner::RunFranka() {
     SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
     dexai::log()->critical(
-        "RunFranka: caught expection during initilization, msg: {}", ex.what());
+        "RunFranka: caught exception during initilization, msg: {}", ex.what());
     comm_interface_->PublishDriverStatus(false, ex.what());
     return 1;  // bad things happened.
   }
