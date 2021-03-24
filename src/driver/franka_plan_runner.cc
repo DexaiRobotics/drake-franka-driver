@@ -142,17 +142,6 @@ int FrankaPlanRunner::Run() {
   return return_value;
 }
 
-franka::RobotMode FrankaPlanRunner::GetRobotMode() const {
-  franka::RobotMode current_mode;
-  robot_->read([&current_mode](const franka::RobotState& robot_state) {
-    current_mode = robot_state.robot_mode;
-    return false;
-  });
-  dexai::log()->debug("GetRobotMode: Franka is in mode: {}",
-                      utils::RobotModeToString(current_mode));
-  return current_mode;
-}
-
 int FrankaPlanRunner::RunFranka() {
   {  // connection and mode checking and handling
     // attempt connection to robot and read current mode
@@ -191,8 +180,9 @@ int FrankaPlanRunner::RunFranka() {
               ce.what());
         }
       } else if (current_mode != franka::RobotMode::kIdle) {
-        auto err_msg {fmt::format("robot cannot receive commands in mode: {}",
-                                  utils::RobotModeToString(current_mode))};
+        auto err_msg {
+            fmt::format("robot cannot receive commands in mode: {} at startup",
+                        utils::RobotModeToString(current_mode))};
         comm_interface_->PublishDriverStatus(false, err_msg);
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
@@ -203,12 +193,15 @@ int FrankaPlanRunner::RunFranka() {
             utils::get_current_utime(),
             comm_interface_->GetUserStopChannelName(), true);
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
-          dexai::log()->error("RunFranka: robot is in User-Stopped mode");
+          dexai::log()->error(
+              "RunFranka: robot is in User-Stopped mode at startup");
           t_last_main_loop_log_ = t_now;
         }
       } else {  // if we got this far, we are talking to Franka and it is happy
-        dexai::log()->info("RunFranka: connected to robot in {} mode",
-                           utils::RobotModeToString(current_mode));
+        dexai::log()->info(
+            "RunFranka: connected to robot in {} mode at startup, proceeding "
+            "to initialisation",
+            utils::RobotModeToString(current_mode));
         connection_established = true;
       }
     } while (!connection_established);
@@ -222,8 +215,12 @@ int FrankaPlanRunner::RunFranka() {
     // Set collision behavior:
     SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
+    // try recovery here unFranka: caught expection during initilization, msg:
+    // libfranka: Set Joint Impedance command rejected: command not possible in
+    // the current mode!
+
     dexai::log()->critical(
-        "RunFranka: caught expection during initilization, msg: {}", ex.what());
+        "RunFranka: caught exception during initilization, msg: {}", ex.what());
     comm_interface_->PublishDriverStatus(false, ex.what());
     return 1;  // bad things happened.
   }
@@ -232,71 +229,91 @@ int FrankaPlanRunner::RunFranka() {
   bool status_has_changed {true};
 
   while (true) {  // main control loop
-    auto new_status {comm_interface_->GetPauseStatus() ? RobotStatus::Paused
-                                                       : RobotStatus::Running};
-    if (new_status != status_) {  // check if status has changed
-      status_has_changed = true;
-      status_ = new_status;
-    }
-
-    // prevent the plan from being started if robot is not running...
-    if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()) {
-      dexai::log()->info(
-          "RunFranka: found a new plan in buffer, attaching callback...");
-      status_has_changed = true;
-      try {  // Use either joint position or impedance control callback here
-        // blocking
-        robot_->control(std::bind(&FrankaPlanRunner::JointPositionCallback,
-                                  this, std::placeholders::_1,
-                                  std::placeholders::_2));
-      } catch (const franka::ControlException& ce) {
+    // make sure robot is not user-stopped before doing anything else
+    if (auto mode {GetRobotMode()};
+        CommunicationInterface::CanReceiveCommands(mode)) {
+      // robot status only depends on the LCM pause command
+      if (auto new_status {comm_interface_->GetPauseStatus()
+                               ? RobotStatus::Paused
+                               : RobotStatus::Running};
+          new_status != status_) {  // check if status has changed
         status_has_changed = true;
-        if (plan_) {  // broadcast exception details over LCM
-          dexai::log()->warn(
-              "RunFranka: control exception during active plan "
-              "{} at franka_t: {:.4f}, aborting and recovering...",
-              plan_utime_, franka_time_);
-          comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
-        } else {
-          dexai::log()->error("RunFranka: control exception in main loop: {}.",
-                              ce.what());
-        }
-        if (!RecoverFromControlException()) {  // plan_ is released/reset
-          dexai::log()->critical(
-              "RunFranka: RecoverFromControlException failed");
-          comm_interface_->PublishDriverStatus(false, ce.what());
-          return 1;
-        }
+        status_ = new_status;
       }
-      continue;
-    }
-    // no new plan available in the buffer or robot isn't running
-    if (comm_interface_->CancelPlanRequested()) {
-      log()->error(
-          "RunFranka: plan cancellation requested but there is no active "
-          "plan");
-      comm_interface_->ClearCancelPlanRequest();
-    }
-    // print out status if there's any change, or every 10 sec
-    if (auto t_now {std::chrono::steady_clock::now()};
-        status_has_changed
-        || t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
-      switch (status_) {
-        case RobotStatus::Running:
-          dexai::log()->info(
-              "RunFranka: robot is running and waiting for a new plan...");
-          break;
-        case RobotStatus::Paused:
-          dexai::log()->info(
-              "RunFranka: robot is paused, waiting to get unpaused...");
-          break;
-        default:
-          dexai::log()->error(
-              "RunFranka: robot status: {}, this should not have happened",
-              utils::RobotStatusToString(status_));
+      // print out status if there's any change, or every 10 sec
+      if (auto t_now {std::chrono::steady_clock::now()};
+          status_has_changed
+          || t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
+        switch (status_) {
+          case RobotStatus::Running:
+            dexai::log()->info(
+                "RunFranka: robot is running and waiting for a new plan...");
+            break;
+          case RobotStatus::Paused:
+            dexai::log()->info(
+                "RunFranka: robot is paused, waiting to get unpaused...");
+            break;
+          default:
+            dexai::log()->error(
+                "RunFranka: robot status: {}, this should not have happened",
+                utils::RobotStatusToString(status_));
+        }
+        status_has_changed = false;  // reset
+        t_last_main_loop_log_ = t_now;
       }
-      status_has_changed = false;  // reset
-      t_last_main_loop_log_ = t_now;
+      // prevent the plan from being started if robot is not running...
+      if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()) {
+        dexai::log()->info(
+            "RunFranka: found a new plan in buffer, attaching callback...");
+        status_has_changed = true;
+        try {  // Use either joint position or impedance control callback here
+          // blocking
+          robot_->control(std::bind(&FrankaPlanRunner::JointPositionCallback,
+                                    this, std::placeholders::_1,
+                                    std::placeholders::_2));
+        } catch (const franka::ControlException& ce) {
+          status_has_changed = true;
+          if (plan_) {  // broadcast exception details over LCM
+            dexai::log()->warn(
+                "RunFranka: control exception during active plan "
+                "{} at franka_t: {:.4f}, aborting and recovering...",
+                plan_utime_, franka_time_);
+            comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
+          } else {
+            dexai::log()->error("RunFranka: exception in main loop: {}.",
+                                ce.what());
+          }
+          if (!RecoverFromControlException()) {  // plan_ is released/reset
+            dexai::log()->critical(
+                "RunFranka: RecoverFromControlException failed");
+            comm_interface_->PublishDriverStatus(false, ce.what());
+            return 1;
+          }
+        }
+        continue;
+      }
+      // no new plan available in the buffer or robot isn't running
+      if (comm_interface_->CancelPlanRequested()) {
+        log()->error(
+            "RunFranka: plan cancellation requested but there is no active "
+            "plan");
+        comm_interface_->ClearCancelPlanRequest();
+      }
+    } else {  // unable to receive commands because robot is in a wrong mode
+      if (comm_interface_->HasNewPlan()) {  // locked or u-stopped, clear plan
+        std::string err_msg {
+            fmt::format("buffered plan discarded because robot is now in mode "
+                        "{}, unable to receive plan",
+                        utils::RobotModeToString(mode))};
+        comm_interface_->ClearNewPlan(err_msg);
+      }
+      if (auto t_now {std::chrono::steady_clock::now()};
+          t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
+        dexai::log()->error(
+            "RunFranka: robot cannot receive commands in mode: {}, waiting...",
+            utils::RobotModeToString(mode));
+        t_last_main_loop_log_ = t_now;
+      }
     }
     // only publish robot_status, twice as fast as the lcm publish rate
     // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.

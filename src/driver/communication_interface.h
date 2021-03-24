@@ -106,6 +106,13 @@ class CommunicationInterface {
     return !(new_plan_buffer_.plan == nullptr);
   }
 
+  void ClearNewPlan(std::string_view reason) {
+    dexai::log()->warn("ClearNewPlan: {}", reason.data());
+    PublishPlanComplete(new_plan_buffer_.utime, false, reason.data());
+    new_plan_buffer_.plan.release();
+    new_plan_buffer_.utime = -1;
+  }
+
   std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
 
   // TODO(@anyone): remove franka specific RobotState type and
@@ -134,6 +141,10 @@ class CommunicationInterface {
 
   std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
 
+  /// check if robot is in a mode that can receive commands, i.e. not user
+  /// stopped or error recovery
+  static bool CanReceiveCommands(const franka::RobotMode& current_mode);
+
  protected:
   void ResetData();
   void HandleLcm();
@@ -147,9 +158,7 @@ class CommunicationInterface {
   void PublishTriggerToChannel(int64_t utime, std::string_view lcm_channel,
                                bool success = true,
                                std::string_view message = "");
-  /// check if robot is in a mode that can receive commands, i.e. not user
-  /// stopped or error recovery
-  bool CanReceiveCommands(const franka::RobotMode& current_mode);
+
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
                   const lcmtypes::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
