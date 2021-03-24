@@ -305,10 +305,7 @@ int FrankaPlanRunner::RunFranka() {
             fmt::format("buffered plan discarded because robot is now in mode "
                         "{}, unable to receive plan",
                         utils::RobotModeToString(mode))};
-        dexai::log()->warn("RunFranka: {}", err_msg);
-        comm_interface_->PublishPlanComplete(plan_utime_, false, err_msg);
-        plan_.release();
-        plan_utime_ = -1;  // reset plan to -1
+        comm_interface_->ClearNewPlan(err_msg);
       }
       if (auto t_now {std::chrono::steady_clock::now()};
           t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {

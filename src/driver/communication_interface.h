@@ -106,6 +106,13 @@ class CommunicationInterface {
     return !(new_plan_buffer_.plan == nullptr);
   }
 
+  void ClearNewPlan(std::string_view reason) {
+    dexai::log()->warn("ClearNewPlan: {}", reason.data());
+    PublishPlanComplete(new_plan_buffer_.utime, false, reason.data());
+    new_plan_buffer_.plan.release();
+    new_plan_buffer_.utime = -1;
+  }
+
   std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
 
   // TODO(@anyone): remove franka specific RobotState type and
