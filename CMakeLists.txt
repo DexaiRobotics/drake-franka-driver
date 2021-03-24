@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.19)
+cmake_minimum_required(VERSION 3.20)
 project(drake-franka-driver)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -134,9 +134,8 @@ set(TEST_SOURCES
 )
 
 set(TEST_LINK_LIBRARIES
-  gtest
-  gtest_main
-  ${GTEST_BOTH_LIBRARIES}
+  GTest::gtest
+  GTest::gtest_main
   ${CMAKE_THREAD_LIBS_INIT}
   gflags
   drake::drake
@@ -152,9 +151,10 @@ foreach(_file ${GTEST_SRC_FILES})
     ${TEST_SOURCES}
   )
   target_link_libraries(${_name}
-
     ${TEST_LINK_LIBRARIES}
   )
-  add_test(${_name} ${_name})
-  set_tests_properties(${_name} PROPERTIES TIMEOUT 270)
+  gtest_add_tests(
+    TARGET ${_name}
+    TEST_LIST unittests)
 endforeach()
+set_tests_properties(${unittests} PROPERTIES TIMEOUT 270)
