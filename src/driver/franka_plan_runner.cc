@@ -230,19 +230,17 @@ int FrankaPlanRunner::RunFranka() {
 
   while (true) {  // main control loop
     // make sure robot is not user-stopped before doing anything else
-    if (GetRobotMode() == franka::RobotMode::kUserStopped) {
-      comm_interface_->PublishBoolToChannel(
-          utils::get_current_utime(), comm_interface_->GetUserStopChannelName(),
-          true);
+    if (auto mode {GetRobotMode()};
+        !CommunicationInterface::CanReceiveCommands(mode)) {
       if (auto t_now {std::chrono::steady_clock::now()};
           t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
         dexai::log()->error(
-            "RunFranka: robot is in User-Stopped mode in main loop, "
-            "waiting...");
+            "RunFranka: robot cannot receive commands in mode: {}, waiting...",
+            mode);
         t_last_main_loop_log_ = t_now;
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      continue;
+      continue;  // skip everything else and check again
     }
     // robot status only depends on the LCM pause command
     if (auto new_status {comm_interface_->GetPauseStatus()
