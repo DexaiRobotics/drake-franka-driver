@@ -241,14 +241,15 @@ void CommunicationInterface::PublishRobotStatus() {
     franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
     robot_data_.has_robot_data = false;
     lock.unlock();
-    // dexai::log()->info("current mode: {} ", utils::RobotModeToString(robot_data_.robot_state.robot_mode));
+    // dexai::log()->info("current mode: {} ",
+    // utils::RobotModeToString(robot_data_.robot_state.robot_mode));
     lcm_.publish(params_.lcm_status_channel, &franka_status);
 
     PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
                          current_mode == franka::RobotMode::kUserStopped);
-    
+
     // Pause all the robots if robot is U-stopped.
-    PublishPauseToChannel(franka_status.utime, params_.lcm_stop_channel, 
+    PublishPauseToChannel(franka_status.utime, params_.lcm_stop_channel,
                           current_mode == franka::RobotMode::kUserStopped,
                           params_.robot_name);
 
@@ -432,7 +433,6 @@ void CommunicationInterface::HandlePlan(
 void CommunicationInterface::HandlePause(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::pause_cmd* pause_cmd_msg) {
-<<<<<<< HEAD:src/driver/communication_interface.cc
   std::lock_guard<std::mutex> lock {pause_mutex_};
   // check if paused = true or paused = false was received:
   auto source {pause_cmd_msg->source};
@@ -448,27 +448,9 @@ void CommunicationInterface::HandlePause(
       return;
     }
     case PauseCommandType::PAUSE:
-=======
-  std::lock_guard<std::mutex> lock(pause_mutex_);
-
-  // check if paused = true or paused = false was received:
-  bool desired_pause {pause_cmd_msg->data};
-  auto source {pause_cmd_msg->source};
-
-  if (desired_pause) {
-    if(pause_data_.pause_sources_set_.find(source)
-        == pause_data_.pause_sources_set_.end()) {
-      dexai::log()->warn(
-        "CommunicationInterface::HandlePause: Received pause command from {}",
-        source);
-<<<<<<< HEAD:src/driver/communication_interface.cc
-    }
-    if (pause_data_.pause_sources_set_.insert(source).second == false) {
->>>>>>> 87d4398 (Added u-stop SimEvent):src/communication_interface.cc
       dexai::log()->warn(
           "CommInterface:HandlePause: received pause command from source: {}",
           source);
-<<<<<<< HEAD:src/driver/communication_interface.cc
       if (pause_data_.pause_sources.insert(source).second == false) {
         dexai::log()->warn(
             "CommInterface:HandlePause: Already paused by source: '{}'",
@@ -476,42 +458,12 @@ void CommunicationInterface::HandlePause(
       }
       break;
     case PauseCommandType::CONTINUE:
-=======
-=======
-    
-      if (pause_data_.pause_sources_set_.insert(source).second == false) {
-        dexai::log()->warn(
-            "CommunicationInterface::HandlePause: Already paused by source: {}",
-            source);
-      }
->>>>>>> 8965365 (TryToSetRobotData to keep current mode and handlePause to not spam pause updates):src/communication_interface.cc
-    }
-  } else {
-    if(pause_data_.pause_sources_set_.find(source)
-        != pause_data_.pause_sources_set_.end()) {
-    dexai::log()->warn(
-        "CommunicationInterface::HandlePause: Received continue command from "
-        "{}",
-        source);
-    }
-    if (pause_data_.pause_sources_set_.find(source)
-        != pause_data_.pause_sources_set_.end()) {
-      pause_data_.pause_sources_set_.erase(source);
-    } else {
-      if(pause_data_.pause_sources_set_.find(source)
-<<<<<<< HEAD:src/driver/communication_interface.cc
-        != pause_data_.pause_sources_set_.end()){
->>>>>>> 87d4398 (Added u-stop SimEvent):src/communication_interface.cc
-=======
-        != pause_data_.pause_sources_set_.end()) {
->>>>>>> 8965365 (TryToSetRobotData to keep current mode and handlePause to not spam pause updates):src/communication_interface.cc
-      dexai::log()->warn(
-          "CommInterface:HandlePause: received continue command from source: "
-          "{}",
-          source);
-<<<<<<< HEAD:src/driver/communication_interface.cc
       if (pause_data_.pause_sources.find(source)
           != pause_data_.pause_sources.end()) {
+        dexai::log()->warn(
+            "CommInterface:HandlePause: received continue command from source: "
+            "{}",
+            source);
         pause_data_.pause_sources.erase(source);
       } else {
         dexai::log()->warn(
@@ -526,10 +478,6 @@ void CommunicationInterface::HandlePause(
           "source: {}",
           source);
       break;
-=======
-      }
-    }
->>>>>>> 87d4398 (Added u-stop SimEvent):src/communication_interface.cc
   }
 
   // if the set of pause sources is empty, then
@@ -546,53 +494,35 @@ void CommunicationInterface::HandlePause(
 void CommunicationInterface::HandleSimDriverEventTrigger(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::pause_cmd* cmd_msg) {
-  bool desired_state {cmd_msg->data};
+  // auto desired_state {cmd_msg->data};
   auto desired_event {cmd_msg->source};
 
   // simulate control exception
-  if(desired_event == "control_exception") {
+  if (desired_event == "control_exception") {
     dexai::log()->error(
-<<<<<<< HEAD:src/driver/communication_interface.cc
         "CommInterface:HandleSimDriverEventTrigger: received command "
-=======
-        "CommunicationInterface::HandleSimDriverEventTrigger: received command "
->>>>>>> 87d4398 (Added u-stop SimEvent):src/communication_interface.cc
         "to simulate control exception!");
     sim_control_exception_triggered_ = true;
     return;
-  } 
-  if(desired_event == "u_stop"){
-
-    if(robot_data_.robot_state.robot_mode != franka::RobotMode::kUserStopped){
+  }
+  if (desired_event == "u_stop") {
+    if (robot_data_.robot_state.robot_mode != franka::RobotMode::kUserStopped) {
       dexai::log()->info(
-          "CommunicationInterface::HandleSimDriverEventTrigger: received command "
+          "CommunicationInterface:HandleSimDriverEventTrigger: received "
+          "command "
           "to simulate U Stop = True");
       robot_data_.robot_state.robot_mode = franka::RobotMode::kUserStopped;
-    }
-    else{
+    } else {
       dexai::log()->info(
-          "CommunicationInterface::HandleSimDriverEventTrigger: received command "
+          "CommunicationInterface:HandleSimDriverEventTrigger: received "
+          "command "
           "to simulate U Stop = False");
       robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
     }
   } else {
     dexai::log()->error(
-<<<<<<< HEAD:src/driver/communication_interface.cc
         "CommInterface:HandleSimDriverEventTrigger: Unrecognized "
-=======
-        "CommunicationInterface::HandleSimDriverEventTrigger: Unrecognized "
->>>>>>> 87d4398 (Added u-stop SimEvent):src/communication_interface.cc
         "trigger {}!",
         desired_event);
   }
-}
-
-void CommunicationInterface::HandleUserStop(
-    const ::lcm::ReceiveBuffer*, const std::string&,
-    const robot_msgs::bool_t* user_stop_msg) {
-
-  PublishPauseToChannel(user_stop_msg->utime,
-                        params_.lcm_stop_channel,
-                        user_stop_msg->data,
-                        params_.robot_name);
 }
