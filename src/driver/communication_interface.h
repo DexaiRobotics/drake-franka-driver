@@ -138,6 +138,8 @@ class CommunicationInterface {
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
   void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
                             bool data);
+  void PublishPauseToChannel(int64_t utime, std::string_view lcm_channel,
+                             int data, std::string_view source = "");
 
   std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
 
