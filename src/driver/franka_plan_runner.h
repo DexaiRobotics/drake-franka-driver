@@ -153,7 +153,16 @@ class FrankaPlanRunner {
                                  kHighForceThreshold, kHighForceThreshold);
   }
 
-  franka::RobotMode GetRobotMode() const;
+  franka::RobotMode GetRobotMode() const {
+    franka::RobotMode current_mode;
+    robot_->read([&current_mode](const franka::RobotState& robot_state) {
+      current_mode = robot_state.robot_mode;
+      return false;
+    });
+    dexai::log()->debug("GetRobotMode: Franka is in mode: {}",
+                        utils::RobotModeToString(current_mode));
+    return current_mode;
+  }
 
   int RunFranka();
 
@@ -262,7 +271,7 @@ class FrankaPlanRunner {
   //    Motion finished commanded, but the robot is still moving!
   //    ["joint_motion_generator_acceleration_discontinuity"]
   const double CONV_ANGLE_THRESHOLD {1e-3};         // rad, empirical
-  const double CONV_SPEED_NORM_THRESHOLD {7.3e-3};  // rad/s, L2
+  const double CONV_SPEED_NORM_THRESHOLD {6.6e-3};  // rad/s, L2
   Eigen::VectorXd CONV_SPEED_THRESHOLD;
 };  // FrankaPlanRunner
 
