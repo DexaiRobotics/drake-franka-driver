@@ -498,7 +498,7 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
   auto desired_event {cmd_msg->source};
 
   // simulate control exception
-  if (desired_event == "control_exception") {
+  if(desired_event == "control_exception") {
     dexai::log()->error(
         "CommInterface:HandleSimDriverEventTrigger: received command "
         "to simulate control exception!");
