@@ -171,7 +171,7 @@ void CommunicationInterface::SetRobotData(
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
   robot_data_.has_robot_data = true;
-  // keep current robot mode if simulated for U-stop status
+  // keep current robot mode when using simulated U-stop 
   if (is_sim_) {
     robot_data_.robot_state.robot_mode = current_mode;
   }
