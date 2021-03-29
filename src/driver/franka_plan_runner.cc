@@ -466,8 +466,10 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
   // get pause data from the communication interface
   auto paused = comm_interface_->GetPauseStatus();
   auto cancel_plan_requested = comm_interface_->CancelPlanRequested();
-  if (cancel_plan_requested && !plan_){
-    log()->debug("CommInterface:IncreaseFrankaTimeBasedOnStatus: Received cancel plan request with no active plan");
+  if (cancel_plan_requested && !plan_) {
+    log()->debug(
+        "CommInterface:IncreaseFrankaTimeBasedOnStatus: Received cancel plan "
+        "request with no active plan");
     comm_interface_->ClearCancelPlanRequest();
     cancel_plan_requested = false;
   }
