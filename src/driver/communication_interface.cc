@@ -63,7 +63,7 @@ using utils::PauseCommandType;
 
 CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                                                double lcm_publish_rate,
-                                               bool simulated)
+                                               const bool simulated)
     : params_ {params},
       is_sim_ {simulated},
       lcm_ {params_.lcm_url},
@@ -167,11 +167,12 @@ void CommunicationInterface::SetRobotData(
     const franka::RobotState& robot_state,
     const Eigen::VectorXd& robot_plan_next_conf) {
   std::scoped_lock<std::mutex> lock {robot_data_mutex_};
+  franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
   robot_data_.has_robot_data = true;
-  if(is_sim_){
-    franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
+  // keep current robot mode if simulated for U-stop status
+  if (is_sim_) {
     robot_data_.robot_state.robot_mode = current_mode;
   }
 }
@@ -253,7 +254,7 @@ void CommunicationInterface::PublishRobotStatus() {
                          current_mode == franka::RobotMode::kUserStopped);
 
     // Cancel robot plans if robot is U-stopped.
-    if (current_mode == franka::RobotMode::kUserStopped){
+    if (current_mode == franka::RobotMode::kUserStopped) {
       PublishPauseToChannel(franka_status.utime, params_.lcm_stop_channel,
                             PauseCommandType::CANCEL_PLAN,
                             fmt::format("{}_u_stop", params_.robot_name));
@@ -291,7 +292,7 @@ void CommunicationInterface::PublishTriggerToChannel(
 
 void CommunicationInterface::PublishPauseToChannel(int64_t utime,
                                                    std::string_view lcm_channel,
-                                                   int data,
+                                                   int8_t data,
                                                    std::string_view source) {
   robot_msgs::pause_cmd msg;
   msg.utime = utime;
@@ -440,7 +441,7 @@ void CommunicationInterface::HandlePause(
 
   switch (pause_type) {
     case PauseCommandType::CANCEL_PLAN: {
-      dexai::log()->warn(
+      dexai::log()->debug(
           "CommInterface:HandlePause: Received cancel plan request!");
       cancel_plan_requested_ = true;
       break;

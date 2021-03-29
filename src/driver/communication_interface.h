@@ -140,7 +140,7 @@ class CommunicationInterface {
   void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
                             bool data);
   void PublishPauseToChannel(int64_t utime, std::string_view lcm_channel,
-                             int data, std::string_view source = "");
+                             int8_t data, std::string_view source = "");
 
   std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
 

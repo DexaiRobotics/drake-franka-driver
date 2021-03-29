@@ -465,7 +465,12 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     const std::array<double, 7>& vel, double period_in_seconds) {
   // get pause data from the communication interface
   auto paused = comm_interface_->GetPauseStatus();
-  auto cancel_plan_requested = comm_interface_->CancelPlanRequested() && plan_;
+  auto cancel_plan_requested = comm_interface_->CancelPlanRequested();
+  if (cancel_plan_requested && !plan_){
+    log()->debug("CommInterface:IncreaseFrankaTimeBasedOnStatus: Received cancel plan request with no active plan");
+    comm_interface_->ClearCancelPlanRequest();
+    cancel_plan_requested = false;
+  }
   // robot can be in four states: running, pausing, paused, unpausing
 
   // check if robot is supposed to be paused
