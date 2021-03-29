@@ -504,7 +504,7 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
     return;
   }
   if (desired_event == "u_stop") {
-    if (robot_data_.robot_state.robot_mode != franka::RobotMode::kUserStopped) {
+    if (cmd_msg->data) {
       dexai::log()->info(
           "CommInterface:HandleSimDriverEventTrigger: received "
           "command "
