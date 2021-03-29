@@ -66,8 +66,8 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
       is_sim_ {ip_addr_ == "192.168.1.1"},
       status_ {RobotStatus::Uninitialized} {
   // setup communication interface
-  comm_interface_ =
-      std::make_unique<CommunicationInterface>(params_, lcm_publish_rate_);
+  comm_interface_ = std::make_unique<CommunicationInterface>(
+      params_, lcm_publish_rate_, is_sim_);
   max_accels_ = params.robot_max_accelerations;
 
   assert(!params_.urdf_filepath.empty()
@@ -465,7 +465,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     const std::array<double, 7>& vel, double period_in_seconds) {
   // get pause data from the communication interface
   auto paused = comm_interface_->GetPauseStatus();
-  auto cancel_plan_requested = comm_interface_->CancelPlanRequested();
+  auto cancel_plan_requested = comm_interface_->CancelPlanRequested() && plan_;
   // robot can be in four states: running, pausing, paused, unpausing
 
   // check if robot is supposed to be paused

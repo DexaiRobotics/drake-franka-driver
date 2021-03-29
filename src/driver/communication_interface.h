@@ -87,7 +87,8 @@ struct RobotPiecewisePolynomial {
 class CommunicationInterface {
  public:
   explicit CommunicationInterface(const RobotParameters& params,
-                                  double lcm_publish_rate = 200.0 /* Hz */);
+                                  double lcm_publish_rate = 200.0 /* Hz */,
+                                  const bool simulated = false);
   void StartInterface();
   void StopInterface();
 
@@ -177,6 +178,7 @@ class CommunicationInterface {
   std::atomic_bool running_ {false};
   std::atomic<bool> sim_control_exception_triggered_ {false};
   std::atomic<bool> cancel_plan_requested_ {false};
+  std::atomic<bool> is_sim_ {false};
 
   ::lcm::LCM lcm_;
 

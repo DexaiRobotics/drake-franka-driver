@@ -62,8 +62,10 @@ using franka_driver::CommunicationInterface;
 using utils::PauseCommandType;
 
 CommunicationInterface::CommunicationInterface(const RobotParameters& params,
-                                               double lcm_publish_rate)
+                                               double lcm_publish_rate,
+                                               bool simulated)
     : params_ {params},
+      is_sim_ {simulated},
       lcm_ {params_.lcm_url},
       lcm_publish_rate_ {lcm_publish_rate} {
   lcm_.subscribe(params_.lcm_plan_channel, &CommunicationInterface::HandlePlan,
@@ -168,6 +170,10 @@ void CommunicationInterface::SetRobotData(
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
   robot_data_.has_robot_data = true;
+  if(is_sim_){
+    franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
+    robot_data_.robot_state.robot_mode = current_mode;
+  }
 }
 
 bool CommunicationInterface::GetPauseStatus() {
@@ -246,11 +252,12 @@ void CommunicationInterface::PublishRobotStatus() {
     PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
                          current_mode == franka::RobotMode::kUserStopped);
 
-    // Pause all the robots if robot is U-stopped.
-    PublishPauseToChannel(franka_status.utime, params_.lcm_stop_channel,
-                          current_mode == franka::RobotMode::kUserStopped,
-                          params_.robot_name);
-
+    // Cancel robot plans if robot is U-stopped.
+    if (current_mode == franka::RobotMode::kUserStopped){
+      PublishPauseToChannel(franka_status.utime, params_.lcm_stop_channel,
+                            PauseCommandType::CANCEL_PLAN,
+                            fmt::format("{}_u_stop", params_.robot_name));
+    }
     PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
                          current_mode == franka::RobotMode::kOther);
   }
@@ -284,7 +291,7 @@ void CommunicationInterface::PublishTriggerToChannel(
 
 void CommunicationInterface::PublishPauseToChannel(int64_t utime,
                                                    std::string_view lcm_channel,
-                                                   bool data,
+                                                   int data,
                                                    std::string_view source) {
   robot_msgs::pause_cmd msg;
   msg.utime = utime;
@@ -433,10 +440,10 @@ void CommunicationInterface::HandlePause(
 
   switch (pause_type) {
     case PauseCommandType::CANCEL_PLAN: {
-      dexai::log()->error(
+      dexai::log()->warn(
           "CommInterface:HandlePause: Received cancel plan request!");
       cancel_plan_requested_ = true;
-      return;
+      break;
     }
     case PauseCommandType::PAUSE:
       dexai::log()->warn(
@@ -449,12 +456,12 @@ void CommunicationInterface::HandlePause(
       }
       break;
     case PauseCommandType::CONTINUE:
+      dexai::log()->warn(
+          "CommInterface:HandlePause: received continue command from source: "
+          "{}",
+          source);
       if (pause_data_.pause_sources.find(source)
           != pause_data_.pause_sources.end()) {
-        dexai::log()->warn(
-            "CommInterface:HandlePause: received continue command from source: "
-            "{}",
-            source);
         pause_data_.pause_sources.erase(source);
       } else {
         dexai::log()->warn(
