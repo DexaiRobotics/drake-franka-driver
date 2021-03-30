@@ -294,7 +294,7 @@ int FrankaPlanRunner::RunFranka() {
       }
       // no new plan available in the buffer or robot isn't running
       if (comm_interface_->CancelPlanRequested()) {
-        log()->error(
+        log()->debug(
             "RunFranka: plan cancellation requested but there is no active "
             "plan");
         comm_interface_->ClearCancelPlanRequest();
