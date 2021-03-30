@@ -101,6 +101,7 @@ class CommunicationInterface {
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
+  std::string CancelPlanSource() { return cancel_plan_source_; }
 
   bool HasNewPlan() {
     std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
@@ -202,6 +203,8 @@ class CommunicationInterface {
   std::string lcm_user_stop_channel_;
   std::string lcm_brakes_locked_channel_;
   std::string lcm_sim_driver_event_trigger_channel_;
+
+  std::string cancel_plan_source_;
 
   double lcm_publish_rate_;  // Hz
 };

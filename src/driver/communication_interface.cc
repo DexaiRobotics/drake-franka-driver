@@ -444,6 +444,7 @@ void CommunicationInterface::HandlePause(
       dexai::log()->debug(
           "CommInterface:HandlePause: Received cancel plan request!");
       cancel_plan_requested_ = true;
+      cancel_plan_source_ = source;
       break;
     }
     case PauseCommandType::PAUSE:
