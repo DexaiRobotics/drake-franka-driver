@@ -257,7 +257,7 @@ void CommunicationInterface::PublishRobotStatus() {
     if (current_mode == franka::RobotMode::kUserStopped) {
       PublishPauseToChannel(franka_status.utime, params_.lcm_stop_channel,
                             PauseCommandType::CANCEL_PLAN,
-                            fmt::format("{}_u_stop", params_.robot_name));
+                            fmt::format("{}_U_STOP", params_.robot_name));
     }
     PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
                          current_mode == franka::RobotMode::kOther);
@@ -444,7 +444,6 @@ void CommunicationInterface::HandlePause(
       dexai::log()->debug(
           "CommInterface:HandlePause: Received cancel plan request!");
       cancel_plan_requested_ = true;
-      std::transform(source.begin(), source.end(), source.begin(), ::toupper);
       cancel_plan_source_ = source;
       break;
     }

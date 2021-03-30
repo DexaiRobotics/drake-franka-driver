@@ -101,7 +101,7 @@ class CommunicationInterface {
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
-  std::string CancelPlanSource() { return cancel_plan_source_; }
+  std::string GetCancelPlanSource() { return cancel_plan_source_; }
 
   bool HasNewPlan() {
     std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
