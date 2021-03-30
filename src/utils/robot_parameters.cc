@@ -137,6 +137,7 @@ bool RobotParameters::GenerateParametersBasedOnRobotName(
   lcm_plan_received_channel = new_robot_name + "_PLAN_RECEIVED";
   lcm_plan_complete_channel = new_robot_name + "_PLAN_COMPLETE";
   lcm_stop_channel = new_robot_name + "_STOP";
+  lcm_user_stop_channel = new_robot_name + "_USER_STOPPED";
 
   return true;
 }
@@ -255,6 +256,7 @@ RobotParameters loadYamlParameters(
     p.lcm_plan_received_channel = p.robot_name + "_PLAN_RECEIVED";
     p.lcm_plan_complete_channel = p.robot_name + "_PLAN_COMPLETE";
     p.lcm_stop_channel = p.robot_name + "_STOP";
+    p.lcm_user_stop_channel = p.robot_name + "_USER_STOPPED";
 
     get_yaml_val_or_die(param, "lcm_url", p.lcm_url, yaml_full_path, verbose,
                         exit_code);

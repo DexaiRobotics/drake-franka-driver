@@ -66,8 +66,8 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
       is_sim_ {ip_addr_ == "192.168.1.1"},
       status_ {RobotStatus::Uninitialized} {
   // setup communication interface
-  comm_interface_ =
-      std::make_unique<CommunicationInterface>(params_, lcm_publish_rate_);
+  comm_interface_ = std::make_unique<CommunicationInterface>(
+      params_, lcm_publish_rate_, is_sim_);
   max_accels_ = params.robot_max_accelerations;
 
   assert(!params_.urdf_filepath.empty()
@@ -294,7 +294,7 @@ int FrankaPlanRunner::RunFranka() {
       }
       // no new plan available in the buffer or robot isn't running
       if (comm_interface_->CancelPlanRequested()) {
-        log()->error(
+        log()->debug(
             "RunFranka: plan cancellation requested but there is no active "
             "plan");
         comm_interface_->ClearCancelPlanRequest();
@@ -466,6 +466,13 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
   // get pause data from the communication interface
   auto paused = comm_interface_->GetPauseStatus();
   auto cancel_plan_requested = comm_interface_->CancelPlanRequested();
+  if (cancel_plan_requested && !plan_) {
+    log()->debug(
+        "CommInterface:IncreaseFrankaTimeBasedOnStatus: Received cancel plan "
+        "request with no active plan");
+    comm_interface_->ClearCancelPlanRequest();
+    cancel_plan_requested = false;
+  }
   // robot can be in four states: running, pausing, paused, unpausing
 
   // check if robot is supposed to be paused
@@ -568,7 +575,8 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
       if (plan_) {
         dexai::log()->warn(
             "IncreaseFrankaTimeBasedOnStatus: Paused successfully after "
-            "canceling plan.");
+            "cancel plan request from source: {}",
+            comm_interface_->GetCancelPlanSource());
         comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
         plan_.release();
         plan_utime_ = -1;  // reset plan to -1

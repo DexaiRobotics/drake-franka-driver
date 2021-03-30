@@ -87,7 +87,8 @@ struct RobotPiecewisePolynomial {
 class CommunicationInterface {
  public:
   explicit CommunicationInterface(const RobotParameters& params,
-                                  double lcm_publish_rate = 200.0 /* Hz */);
+                                  double lcm_publish_rate = 200.0 /* Hz */,
+                                  const bool simulated = false);
   void StartInterface();
   void StopInterface();
 
@@ -100,6 +101,7 @@ class CommunicationInterface {
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
+  std::string GetCancelPlanSource() { return cancel_plan_source_; }
 
   bool HasNewPlan() {
     std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
@@ -138,6 +140,8 @@ class CommunicationInterface {
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
   void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
                             bool data);
+  void PublishPauseToChannel(int64_t utime, std::string_view lcm_channel,
+                             int8_t data, std::string_view source = "");
 
   std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
 
@@ -175,6 +179,7 @@ class CommunicationInterface {
   std::atomic_bool running_ {false};
   std::atomic<bool> sim_control_exception_triggered_ {false};
   std::atomic<bool> cancel_plan_requested_ {false};
+  std::atomic<bool> is_sim_ {false};
 
   ::lcm::LCM lcm_;
 
@@ -198,6 +203,8 @@ class CommunicationInterface {
   std::string lcm_user_stop_channel_;
   std::string lcm_brakes_locked_channel_;
   std::string lcm_sim_driver_event_trigger_channel_;
+
+  std::string cancel_plan_source_;
 
   double lcm_publish_rate_;  // Hz
 };
