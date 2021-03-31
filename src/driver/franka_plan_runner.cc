@@ -367,7 +367,6 @@ int FrankaPlanRunner::RunSim() {
   Eigen::VectorXd prev_conf(dof_);
   std::vector<double> vel(7, 1);
   franka::RobotState robot_state;  // internal state; mapping to franka state
-  robot_state.robot_mode = franka::RobotMode::kIdle;
 
   franka::Duration period;
   std::chrono::milliseconds last_ms =

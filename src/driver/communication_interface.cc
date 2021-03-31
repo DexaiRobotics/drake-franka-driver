@@ -68,6 +68,13 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
       is_sim_ {simulated},
       lcm_ {params_.lcm_url},
       lcm_publish_rate_ {lcm_publish_rate} {
+  // initialize robot mode to idle when running in sim
+  // on the real Franka, the robot mode gets read in via libfranka from the
+  // actual robot
+  if (is_sim_) {
+    robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
+  }
+
   lcm_.subscribe(params_.lcm_plan_channel, &CommunicationInterface::HandlePlan,
                  this);
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
@@ -171,7 +178,11 @@ void CommunicationInterface::SetRobotData(
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
   robot_data_.has_robot_data = true;
-  // keep current robot mode when using simulated U-stop
+  // when running on the real robot, the robot_state passed into this function
+  // is retrieved from libfranka and gives us accurate information about the
+  // robot's operating mode, in sim we just want to propagate the existing mode
+  // so we don't overwrite after changing it in simulation-specific logic (sim
+  // driver event handler)
   if (is_sim_) {
     robot_data_.robot_state.robot_mode = current_mode;
   }
@@ -505,17 +516,16 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
     return;
   }
   if (desired_event == "u_stop") {
+    std::scoped_lock<std::mutex> lock {robot_data_mutex_};
     if (cmd_msg->data) {
       dexai::log()->info(
           "CommInterface:HandleSimDriverEventTrigger: received "
-          "command "
-          "to simulate U Stop = True");
+          "command to simulate U Stop = True");
       robot_data_.robot_state.robot_mode = franka::RobotMode::kUserStopped;
     } else {
       dexai::log()->info(
           "CommInterface:HandleSimDriverEventTrigger: received "
-          "command "
-          "to simulate U Stop = False");
+          "command to simulate U Stop = False");
       robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
     }
   } else {
