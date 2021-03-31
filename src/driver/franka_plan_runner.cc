@@ -367,8 +367,6 @@ int FrankaPlanRunner::RunSim() {
   Eigen::VectorXd prev_conf(dof_);
   std::vector<double> vel(7, 1);
   franka::RobotState robot_state;  // internal state; mapping to franka state
-  robot_state.robot_mode = franka::RobotMode::kIdle;
-
   franka::Duration period;
   std::chrono::milliseconds last_ms =
       std::chrono::duration_cast<std::chrono::milliseconds>(
@@ -573,11 +571,14 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     // do nothing
     if (cancel_plan_requested) {
       if (plan_) {
+        auto source {comm_interface_->GetCancelPlanSource()};
         dexai::log()->warn(
             "IncreaseFrankaTimeBasedOnStatus: Paused successfully after "
             "cancel plan request from source: {}",
-            comm_interface_->GetCancelPlanSource());
-        comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
+            source);
+        comm_interface_->PublishPlanComplete(
+            plan_utime_, false,
+            fmt::format("plan canceled upon request from source: {}", source));
         plan_.release();
         plan_utime_ = -1;  // reset plan to -1
       }

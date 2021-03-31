@@ -122,6 +122,15 @@ void CommunicationInterface::ResetData() {
 void CommunicationInterface::StartInterface() {
   // Initialize data as empty for exchange with robot driver
   ResetData();
+
+  // initialize robot mode to idle when running in simulation.
+  // on the real Franka, the robot mode gets read in via libfranka from the
+  // actual robot arm
+  if (is_sim_) {
+    std::scoped_lock<std::mutex> lock {robot_data_mutex_};
+    robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
+  }
+
   // start LCM threads; independent of sim vs. real robot
   dexai::log()->info("CommInterface:StartInterface: Start LCM threads");
   running_ = true;  // sets the lcm threads to active.
@@ -171,7 +180,11 @@ void CommunicationInterface::SetRobotData(
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
   robot_data_.has_robot_data = true;
-  // keep current robot mode when using simulated U-stop
+  // when running on the real robot, the robot_state passed into this function
+  // is retrieved from libfranka and gives us accurate information about the
+  // robot's operating mode, in sim we just want to propagate the existing mode
+  // so we don't overwrite after changing it in simulation-specific logic (sim
+  // driver event handler)
   if (is_sim_) {
     robot_data_.robot_state.robot_mode = current_mode;
   }
@@ -442,7 +455,9 @@ void CommunicationInterface::HandlePause(
   switch (pause_type) {
     case PauseCommandType::CANCEL_PLAN: {
       dexai::log()->debug(
-          "CommInterface:HandlePause: Received cancel plan request!");
+          "CommInterface:HandlePause: Received cancel plan request with "
+          "source: {}",
+          source);
       cancel_plan_requested_ = true;
       cancel_plan_source_ = source;
       break;
@@ -505,17 +520,16 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
     return;
   }
   if (desired_event == "u_stop") {
+    std::scoped_lock<std::mutex> lock {robot_data_mutex_};
     if (cmd_msg->data) {
-      dexai::log()->info(
+      dexai::log()->warn(
           "CommInterface:HandleSimDriverEventTrigger: received "
-          "command "
-          "to simulate U Stop = True");
+          "command to simulate User Stop button press");
       robot_data_.robot_state.robot_mode = franka::RobotMode::kUserStopped;
     } else {
-      dexai::log()->info(
+      dexai::log()->warn(
           "CommInterface:HandleSimDriverEventTrigger: received "
-          "command "
-          "to simulate U Stop = False");
+          "command to simulate User Stop release");
       robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
     }
   } else {
