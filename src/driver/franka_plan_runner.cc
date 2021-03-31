@@ -578,7 +578,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
             source);
         comm_interface_->PublishPlanComplete(
             plan_utime_, false,
-            fmt::format("plan canceled after request from source: {}", source));
+            fmt::format("plan canceled upon request from source: {}", source));
         plan_.release();
         plan_utime_ = -1;  // reset plan to -1
       }
