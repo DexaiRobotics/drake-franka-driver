@@ -571,11 +571,14 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     // do nothing
     if (cancel_plan_requested) {
       if (plan_) {
+        auto source {comm_interface_->GetCancelPlanSource()};
         dexai::log()->warn(
             "IncreaseFrankaTimeBasedOnStatus: Paused successfully after "
             "cancel plan request from source: {}",
-            comm_interface_->GetCancelPlanSource());
-        comm_interface_->PublishPlanComplete(plan_utime_, false, "canceled");
+            source);
+        comm_interface_->PublishPlanComplete(
+            plan_utime_, false,
+            fmt::format("plan canceled after request from source: {}", source));
         plan_.release();
         plan_utime_ = -1;  // reset plan to -1
       }
