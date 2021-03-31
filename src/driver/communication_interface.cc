@@ -522,14 +522,14 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
   if (desired_event == "u_stop") {
     std::scoped_lock<std::mutex> lock {robot_data_mutex_};
     if (cmd_msg->data) {
-      dexai::log()->info(
+      dexai::log()->warn(
           "CommInterface:HandleSimDriverEventTrigger: received "
-          "command to simulate U Stop = True");
+          "command to simulate User Stop button press");
       robot_data_.robot_state.robot_mode = franka::RobotMode::kUserStopped;
     } else {
-      dexai::log()->info(
+      dexai::log()->warn(
           "CommInterface:HandleSimDriverEventTrigger: received "
-          "command to simulate U Stop = False");
+          "command to simulate User Stop release");
       robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
     }
   } else {
