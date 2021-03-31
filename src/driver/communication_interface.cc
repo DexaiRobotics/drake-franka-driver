@@ -68,13 +68,6 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
       is_sim_ {simulated},
       lcm_ {params_.lcm_url},
       lcm_publish_rate_ {lcm_publish_rate} {
-  // initialize robot mode to idle when running in sim
-  // on the real Franka, the robot mode gets read in via libfranka from the
-  // actual robot
-  if (is_sim_) {
-    robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
-  }
-
   lcm_.subscribe(params_.lcm_plan_channel, &CommunicationInterface::HandlePlan,
                  this);
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
@@ -129,6 +122,15 @@ void CommunicationInterface::ResetData() {
 void CommunicationInterface::StartInterface() {
   // Initialize data as empty for exchange with robot driver
   ResetData();
+
+  // initialize robot mode to idle when running in simulation.
+  // on the real Franka, the robot mode gets read in via libfranka from the
+  // actual robot arm
+  if (is_sim_) {
+    std::scoped_lock<std::mutex> lock {robot_data_mutex_};
+    robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
+  }
+
   // start LCM threads; independent of sim vs. real robot
   dexai::log()->info("CommInterface:StartInterface: Start LCM threads");
   running_ = true;  // sets the lcm threads to active.
@@ -453,7 +455,9 @@ void CommunicationInterface::HandlePause(
   switch (pause_type) {
     case PauseCommandType::CANCEL_PLAN: {
       dexai::log()->debug(
-          "CommInterface:HandlePause: Received cancel plan request!");
+          "CommInterface:HandlePause: Received cancel plan request with "
+          "source: {}",
+          source);
       cancel_plan_requested_ = true;
       cancel_plan_source_ = source;
       break;
