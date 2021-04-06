@@ -452,9 +452,14 @@ int FrankaPlanRunner::RunFranka() {
             return ret_torques;
           }
 
-          log()->info("norm: {}\tcounter: {}", joint_vel.norm(),
-                      stopped_debounce_counter);
+          // log()->info("norm: {}\tcounter: {}", joint_vel.norm(),
+          //             stopped_debounce_counter);
 
+          const auto end_time {std::chrono::high_resolution_clock::now()};
+          const auto time_elapsed_us =
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  end_time - start_time);
+          log()->info("{} us", time_elapsed_us.count());
           return ret_torques;
         };
         robot_->control(impedance_control_callback);
