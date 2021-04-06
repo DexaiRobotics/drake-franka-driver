@@ -342,6 +342,10 @@ int FrankaPlanRunner::RunFranka() {
 
         const Eigen::Matrix<double, 7, 1> q_center =
             0.5 * (joint_limits_.col(0) + joint_limits_.col(1));
+        log()->info("Limits: \n\t{}\n\t{}\nCenter:\n\t{}",
+          joint_limits_.col(0).transpose(),
+          joint_limits_.col(1).transpose(),
+          q_center.transpose());
 
         const double k_centering {0.001};
 
