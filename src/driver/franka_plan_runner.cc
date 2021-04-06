@@ -299,8 +299,8 @@ int FrankaPlanRunner::RunFranka() {
                  && comm_interface_->CompliantPushFwdRequested()) {
         std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
         // Compliance parameters
-        const double translational_stiffness {300.0};
-        const double rotational_stiffness {10.0};
+        const double translational_stiffness {200.0};
+        const double rotational_stiffness {50.0};
         Eigen::MatrixXd stiffness(6, 6), damping(6, 6);
         stiffness.setZero();
         stiffness.topLeftCorner(3, 3)
@@ -473,16 +473,29 @@ int FrankaPlanRunner::RunFranka() {
           //     null_space.array() / null_space.norm()};
 
           // 7x1
-          const auto q_diff_from_center {q_center - q};
+          const auto q_diff_from_center {q - q_center};
 
           const auto cart_vel {jacobian * dq};
 
           // compute control
           Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7),
               tau_joint_centering(7);
+
+
+          // // static const std::array<double, 6> wrench_limits_array {5.0, 5.0, 5.0, 10.0, 10.0, 10.0};
+          // // Eigen::Map<const Eigen::Matrix<double, 6, 1>> wrench_limits{wrench_limits_array.data()};
+
+          // Eigen::Matrix<double, 6, 1> task_wrench {(-stiffness * error - damping * (cart_vel))};
+          // // log()->info("task_wrench: {}", task_wrench.transpose());
+          // // task_wrench = task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
+          // // log()->info("task_wrench*: {}", task_wrench.transpose());
+
+          auto task_wrench {(-stiffness * error - damping * (cart_vel))};
+          // task_wrench = task_wrench.cwiseMin(torque_limits).cwiseMax(-torque_limits);
+
           // Spring damper system with damping ratio=1
           tau_task << jacobian.transpose()
-                          * (-stiffness * error - damping * (cart_vel));
+                          * task_wrench;
 
           std::thread update_thread {update_null_space, jacobian, inertia};
           update_thread.detach();
@@ -495,8 +508,7 @@ int FrankaPlanRunner::RunFranka() {
 
           // 7x7 * 7x1
           tau_joint_centering
-              << null_space_normalized_working_copy * q_diff_from_center;
-          tau_joint_centering = tau_joint_centering.array() * k_centering;
+              << null_space_normalized_working_copy * (q_diff_from_center * (-k_centering) + dq * (-2 * sqrt(k_centering)) );
 
           tau_d << tau_task + coriolis + tau_joint_centering;
 
