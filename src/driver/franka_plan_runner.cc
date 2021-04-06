@@ -418,8 +418,8 @@ int FrankaPlanRunner::RunFranka() {
         robot_->control(impedance_control_callback);
         comm_interface_->ClearCompliantPushFwdRequest();
         comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
+        continue;
       }
-      continue;
       // no new plan available in the buffer or robot isn't running
       if (comm_interface_->CancelPlanRequested()) {
         log()->debug(
