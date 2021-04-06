@@ -340,7 +340,7 @@ int FrankaPlanRunner::RunFranka() {
             {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
             {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
 
-        const double stopped_max_vel_norm {0.1};
+        const double stopped_max_vel_norm {0.01};
         int stopped_debounce_counter {};
 
         // define callback for the torque control loop
@@ -408,7 +408,7 @@ int FrankaPlanRunner::RunFranka() {
             stopped_debounce_counter = 0;
           }
 
-          if (stopped_debounce_counter > 20) {
+          if (stopped_debounce_counter > 30) {
             ret_torques.motion_finished = true;
             return ret_torques;
           }
