@@ -49,6 +49,8 @@
 #include <cmath>      // for exp
 #include <vector>     // for vector
 
+#include <Eigen/QR>
+
 #include <drake/lcmt_iiwa_status.hpp>
 #include <franka/model.h>  // for Model
 
@@ -347,9 +349,10 @@ int FrankaPlanRunner::RunFranka() {
           joint_limits_.col(1).transpose(),
           q_center.transpose());
 
-        const double k_centering {0.01};
+        const double k_centering {0.1};
 
-        const double stopped_max_vel_norm {0.01};
+        const double stopped_max_vel_norm {0.005};
+        const int debounce_counter_max {30};
         int stopped_debounce_counter {};
 
         Eigen::Map<const Eigen::Matrix<double, 7, 1>> torque_limits(
@@ -389,9 +392,6 @@ int FrankaPlanRunner::RunFranka() {
           Eigen::Vector3d position(transform.translation());
           Eigen::Quaterniond orientation(transform.linear());
 
-          Eigen::Map<const Eigen::Matrix<double, 7, 1>> joint_vel(
-              robot_state.dq.data());
-
           // compute error to desired equilibrium pose
           // position error
           Eigen::Matrix<double, 6, 1> error;
@@ -430,17 +430,24 @@ int FrankaPlanRunner::RunFranka() {
           // 7x1
           const auto q_diff_from_center {q_center - q};
 
+          const auto cart_vel {jacobian * dq};
+
           // compute control
           Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7),
               tau_joint_centering(7);
           // Spring damper system with damping ratio=1
           tau_task << jacobian.transpose()
-                          * (-stiffness * error - damping * (jacobian * dq));
+                          * (-stiffness * error - damping * (cart_vel));
           // 7x7 * 7x1
           tau_joint_centering << null_space_normalized * q_diff_from_center;
           tau_joint_centering = tau_joint_centering.array() * k_centering;
 
           tau_d << tau_task + coriolis + tau_joint_centering;
+
+          // log()->info("Task:\t{}\nCoriolis:\t{}\nCentering:\t{}",
+          //   tau_task.transpose(),
+          //   coriolis.transpose(),
+          //   tau_joint_centering.transpose());
 
           // torque saturation to limits
           // tau_d = (tau_d > torque_limits).select(torque_limits, tau_d);
@@ -451,19 +458,21 @@ int FrankaPlanRunner::RunFranka() {
 
           franka::Torques ret_torques {tau_d_array};
 
-          if (joint_vel.norm() < stopped_max_vel_norm) {
+          if (cart_vel.head(3).norm() < stopped_max_vel_norm) {
             stopped_debounce_counter++;
           } else {
             stopped_debounce_counter = 0;
           }
 
-          if (stopped_debounce_counter > 30) {
+          if (stopped_debounce_counter > debounce_counter_max) {
             ret_torques.motion_finished = true;
             return ret_torques;
           }
 
-          // log()->info("norm: {}\tcounter: {}", joint_vel.norm(),
-          //             stopped_debounce_counter);
+          // log()->info("vel: {}\nnorm: {}\tcounter: {}",
+          //   cart_vel.transpose(),
+          //   cart_vel.head(3).norm(),
+          //   stopped_debounce_counter);
 
           end_time = std::chrono::high_resolution_clock::now();
           time_elapsed_us =
