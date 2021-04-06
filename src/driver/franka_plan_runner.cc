@@ -355,13 +355,19 @@ int FrankaPlanRunner::RunFranka() {
         Eigen::Map<const Eigen::Matrix<double, 7, 1>> torque_limits(
             kJointTorqueLimits.data());
 
+        auto start_time {std::chrono::high_resolution_clock::now()};
+        auto end_time {start_time};
+        auto time_elapsed_us =
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  end_time - start_time);
+
         // define callback for the torque control loop
         std::function<franka::Torques(const franka::RobotState&,
                                       franka::Duration)>
             impedance_control_callback =
                 [&](const franka::RobotState& robot_state,
                     franka::Duration /*duration*/) -> franka::Torques {
-          const auto start_time {std::chrono::high_resolution_clock::now()};
+          start_time = std::chrono::high_resolution_clock::now();
           // get state variables
           std::array<double, 7> coriolis_array = model.coriolis(robot_state);
           std::array<double, 42> jacobian_array =
@@ -459,16 +465,36 @@ int FrankaPlanRunner::RunFranka() {
           // log()->info("norm: {}\tcounter: {}", joint_vel.norm(),
           //             stopped_debounce_counter);
 
-          const auto end_time {std::chrono::high_resolution_clock::now()};
-          const auto time_elapsed_us =
+          end_time = std::chrono::high_resolution_clock::now();
+          time_elapsed_us =
               std::chrono::duration_cast<std::chrono::microseconds>(
                   end_time - start_time);
-          log()->info("{} us", time_elapsed_us.count());
           return ret_torques;
         };
-        robot_->control(impedance_control_callback);
+
+        try {
+          robot_->control(impedance_control_callback);
+          comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
+        } catch (const franka::ControlException& ce) {
+          log()->info("Took {} us", time_elapsed_us.count());
+          if (plan_) {  // broadcast exception details over LCM
+            dexai::log()->warn(
+                "RunFranka: control exception during active plan "
+                "{} at franka_t: {:.4f}, aborting and recovering...",
+                plan_utime_, franka_time_);
+            comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
+          } else {
+            dexai::log()->error("RunFranka: exception in main loop: {}.",
+                                ce.what());
+          }
+          if (!RecoverFromControlException()) {  // plan_ is released/reset
+            dexai::log()->critical(
+                "RunFranka: RecoverFromControlException failed");
+            comm_interface_->PublishDriverStatus(false, ce.what());
+            return 1;
+          }
+        }
         comm_interface_->ClearCompliantPushFwdRequest();
-        comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
         continue;
       }
       // no new plan available in the buffer or robot isn't running
