@@ -413,6 +413,8 @@ int FrankaPlanRunner::RunFranka() {
             return ret_torques;
           }
 
+          log()->info("norm: {}\tcounter: {}", joint_vel.norm(), stopped_debounce_counter);
+
           return ret_torques;
         };
         robot_->control(impedance_control_callback);
