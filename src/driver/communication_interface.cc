@@ -366,6 +366,7 @@ void CommunicationInterface::HandleCompliantPushReq(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::bool_t* msg) {
   compliant_push_requested_ = msg->data;
+  new_plan_buffer_.plan = std::make_unique<PPType>();
   new_plan_buffer_.utime = msg->utime;
 }
 
