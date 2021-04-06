@@ -294,6 +294,7 @@ int FrankaPlanRunner::RunFranka() {
         continue;
       } else if (status_ == RobotStatus::Running
                  && comm_interface_->CompliantPushFwdRequested()) {
+        std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
         // Compliance parameters
         const double translational_stiffness {300.0};
         const double rotational_stiffness {10.0};
@@ -413,7 +414,10 @@ int FrankaPlanRunner::RunFranka() {
 
           return ret_torques;
         };
+        robot_->control(impedance_control_callback);
+        comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
       }
+      continue;
       // no new plan available in the buffer or robot isn't running
       if (comm_interface_->CancelPlanRequested()) {
         log()->debug(

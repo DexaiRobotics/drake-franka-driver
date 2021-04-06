@@ -72,8 +72,8 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                  this);
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
-  lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandleCompliantPushReq,
-                 this);
+  lcm_.subscribe(params_.lcm_stop_channel,
+                 &CommunicationInterface::HandleCompliantPushReq, this);
 
   // TODO(@anyone): define this in parameters file
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
@@ -366,6 +366,7 @@ void CommunicationInterface::HandleCompliantPushReq(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::bool_t* msg) {
   compliant_push_requested_ = msg->data;
+  new_plan_buffer_.utime = msg->utime;
 }
 
 void CommunicationInterface::HandlePlan(
