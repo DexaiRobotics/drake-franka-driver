@@ -342,13 +342,18 @@ int FrankaPlanRunner::RunFranka() {
             {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
             {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
 
-        const Eigen::Matrix<double, 7, 1> q_center =
-            0.5 * (joint_limits_.col(0) + joint_limits_.col(1));
-        log()->info("Limits: \n\t{}\n\t{}\nCenter:\n\t{}",
-                    joint_limits_.col(0).transpose(),
-                    joint_limits_.col(1).transpose(), q_center.transpose());
+        const Eigen::Matrix<double, 7, 1> q_center {
+            0.5 * (joint_limits_.col(0) + joint_limits_.col(1))};
 
-        const double k_centering {0.1};
+        const Eigen::Matrix<double, 7, 1> q_half_range {
+            0.5 * (joint_limits_.col(1)-joint_limits_.col(0))};
+
+        // log()->info("Limits: \n\t{}\n\t{}\nCenter:\n\t{}\nRange/2:\n\t:{}",
+        //             joint_limits_.col(0).transpose(),
+        //             joint_limits_.col(1).transpose(),
+        //             q_center.transpose(), q_half_range.transpose());
+
+        const double k_centering {10.0};
 
         const double stopped_max_vel_norm {0.005};
         const int debounce_counter_max {30};
@@ -356,12 +361,10 @@ int FrankaPlanRunner::RunFranka() {
 
         Eigen::Map<const Eigen::Matrix<double, 7, 1>> torque_limits(
             kJointTorqueLimits.data());
+        const Eigen::Matrix<double, 7, 1> neg_torque_limits {-torque_limits};
 
         auto start_time {std::chrono::high_resolution_clock::now()};
         auto end_time {start_time};
-        auto time_elapsed_us =
-            std::chrono::duration_cast<std::chrono::microseconds>(end_time
-                                                                  - start_time);
         std::mutex null_space_mutex_ {};
         Eigen::Matrix<double, 7, 7> null_space_normalized;
         std::atomic<bool> null_space_updated {};
@@ -402,6 +405,8 @@ int FrankaPlanRunner::RunFranka() {
 
         Eigen::Matrix<double, 7, 7> null_space_normalized_working_copy {
             null_space_normalized};
+
+        std::deque<size_t> time_elapsed_us;
 
         // define callback for the torque control loop
         std::function<franka::Torques(const franka::RobotState&,
@@ -495,14 +500,15 @@ int FrankaPlanRunner::RunFranka() {
 
           tau_d << tau_task + coriolis + tau_joint_centering;
 
-          // log()->info("Task:\t{}\nCoriolis:\t{}\nCentering:\t{}",
+          // log()->info("Task:\t{}\nCoriolis:\t{}\nCentering:\t{}\nq_err:\t{}\nq_err_max:{}",
           //   tau_task.transpose(),
           //   coriolis.transpose(),
-          //   tau_joint_centering.transpose());
+          //   tau_joint_centering.transpose(),
+          //   q_diff_from_center.transpose(),
+          //   q_half_range.transpose());
 
           // torque saturation to limits
-          // tau_d = (tau_d > torque_limits).select(torque_limits, tau_d);
-          // tau_d = (tau_d < -torque_limits).select(-torque_limits, tau_d);
+          tau_d = tau_d.cwiseMin(torque_limits).cwiseMax(-torque_limits);
 
           std::array<double, 7> tau_d_array {};
           Eigen::Matrix<double, 7, 1>::Map(&tau_d_array[0], 7) = tau_d;
@@ -526,9 +532,12 @@ int FrankaPlanRunner::RunFranka() {
           //   stopped_debounce_counter);
 
           end_time = std::chrono::high_resolution_clock::now();
-          time_elapsed_us =
+          time_elapsed_us.push_back(
               std::chrono::duration_cast<std::chrono::microseconds>(
-                  end_time - start_time);
+                  end_time - start_time).count());
+          if (time_elapsed_us.size() > 20) {
+            time_elapsed_us.pop_front();
+          }
           return ret_torques;
         };
 
@@ -537,7 +546,11 @@ int FrankaPlanRunner::RunFranka() {
           comm_interface_->PublishPlanComplete(plan_utime_,
                                                true /* = success */);
         } catch (const franka::ControlException& ce) {
-          log()->info("Took {} us", time_elapsed_us.count());
+          
+          std::for_each(time_elapsed_us.begin(), time_elapsed_us.end(), [](const auto& time_val){
+            log()->info("Took {} us", time_val);
+          });
+
           if (plan_) {  // broadcast exception details over LCM
             dexai::log()->warn(
                 "RunFranka: control exception during active plan "
