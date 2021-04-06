@@ -416,6 +416,7 @@ int FrankaPlanRunner::RunFranka() {
           return ret_torques;
         };
         robot_->control(impedance_control_callback);
+        comm_interface_->ClearCompliantPushFwdRequest();
         comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
       }
       continue;
