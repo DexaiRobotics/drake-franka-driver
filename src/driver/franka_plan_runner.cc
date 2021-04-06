@@ -45,11 +45,11 @@
 
 #include "driver/franka_plan_runner.h"
 
+#include <Eigen/QR>
+
 #include <algorithm>  // for min
 #include <cmath>      // for exp
 #include <vector>     // for vector
-
-#include <Eigen/QR>
 
 #include <drake/lcmt_iiwa_status.hpp>
 #include <franka/model.h>  // for Model
@@ -345,9 +345,8 @@ int FrankaPlanRunner::RunFranka() {
         const Eigen::Matrix<double, 7, 1> q_center =
             0.5 * (joint_limits_.col(0) + joint_limits_.col(1));
         log()->info("Limits: \n\t{}\n\t{}\nCenter:\n\t{}",
-          joint_limits_.col(0).transpose(),
-          joint_limits_.col(1).transpose(),
-          q_center.transpose());
+                    joint_limits_.col(0).transpose(),
+                    joint_limits_.col(1).transpose(), q_center.transpose());
 
         const double k_centering {0.1};
 
@@ -361,8 +360,48 @@ int FrankaPlanRunner::RunFranka() {
         auto start_time {std::chrono::high_resolution_clock::now()};
         auto end_time {start_time};
         auto time_elapsed_us =
-              std::chrono::duration_cast<std::chrono::microseconds>(
-                  end_time - start_time);
+            std::chrono::duration_cast<std::chrono::microseconds>(end_time
+                                                                  - start_time);
+        std::mutex null_space_mutex_ {};
+        Eigen::Matrix<double, 7, 7> null_space_normalized;
+        std::atomic<bool> null_space_updated {};
+
+        auto update_null_space {[&null_space_normalized, &null_space_mutex_](
+                                    const Eigen::Matrix<double, 6, 7> jacobian,
+                                    const Eigen::Matrix<double, 7, 7> inertia) {
+          // 7x7
+          auto inertia_inv {inertia.inverse()};
+
+          // (6x7 * 7x7 * 7x6)^-1 = 6x6
+          auto inertia_op_space {
+              (jacobian * inertia_inv * jacobian.transpose()).inverse()};
+
+          // 7x7 * 7x6 * 6x6 = 7x6
+          auto dyn_J_inv {inertia_inv * jacobian.transpose()
+                          * inertia_op_space};
+
+          // 7x6 * 6x7 = 7x7
+          Eigen::Matrix<double, 7, 7> null_space {
+              Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv * jacobian};
+
+          std::scoped_lock<std::mutex> lock {null_space_mutex_};
+          null_space_normalized = null_space.array() / null_space.norm();
+        }};
+
+        {
+          std::array<double, 42> jacobian_array =
+              model.zeroJacobian(franka::Frame::kEndEffector, initial_state);
+          std::array<double, 49> inertia_array = model.mass(initial_state);
+          Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(
+              jacobian_array.data());
+          Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(
+              inertia_array.data());
+          update_null_space(jacobian, inertia);
+        }
+
+
+        Eigen::Matrix<double, 7, 7> null_space_normalized_working_copy {
+            null_space_normalized};
 
         // define callback for the torque control loop
         std::function<franka::Torques(const franka::RobotState&,
@@ -410,22 +449,23 @@ int FrankaPlanRunner::RunFranka() {
           // Transform to base frame
           error.tail(3) << -transform.linear() * error.tail(3);
 
-          // 7x7
-          const auto inertia_inv {inertia.inverse()};
+          // // 7x7
+          // const auto inertia_inv {inertia.inverse()};
 
-          // (6x7 * 7x7 * 7x6)^-1 = 6x6
-          const auto inertia_op_space {
-              (jacobian * inertia_inv * jacobian.transpose()).inverse()};
+          // // (6x7 * 7x7 * 7x6)^-1 = 6x6
+          // const auto inertia_op_space {
+          //     (jacobian * inertia_inv * jacobian.transpose()).inverse()};
 
-          // 7x7 * 7x6 * 6x6 = 7x6
-          const auto dyn_J_inv {inertia_inv * jacobian.transpose()
-                                * inertia_op_space};
+          // // 7x7 * 7x6 * 6x6 = 7x6
+          // const auto dyn_J_inv {inertia_inv * jacobian.transpose()
+          //                       * inertia_op_space};
 
-          // 7x6 * 6x7 = 7x7
-          const Eigen::Matrix<double, 7, 7> null_space {
-              Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv * jacobian};
-          const Eigen::Matrix<double, 7, 7> null_space_normalized {
-              null_space.array() / null_space.norm()};
+          // // 7x6 * 6x7 = 7x7
+          // const Eigen::Matrix<double, 7, 7> null_space {
+          //     Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv *
+          //     jacobian};
+          // const Eigen::Matrix<double, 7, 7> null_space_normalized {
+          //     null_space.array() / null_space.norm()};
 
           // 7x1
           const auto q_diff_from_center {q_center - q};
@@ -438,8 +478,19 @@ int FrankaPlanRunner::RunFranka() {
           // Spring damper system with damping ratio=1
           tau_task << jacobian.transpose()
                           * (-stiffness * error - damping * (cart_vel));
+
+          std::thread update_thread {update_null_space, jacobian, inertia};
+          update_thread.detach();
+
+          if (null_space_updated) {
+            std::scoped_lock<std::mutex> lock {null_space_mutex_};
+            null_space_normalized_working_copy = null_space_normalized;
+            null_space_updated = false;
+          }
+
           // 7x7 * 7x1
-          tau_joint_centering << null_space_normalized * q_diff_from_center;
+          tau_joint_centering
+              << null_space_normalized_working_copy * q_diff_from_center;
           tau_joint_centering = tau_joint_centering.array() * k_centering;
 
           tau_d << tau_task + coriolis + tau_joint_centering;
@@ -483,7 +534,8 @@ int FrankaPlanRunner::RunFranka() {
 
         try {
           robot_->control(impedance_control_callback);
-          comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
+          comm_interface_->PublishPlanComplete(plan_utime_,
+                                               true /* = success */);
         } catch (const franka::ControlException& ce) {
           log()->info("Took {} us", time_elapsed_us.count());
           if (plan_) {  // broadcast exception details over LCM
