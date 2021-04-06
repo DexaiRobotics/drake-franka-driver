@@ -263,7 +263,8 @@ int FrankaPlanRunner::RunFranka() {
         t_last_main_loop_log_ = t_now;
       }
       // prevent the plan from being started if robot is not running...
-      if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()) {
+      if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
+          && !comm_interface_->CompliantPushFwdRequested()) {
         dexai::log()->info(
             "RunFranka: found a new plan in buffer, attaching callback...");
         status_has_changed = true;
