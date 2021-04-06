@@ -340,8 +340,16 @@ int FrankaPlanRunner::RunFranka() {
             {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
             {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
 
+        const Eigen::Matrix<double, 7, 1> q_center =
+            0.5 * (joint_limits_.col(0) + joint_limits_.col(1));
+
+        const double k_centering {0.001};
+
         const double stopped_max_vel_norm {0.01};
         int stopped_debounce_counter {};
+
+        Eigen::Map<const Eigen::Matrix<double, 7, 1>> torque_limits(
+            kJointTorqueLimits.data());
 
         // define callback for the torque control loop
         std::function<franka::Torques(const franka::RobotState&,
@@ -354,12 +362,15 @@ int FrankaPlanRunner::RunFranka() {
           std::array<double, 7> coriolis_array = model.coriolis(robot_state);
           std::array<double, 42> jacobian_array =
               model.zeroJacobian(franka::Frame::kEndEffector, robot_state);
+          std::array<double, 49> inertia_array = model.mass(robot_state);
 
           // convert to Eigen
           Eigen::Map<const Eigen::Matrix<double, 7, 1>> coriolis(
               coriolis_array.data());
           Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(
               jacobian_array.data());
+          Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(
+              inertia_array.data());
           Eigen::Map<const Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
           Eigen::Map<const Eigen::Matrix<double, 7, 1>> dq(
               robot_state.dq.data());
@@ -389,16 +400,44 @@ int FrankaPlanRunner::RunFranka() {
           // Transform to base frame
           error.tail(3) << -transform.linear() * error.tail(3);
 
-          // compute control
-          Eigen::VectorXd tau_task(7), tau_d(7);
+          // 7x7
+          const auto inertia_inv {inertia.inverse()};
 
+          // (6x7 * 7x7 * 7x6)^-1 = 6x6
+          const auto inertia_op_space {
+              (jacobian * inertia_inv * jacobian.transpose()).inverse()};
+
+          // 7x7 * 7x6 * 6x6 = 7x6
+          const auto dyn_J_inv {inertia_inv * jacobian.transpose()
+                                * inertia_op_space};
+
+          // 7x6 * 6x7 = 7x7
+          const Eigen::Matrix<double, 7, 7> null_space {
+              Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv * jacobian};
+          const Eigen::Matrix<double, 7, 7> null_space_normalized {
+              null_space.array() / null_space.norm()};
+
+          // 7x1
+          const auto q_diff_from_center {q_center - q};
+
+          // compute control
+          Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7),
+              tau_joint_centering(7);
           // Spring damper system with damping ratio=1
           tau_task << jacobian.transpose()
                           * (-stiffness * error - damping * (jacobian * dq));
-          tau_d << tau_task + coriolis;
+          // 7x7 * 7x1
+          tau_joint_centering << null_space_normalized * q_diff_from_center;
+          tau_joint_centering = tau_joint_centering.array() * k_centering;
+
+          tau_d << tau_task + coriolis + tau_joint_centering;
+
+          // torque saturation to limits
+          // tau_d = (tau_d > torque_limits).select(torque_limits, tau_d);
+          // tau_d = (tau_d < -torque_limits).select(-torque_limits, tau_d);
 
           std::array<double, 7> tau_d_array {};
-          Eigen::VectorXd::Map(&tau_d_array[0], 7) = tau_d;
+          Eigen::Matrix<double, 7, 1>::Map(&tau_d_array[0], 7) = tau_d;
 
           franka::Torques ret_torques {tau_d_array};
 
@@ -413,7 +452,8 @@ int FrankaPlanRunner::RunFranka() {
             return ret_torques;
           }
 
-          log()->info("norm: {}\tcounter: {}", joint_vel.norm(), stopped_debounce_counter);
+          log()->info("norm: {}\tcounter: {}", joint_vel.norm(),
+                      stopped_debounce_counter);
 
           return ret_torques;
         };

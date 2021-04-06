@@ -263,6 +263,9 @@ class FrankaPlanRunner {
   const std::array<double, 6> kMediumForceThreshold {40.0, 40.0, 40.0,
                                                      50.0, 50.0, 50.0};
 
+  const std::array<double, 7> kJointTorqueLimits {87.0, 87.0, 87.0, 87.0,
+                                                  12.0, 12.0, 12.0};
+
   std::array<double, 7> upper_torque_threshold_;
   std::array<double, 6> upper_force_threshold_;
 
