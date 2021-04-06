@@ -50,6 +50,7 @@
 #include <vector>     // for vector
 
 #include <drake/lcmt_iiwa_status.hpp>
+#include <franka/model.h>  // for Model
 
 #include "franka/exception.h"  // for Exception, ControlException
 #include "franka/robot.h"      // for Robot
@@ -291,8 +292,127 @@ int FrankaPlanRunner::RunFranka() {
           }
         }
         continue;
-      } else if (status_ == RobotStatus::Running && comm_interface_->CompliantPushFwdRequested()) {
-        // robot_->control()
+      } else if (status_ == RobotStatus::Running
+                 && comm_interface_->CompliantPushFwdRequested()) {
+        // Compliance parameters
+        const double translational_stiffness {300.0};
+        const double rotational_stiffness {10.0};
+        Eigen::MatrixXd stiffness(6, 6), damping(6, 6);
+        stiffness.setZero();
+        stiffness.topLeftCorner(3, 3)
+            << translational_stiffness * Eigen::MatrixXd::Identity(3, 3);
+        stiffness.bottomRightCorner(3, 3)
+            << rotational_stiffness * Eigen::MatrixXd::Identity(3, 3);
+        damping.setZero();
+        damping.topLeftCorner(3, 3) << 2.0 * sqrt(translational_stiffness)
+                                           * Eigen::MatrixXd::Identity(3, 3);
+        damping.bottomRightCorner(3, 3)
+            << 2.0 * sqrt(rotational_stiffness)
+                   * Eigen::MatrixXd::Identity(3, 3);
+
+        franka::Model model = robot_->loadModel();
+
+        franka::RobotState initial_state = robot_->readOnce();
+
+        // equilibrium point is the initial position
+        Eigen::Affine3d initial_transform(
+            Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
+
+        Eigen::Affine3d desired_xform {initial_transform};
+        desired_xform.translate(Eigen::Vector3d(0, 0, 0.075));
+
+        const auto initial_trans {initial_transform.translation()};
+        std::cerr << initial_trans.transpose() << std::endl;
+
+        const auto desired_trans {desired_xform.translation()};
+        const auto desired_quat {Eigen::Quaterniond(desired_xform.linear())};
+        std::cerr << desired_trans.transpose() << std::endl;
+
+        Eigen::Vector3d position_d(desired_xform.translation());
+        Eigen::Quaterniond orientation_d(desired_xform.linear());
+
+        // set collision behavior
+        robot_->setCollisionBehavior(
+            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
+            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
+            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
+            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
+
+        const double stopped_max_vel_norm {0.1};
+        int stopped_debounce_counter {};
+
+        // define callback for the torque control loop
+        std::function<franka::Torques(const franka::RobotState&,
+                                      franka::Duration)>
+            impedance_control_callback =
+                [&](const franka::RobotState& robot_state,
+                    franka::Duration /*duration*/) -> franka::Torques {
+          const auto start_time {std::chrono::high_resolution_clock::now()};
+          // get state variables
+          std::array<double, 7> coriolis_array = model.coriolis(robot_state);
+          std::array<double, 42> jacobian_array =
+              model.zeroJacobian(franka::Frame::kEndEffector, robot_state);
+
+          // convert to Eigen
+          Eigen::Map<const Eigen::Matrix<double, 7, 1>> coriolis(
+              coriolis_array.data());
+          Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(
+              jacobian_array.data());
+          Eigen::Map<const Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
+          Eigen::Map<const Eigen::Matrix<double, 7, 1>> dq(
+              robot_state.dq.data());
+          Eigen::Affine3d transform(
+              Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
+          Eigen::Vector3d position(transform.translation());
+          Eigen::Quaterniond orientation(transform.linear());
+
+          Eigen::Map<const Eigen::Matrix<double, 7, 1>> joint_vel(
+              robot_state.dq.data());
+
+          // compute error to desired equilibrium pose
+          // position error
+          Eigen::Matrix<double, 6, 1> error;
+          error.head(3) << position - position_d;
+
+          // orientation error
+          // "difference" quaternion
+          if (orientation_d.coeffs().dot(orientation.coeffs()) < 0.0) {
+            orientation.coeffs() << -orientation.coeffs();
+          }
+          // "difference" quaternion
+          Eigen::Quaterniond error_quaternion(orientation.inverse()
+                                              * orientation_d);
+          error.tail(3) << error_quaternion.x(), error_quaternion.y(),
+              error_quaternion.z();
+          // Transform to base frame
+          error.tail(3) << -transform.linear() * error.tail(3);
+
+          // compute control
+          Eigen::VectorXd tau_task(7), tau_d(7);
+
+          // Spring damper system with damping ratio=1
+          tau_task << jacobian.transpose()
+                          * (-stiffness * error - damping * (jacobian * dq));
+          tau_d << tau_task + coriolis;
+
+          std::array<double, 7> tau_d_array {};
+          Eigen::VectorXd::Map(&tau_d_array[0], 7) = tau_d;
+
+          franka::Torques ret_torques {tau_d_array};
+
+          if (joint_vel.norm() < stopped_max_vel_norm) {
+            stopped_debounce_counter++;
+          } else {
+            stopped_debounce_counter = 0;
+          }
+
+          if (stopped_debounce_counter > 20) {
+            ret_torques.motion_finished = true;
+            return ret_torques;
+          }
+
+          return ret_torques;
+        };
       }
       // no new plan available in the buffer or robot isn't running
       if (comm_interface_->CancelPlanRequested()) {
