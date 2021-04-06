@@ -72,12 +72,15 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                  this);
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
+  lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandleCompliantPushReq,
+                 this);
 
   // TODO(@anyone): define this in parameters file
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
   // TODO(@anyone): remove these channels and combine with robot status channel
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
   lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
+  lcm_compliant_push_req_channel_ = params_.robot_name + "_COMPLIANT_PUSH_REQ";
   lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
   lcm_sim_driver_event_trigger_channel_ =
       params_.robot_name + "_SIM_EVENT_TRIGGER";
@@ -357,6 +360,12 @@ bool CommunicationInterface::CanReceiveCommands(
       dexai::log()->error("CanReceiveCommands: Mode unknown!");
       return false;
   }
+}
+
+void CommunicationInterface::HandleCompliantPushReq(
+    const ::lcm::ReceiveBuffer*, const std::string&,
+    const robot_msgs::bool_t* msg) {
+  compliant_push_requested_ = msg->data;
 }
 
 void CommunicationInterface::HandlePlan(

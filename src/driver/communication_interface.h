@@ -59,6 +59,7 @@
 
 #include "franka/robot_state.h"         // for RobotState
 #include "lcmtypes/robot_spline_t.hpp"  // for robot_spline_t
+#include "robot_msgs/bool_t.hpp"     // for pause_cmd
 #include "robot_msgs/pause_cmd.hpp"     // for pause_cmd
 #include "utils/robot_parameters.h"     // for RobotParameters
 
@@ -98,6 +99,9 @@ class CommunicationInterface {
   void ClearSimControlExceptionTrigger() {
     sim_control_exception_triggered_ = false;
   }
+
+  bool CompliantPushFwdRequested() const { return compliant_push_requested_; }
+  void ClearCompliantPushFwdRequest() { compliant_push_requested_ = false; }
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
@@ -167,6 +171,8 @@ class CommunicationInterface {
                   const lcmtypes::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
                    const robot_msgs::pause_cmd* pause_cmd_msg);
+  void HandleCompliantPushReq(const ::lcm::ReceiveBuffer*, const std::string&,
+                              const robot_msgs::bool_t* msg);
 
   /// Handler for control exception and u-stop triggers for simulated driver so
   /// we can test full spectrum of driver states.
@@ -179,6 +185,7 @@ class CommunicationInterface {
   std::atomic_bool running_ {false};
   std::atomic<bool> sim_control_exception_triggered_ {false};
   std::atomic<bool> cancel_plan_requested_ {false};
+  std::atomic<bool> compliant_push_requested_ {false};
   std::atomic<bool> is_sim_ {false};
 
   ::lcm::LCM lcm_;
@@ -201,6 +208,7 @@ class CommunicationInterface {
   std::string lcm_driver_status_channel_;
   std::string lcm_pause_status_channel_;
   std::string lcm_user_stop_channel_;
+  std::string lcm_compliant_push_req_channel_;
   std::string lcm_brakes_locked_channel_;
   std::string lcm_sim_driver_event_trigger_channel_;
 

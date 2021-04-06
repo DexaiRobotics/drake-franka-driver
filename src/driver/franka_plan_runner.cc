@@ -291,6 +291,8 @@ int FrankaPlanRunner::RunFranka() {
           }
         }
         continue;
+      } else if (status_ == RobotStatus::Running && comm_interface_->CompliantPushFwdRequested()) {
+        // robot_->control()
       }
       // no new plan available in the buffer or robot isn't running
       if (comm_interface_->CancelPlanRequested()) {

@@ -188,6 +188,7 @@ class RobotParameters {
   std::string lcm_plan_complete_channel;
   std::string lcm_stop_channel;
   std::string lcm_user_stop_channel;
+  std::string lcm_compliant_push_req_channel;
 
   std::string lcm_url;
   std::string robot_ip;
