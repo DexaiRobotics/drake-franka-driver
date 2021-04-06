@@ -347,7 +347,7 @@ int FrankaPlanRunner::RunFranka() {
           joint_limits_.col(1).transpose(),
           q_center.transpose());
 
-        const double k_centering {0.001};
+        const double k_centering {0.01};
 
         const double stopped_max_vel_norm {0.01};
         int stopped_debounce_counter {};
