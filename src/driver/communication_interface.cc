@@ -72,7 +72,7 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                  this);
   lcm_.subscribe(params_.lcm_stop_channel, &CommunicationInterface::HandlePause,
                  this);
-  lcm_.subscribe(params_.lcm_stop_channel,
+  lcm_.subscribe(params_.lcm_compliant_push_req_channel,
                  &CommunicationInterface::HandleCompliantPushReq, this);
 
   // TODO(@anyone): define this in parameters file
