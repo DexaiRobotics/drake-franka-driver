@@ -321,7 +321,7 @@ int FrankaPlanRunner::RunFranka() {
             Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
 
         Eigen::Affine3d desired_xform {initial_transform};
-        desired_xform.translate(Eigen::Vector3d(0, 0, 0.075));
+        desired_xform.translate(Eigen::Vector3d(0, 0, 0.055));
 
         const auto initial_trans {initial_transform.translation()};
         std::cerr << initial_trans.transpose() << std::endl;
