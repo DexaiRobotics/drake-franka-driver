@@ -299,8 +299,8 @@ int FrankaPlanRunner::RunFranka() {
                  && comm_interface_->CompliantPushFwdRequested()) {
         std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
         // Compliance parameters
-        static const Eigen::Vector3d translational_stiffness {300.0, 300.0, 300.0};
-        static const Eigen::Vector3d rotational_stiffness {30.0, 30.0, 30.0};
+        static const Eigen::Vector3d translational_stiffness {100.0, 100.0, 300.0};
+        static const Eigen::Vector3d rotational_stiffness {10.0, 10.0, 50.0};
 
         static const Eigen::Vector3d translational_stiffness_sqrt {translational_stiffness.array().sqrt()};
         static const Eigen::Vector3d rotational_stiffness_sqrt {rotational_stiffness.array().sqrt()};
@@ -365,7 +365,7 @@ int FrankaPlanRunner::RunFranka() {
         //             joint_limits_.col(1).transpose(),
         //             q_center.transpose(), q_half_range.transpose());
 
-        const double k_centering {1.0};
+        const double k_centering {5.0};
 
         const double stopped_max_vel_norm {0.002};
         const int debounce_counter_max {30};
