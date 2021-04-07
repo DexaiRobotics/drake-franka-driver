@@ -493,7 +493,7 @@ int FrankaPlanRunner::RunFranka() {
           
           const Eigen::Matrix<double, 7, 1> sgn_q_diff {q_diff_from_center.array() / q_diff_from_center.array().abs()};
           const Eigen::Matrix<double, 7, 1> error_exp {2 * q_diff_from_center.array().pow(10).exp()};
-          const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array() * error_exp.array()};
+          const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array() * (error_exp.array()-1)};
 
           const auto cart_vel {jacobian * dq};
 
