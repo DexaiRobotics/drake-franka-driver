@@ -478,7 +478,10 @@ int FrankaPlanRunner::RunFranka() {
           // 7x1
           Eigen::Matrix<double, 7, 1> q_diff_from_center {q - q_center};
           q_diff_from_center = q_diff_from_center.array() / q_half_range.array();
-          q_diff_from_center = q_diff_from_center.array().pow(9);
+          
+          const Eigen::Matrix<double, 7, 1> sgn_q_diff {q_diff_from_center.array() / q_diff_from_center.array().abs()};
+          const Eigen::Matrix<double, 7, 1> error_exp {2 * q_diff_from_center.array().pow(10).exp()};
+          const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array() * error_exp.array()};
 
           const auto cart_vel {jacobian * dq};
 
@@ -508,7 +511,7 @@ int FrankaPlanRunner::RunFranka() {
 
           // 7x7 * 7x1
           tau_joint_centering
-              << null_space_normalized_working_copy * (q_diff_from_center * (-k_centering) + dq * (-2 * sqrt(k_centering)) );
+              << null_space_normalized_working_copy * (q_error * (-k_centering) + dq * (-2 * sqrt(k_centering)) );
           tau_joint_centering = tau_joint_centering.cwiseMin(torque_limits).cwiseMax(-torque_limits);
 
           tau_d << tau_task + coriolis + tau_joint_centering;
