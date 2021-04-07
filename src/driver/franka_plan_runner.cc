@@ -1048,10 +1048,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     Eigen::VectorXd dq_abs {
         utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
             .cwiseAbs()};
-    dexai::log()->warn(
-        "JointPositionCallback: plan {} overtime, "
-        "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
-        plan_utime_, franka_time_, max_joint_err, dq_abs.norm());
+    // dexai::log()->warn(
+    //     "JointPositionCallback: plan {} overtime, "
+    //     "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
+    //     plan_utime_, franka_time_, max_joint_err, dq_abs.norm());
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
         && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()
@@ -1109,10 +1109,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(output_to_franka);
     }
-    dexai::log()->warn(
-        "JointPositionCallback: plan {} overtime, diverged or still moving, "
-        "within allowed grace period",
-        plan_utime_);
+    // dexai::log()->warn(
+    //     "JointPositionCallback: plan {} overtime, diverged or still moving, "
+    //     "within allowed grace period",
+    //     plan_utime_);
   }
   return output_to_franka;
 }
