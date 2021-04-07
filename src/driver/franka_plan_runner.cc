@@ -299,20 +299,32 @@ int FrankaPlanRunner::RunFranka() {
                  && comm_interface_->CompliantPushFwdRequested()) {
         std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
         // Compliance parameters
-        const double translational_stiffness {300.0};
-        const double rotational_stiffness {50.0};
-        Eigen::MatrixXd stiffness(6, 6), damping(6, 6);
+        static const Eigen::Vector3d translational_stiffness {300.0, 300.0, 300.0};
+        static const Eigen::Vector3d rotational_stiffness {30.0, 30.0, 30.0};
+
+        static const Eigen::Vector3d translational_stiffness_sqrt {translational_stiffness.array().sqrt()};
+        static const Eigen::Vector3d rotational_stiffness_sqrt {rotational_stiffness.array().sqrt()};
+
+        Eigen::Matrix<double, 6, 6> stiffness, damping;
         stiffness.setZero();
+
+        log()->info("translation stiffness: \n{}", Eigen::Matrix<double, 3, 3>::Identity().array() * translational_stiffness.replicate(1, 3).array());
         stiffness.topLeftCorner(3, 3)
-            << translational_stiffness * Eigen::MatrixXd::Identity(3, 3);
+            <<  Eigen::Matrix<double, 3, 3>::Identity().array() * translational_stiffness.replicate(1, 3).array();
+        
+        log()->info("rotation stiffness");
         stiffness.bottomRightCorner(3, 3)
-            << rotational_stiffness * Eigen::MatrixXd::Identity(3, 3);
+            << Eigen::Matrix<double, 3, 3>::Identity().array() * rotational_stiffness.replicate(1, 3).array();
         damping.setZero();
-        damping.topLeftCorner(3, 3) << 2.0 * sqrt(translational_stiffness)
-                                           * Eigen::MatrixXd::Identity(3, 3);
+
+        log()->info("translation damping");
+        damping.topLeftCorner(3, 3) << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
+                                           * translational_stiffness_sqrt.replicate(1, 3).array();
+
+        log()->info("rotation damping");
         damping.bottomRightCorner(3, 3)
-            << 2.0 * sqrt(rotational_stiffness)
-                   * Eigen::MatrixXd::Identity(3, 3);
+            << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
+                   * rotational_stiffness_sqrt.replicate(1, 3).array();
 
         franka::Model model = robot_->loadModel();
 
@@ -353,7 +365,7 @@ int FrankaPlanRunner::RunFranka() {
         //             joint_limits_.col(1).transpose(),
         //             q_center.transpose(), q_half_range.transpose());
 
-        const double k_centering {20.0};
+        const double k_centering {1.0};
 
         const double stopped_max_vel_norm {0.002};
         const int debounce_counter_max {30};
