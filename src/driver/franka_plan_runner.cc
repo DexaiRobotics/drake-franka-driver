@@ -299,7 +299,7 @@ int FrankaPlanRunner::RunFranka() {
                  && comm_interface_->CompliantPushFwdRequested()) {
         std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
         // Compliance parameters
-        const double translational_stiffness {200.0};
+        const double translational_stiffness {300.0};
         const double rotational_stiffness {50.0};
         Eigen::MatrixXd stiffness(6, 6), damping(6, 6);
         stiffness.setZero();
@@ -353,9 +353,9 @@ int FrankaPlanRunner::RunFranka() {
         //             joint_limits_.col(1).transpose(),
         //             q_center.transpose(), q_half_range.transpose());
 
-        const double k_centering {10.0};
+        const double k_centering {20.0};
 
-        const double stopped_max_vel_norm {0.005};
+        const double stopped_max_vel_norm {0.002};
         const int debounce_counter_max {30};
         int stopped_debounce_counter {};
 
@@ -405,6 +405,9 @@ int FrankaPlanRunner::RunFranka() {
 
         Eigen::Matrix<double, 7, 7> null_space_normalized_working_copy {
             null_space_normalized};
+
+         // compute control
+        Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7), tau_joint_centering(7);
 
         std::deque<size_t> time_elapsed_us;
 
@@ -473,25 +476,22 @@ int FrankaPlanRunner::RunFranka() {
           //     null_space.array() / null_space.norm()};
 
           // 7x1
-          const auto q_diff_from_center {q - q_center};
+          Eigen::Matrix<double, 7, 1> q_diff_from_center {q - q_center};
+          q_diff_from_center = q_diff_from_center.array() / q_half_range.array();
+          q_diff_from_center = q_diff_from_center.array().pow(9);
 
           const auto cart_vel {jacobian * dq};
 
-          // compute control
-          Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7),
-              tau_joint_centering(7);
-
-
-          // // static const std::array<double, 6> wrench_limits_array {5.0, 5.0, 5.0, 10.0, 10.0, 10.0};
-          // // Eigen::Map<const Eigen::Matrix<double, 6, 1>> wrench_limits{wrench_limits_array.data()};
+          static const std::array<double, 6> wrench_limits_array {10.0, 10.0, 10.0, 10.0, 10.0, 10.0};
+          Eigen::Map<const Eigen::Matrix<double, 6, 1>> wrench_limits{wrench_limits_array.data()};
 
           // Eigen::Matrix<double, 6, 1> task_wrench {(-stiffness * error - damping * (cart_vel))};
           // // log()->info("task_wrench: {}", task_wrench.transpose());
           // // task_wrench = task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
           // // log()->info("task_wrench*: {}", task_wrench.transpose());
 
-          auto task_wrench {(-stiffness * error - damping * (cart_vel))};
-          // task_wrench = task_wrench.cwiseMin(torque_limits).cwiseMax(-torque_limits);
+          Eigen::Matrix<double, 6, 1> task_wrench {(-stiffness * error - damping * (cart_vel))};
+          task_wrench = task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
 
           // Spring damper system with damping ratio=1
           tau_task << jacobian.transpose()
@@ -509,6 +509,7 @@ int FrankaPlanRunner::RunFranka() {
           // 7x7 * 7x1
           tau_joint_centering
               << null_space_normalized_working_copy * (q_diff_from_center * (-k_centering) + dq * (-2 * sqrt(k_centering)) );
+          tau_joint_centering = tau_joint_centering.cwiseMin(torque_limits).cwiseMax(-torque_limits);
 
           tau_d << tau_task + coriolis + tau_joint_centering;
 
@@ -559,6 +560,11 @@ int FrankaPlanRunner::RunFranka() {
                                                true /* = success */);
         } catch (const franka::ControlException& ce) {
           
+          log()->info("tau_task:\t{}\ntau_jc:\t{}\ntau_d:\t{}",
+            tau_task.transpose(),
+            tau_joint_centering.transpose(),
+            tau_d.transpose());
+
           std::for_each(time_elapsed_us.begin(), time_elapsed_us.end(), [](const auto& time_val){
             log()->info("Took {} us", time_val);
           });
