@@ -360,10 +360,10 @@ int FrankaPlanRunner::RunFranka() {
         const Eigen::Matrix<double, 7, 1> q_half_range {
             0.5 * (joint_limits_.col(1)-joint_limits_.col(0))};
 
-        // log()->info("Limits: \n\t{}\n\t{}\nCenter:\n\t{}\nRange/2:\n\t:{}",
-        //             joint_limits_.col(0).transpose(),
-        //             joint_limits_.col(1).transpose(),
-        //             q_center.transpose(), q_half_range.transpose());
+        log()->info("Limits: \n\t{}\n\t{}\nCenter:\n\t{}\nRange/2:\n\t:{}",
+                    joint_limits_.col(0).transpose(),
+                    joint_limits_.col(1).transpose(),
+                    q_center.transpose(), q_half_range.transpose());
 
         const double k_centering {5.0};
 
