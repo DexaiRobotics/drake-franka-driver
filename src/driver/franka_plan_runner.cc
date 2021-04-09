@@ -502,6 +502,7 @@ int FrankaPlanRunner::RunFranka() {
           Eigen::Matrix<double, 6, 1> RCC_F_EE_rcc {};
           RCC_F_EE_rcc.head(3)
               << EE_F_ext_hat_EE.head(3).homogeneous();
+          RCC_F_EE_rcc(2) = 0;
           RCC_F_EE_rcc.tail(3)
               << EE_F_ext_hat_EE.tail(3).homogeneous();
 
