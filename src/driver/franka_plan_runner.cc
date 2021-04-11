@@ -492,6 +492,7 @@ int FrankaPlanRunner::RunFranka() {
           Eigen::Matrix<double, 7, 1> q_diff_from_center {q - q_center};
           Eigen::Matrix<double, 7, 1> q_diff_from_center_norm = q_diff_from_center.array() / q_half_range.array();
 
+          // https://www.desmos.com/calculator/8glrxv3bh4
           const Eigen::Matrix<double, 7, 1> sgn_q_diff {q_diff_from_center_norm.array() / q_diff_from_center_norm.array().abs()};
           const Eigen::Matrix<double, 7, 1> error_exp {(q_diff_from_center_norm + sgn_q_diff * 0.02).array().pow(50).exp()};
           const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array() * (error_exp.array()-1)};
