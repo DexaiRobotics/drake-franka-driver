@@ -299,29 +299,27 @@ int FrankaPlanRunner::RunFranka() {
                  && comm_interface_->CompliantPushFwdRequested()) {
         std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
         // Compliance parameters
-        static const Eigen::Vector3d translational_stiffness {100.0, 100.0, 300.0};
+        static const Eigen::Vector3d translational_stiffness {100.0, 100.0, 100.0};
         static const Eigen::Vector3d rotational_stiffness {10.0, 10.0, 50.0};
 
         static const Eigen::Vector3d translational_stiffness_sqrt {translational_stiffness.array().sqrt()};
         static const Eigen::Vector3d rotational_stiffness_sqrt {rotational_stiffness.array().sqrt()};
 
         Eigen::Matrix<double, 6, 6> stiffness, damping;
+
         stiffness.setZero();
-
-        log()->info("translation stiffness: \n{}", Eigen::Matrix<double, 3, 3>::Identity().array() * translational_stiffness.replicate(1, 3).array());
         stiffness.topLeftCorner(3, 3)
-            <<  Eigen::Matrix<double, 3, 3>::Identity().array() * translational_stiffness.replicate(1, 3).array();
+            <<  Eigen::Matrix<double, 3, 3>::Identity().array()
+                * translational_stiffness.replicate(1, 3).array();
         
-        log()->info("rotation stiffness");
         stiffness.bottomRightCorner(3, 3)
-            << Eigen::Matrix<double, 3, 3>::Identity().array() * rotational_stiffness.replicate(1, 3).array();
+            << Eigen::Matrix<double, 3, 3>::Identity().array()
+               * rotational_stiffness.replicate(1, 3).array();
+        
         damping.setZero();
-
-        log()->info("translation damping");
         damping.topLeftCorner(3, 3) << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
                                            * translational_stiffness_sqrt.replicate(1, 3).array();
 
-        log()->info("rotation damping");
         damping.bottomRightCorner(3, 3)
             << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
                    * rotational_stiffness_sqrt.replicate(1, 3).array();
@@ -335,7 +333,7 @@ int FrankaPlanRunner::RunFranka() {
             Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
 
         Eigen::Affine3d desired_xform {initial_transform};
-        desired_xform.translate(Eigen::Vector3d(0, 0, 0.055));
+        desired_xform.translate(Eigen::Vector3d(0, 0, 0.050));
 
         const auto initial_trans {initial_transform.translation()};
         std::cerr << initial_trans.transpose() << std::endl;
@@ -365,7 +363,7 @@ int FrankaPlanRunner::RunFranka() {
                     joint_limits_.col(1).transpose(),
                     q_center.transpose(), q_half_range.transpose());
 
-        const double k_centering {10.0};
+        const double k_centering {1.0};
 
         const double stopped_max_vel_norm {0.002};
         const int debounce_counter_max {30};
@@ -422,6 +420,9 @@ int FrankaPlanRunner::RunFranka() {
         Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7), tau_joint_centering(7);
 
         std::deque<size_t> time_elapsed_us;
+
+        double k_jc_ramp {0.0};
+        static const double filter_gain {0.001};
 
         // define callback for the torque control loop
         std::function<franka::Torques(const franka::RobotState&,
@@ -489,12 +490,11 @@ int FrankaPlanRunner::RunFranka() {
 
           // 7x1
           Eigen::Matrix<double, 7, 1> q_diff_from_center {q - q_center};
-          // q_diff_from_center = q_diff_from_center.array() / q_half_range.array();
+          Eigen::Matrix<double, 7, 1> q_diff_from_center_norm = q_diff_from_center.array() / q_half_range.array();
 
-          // const Eigen::Matrix<double, 7, 1> sgn_q_diff {q_diff_from_center.array() / q_diff_from_center.array().abs()};
-          // const Eigen::Matrix<double, 7, 1> error_exp {2 * q_diff_from_center.array().pow(10).exp()};
-          // const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array() * (error_exp.array()-1)};
-	  // log()->info("qdiff: {}\tqerror: {}", q_diff_from_center.transpose(), q_error.transpose());
+          const Eigen::Matrix<double, 7, 1> sgn_q_diff {q_diff_from_center_norm.array() / q_diff_from_center_norm.array().abs()};
+          const Eigen::Matrix<double, 7, 1> error_exp {(q_diff_from_center_norm + sgn_q_diff * 0.02).array().pow(50).exp()};
+          const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array() * (error_exp.array()-1)};
 
           const auto cart_vel {jacobian * dq};
 
@@ -522,19 +522,33 @@ int FrankaPlanRunner::RunFranka() {
             null_space_updated = false;
           }
 
+          const auto jc_spring {q_error * (-k_centering)};
+          const auto jc_damping {dq * (-2 * sqrt(k_centering))};
+
           // 7x7 * 7x1
           tau_joint_centering
-              << null_space_normalized_working_copy * (q_diff_from_center * (-k_centering) + dq * (-2 * sqrt(k_centering)) );
+              << /* null_space_normalized_working_copy * */ (jc_spring + jc_damping);
+          tau_joint_centering = tau_joint_centering * k_jc_ramp;
           tau_joint_centering = tau_joint_centering.cwiseMin(torque_limits).cwiseMax(-torque_limits);
+
+          k_jc_ramp = k_jc_ramp * (1 - filter_gain) + filter_gain;
 
           tau_d << tau_task + coriolis + tau_joint_centering;
 
-          // log()->info("Task:\t{}\nCoriolis:\t{}\nCentering:\t{}\nq_err:\t{}\nq_err_max:{}",
-          //   tau_task.transpose(),
-          //   coriolis.transpose(),
-          //   tau_joint_centering.transpose(),
-          //   q_diff_from_center.transpose(),
-          //   q_half_range.transpose());
+          auto print_info {[tau_task, coriolis, tau_joint_centering, q_diff_from_center, q_diff_from_center_norm, q_error, jc_spring, jc_damping](){
+            log()->info("\n\tTask:\t{}\n\tCoriolis:\t{}\n\tCentering:\t{}\n\tq_diff:\t{}\n\tq_diff norm:\t{}\n\tq_error:\t{}\n\tjc_spring:\t{}\n\tjc_damping:\t{}",
+            tau_task.transpose(),
+            coriolis.transpose(),
+            tau_joint_centering.transpose(),
+            q_diff_from_center.transpose(),
+            q_diff_from_center_norm.transpose(),
+            q_error.transpose(),
+            jc_spring.transpose(),
+            jc_damping.transpose());
+          }};
+
+          std::thread print_info_thread {print_info};
+          print_info_thread.detach();
 
           // torque saturation to limits
           tau_d = tau_d.cwiseMin(torque_limits).cwiseMax(-torque_limits);
@@ -550,6 +564,7 @@ int FrankaPlanRunner::RunFranka() {
             stopped_debounce_counter = 0;
           }
 
+          // (void) debounce_counter_max;
           if (stopped_debounce_counter > debounce_counter_max) {
             ret_torques.motion_finished = true;
             return ret_torques;
@@ -576,7 +591,7 @@ int FrankaPlanRunner::RunFranka() {
                                                true /* = success */);
         } catch (const franka::ControlException& ce) {
           
-          log()->info("tau_task:\t{}\ntau_jc:\t{}\ntau_d:\t{}",
+          log()->info("\ntau_task:\t{}\ntau_jc:\t{}\ntau_d:\t{}",
             tau_task.transpose(),
             tau_joint_centering.transpose(),
             tau_d.transpose());
