@@ -60,6 +60,7 @@
 #include "driver/constraint_solver.h"        // for ConstraintSolver
 #include "franka/control_types.h"            // for franka::JointPositions
 #include "franka/duration.h"                 // for franka::Duration
+#include "franka/model.h"                    // for Model
 #include "franka/robot.h"                    // for franka::Robot
 #include "franka/robot_state.h"              // for franka::RobotState
 #include "utils/robot_parameters.h"          // for RobotParameters
@@ -192,6 +193,12 @@ class FrankaPlanRunner {
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
 
+  franka::Torques ImpedanceControlCallback(
+      const franka::RobotState& robot_state, franka::Duration);
+
+  void UpdateNullSpace(const Eigen::Matrix<double, 6, 7> jacobian,
+                       const Eigen::Matrix<double, 7, 7> inertia);
+
  private:
   const int dof_;          // degrees of freedom of franka
   const bool safety_off_;  // torque and force limits to max
@@ -205,6 +212,7 @@ class FrankaPlanRunner {
   int64_t plan_utime_ = -1;
   std::unique_ptr<ConstraintSolver> constraint_solver_;
 
+  // TODO: remove? Do we need this?
   std::function<franka::JointPositions(const franka::RobotState&,
                                        franka::Duration)>
       joint_position_callback_;
@@ -233,6 +241,9 @@ class FrankaPlanRunner {
   const double lcm_publish_rate_ {200.0};  // Hz
 
   Eigen::MatrixXd joint_limits_;
+  Eigen::Matrix<double, 7, 1> q_center_;
+  Eigen::Matrix<double, 7, 1> q_half_range_;
+
   float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
 
   // config of start of plan:
@@ -256,15 +267,14 @@ class FrankaPlanRunner {
                                                     100.0, 100.0, 100.0};
   const std::array<double, 7> kMediumTorqueThreshold {40.0, 40.0, 36.0, 36.0,
                                                       32.0, 28.0, 24.0};
+  const std::array<double, 7> kImpedanceControlTorqueThreshold {
+      87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0};
 
   // Collision force thresholds for (x, y, z, R, P, Y) in [N].
   const std::array<double, 6> kHighForceThreshold {100.0, 100.0, 100.0,
                                                    100.0, 100.0, 100.0};
   const std::array<double, 6> kMediumForceThreshold {40.0, 40.0, 40.0,
                                                      50.0, 50.0, 50.0};
-
-  const std::array<double, 7> kJointTorqueLimits {87.0, 87.0, 87.0, 87.0,
-                                                  12.0, 12.0, 12.0};
 
   std::array<double, 7> upper_torque_threshold_;
   std::array<double, 6> upper_force_threshold_;
@@ -276,6 +286,40 @@ class FrankaPlanRunner {
   const double CONV_ANGLE_THRESHOLD {1e-3};         // rad, empirical
   const double CONV_SPEED_NORM_THRESHOLD {6.6e-3};  // rad/s, L2
   Eigen::VectorXd CONV_SPEED_THRESHOLD;
+
+  // Compliance parameters
+  const Eigen::Vector3d translational_stiffness {100.0, 100.0, 100.0};
+  const Eigen::Vector3d rotational_stiffness {10.0, 10.0, 50.0};
+
+  const Eigen::Vector3d translational_stiffness_sqrt {
+      translational_stiffness.array().sqrt()};
+  const Eigen::Vector3d rotational_stiffness_sqrt {
+      rotational_stiffness.array().sqrt()};
+
+  Eigen::Matrix<double, 6, 6> stiffness_, damping_;
+
+  const double k_centering {1.0};
+
+  const double stopped_max_vel_norm {0.002};
+  const int debounce_counter_max {30};
+
+  std::deque<size_t> time_elapsed_us_;
+
+  double k_jc_ramp_ {0.0};
+  const double filter_gain {0.001};
+  int stopped_debounce_counter_ {};
+
+  std::unique_ptr<franka::Model> model_ {};
+
+  std::mutex null_space_mutex_ {};
+
+  Eigen::Matrix<double, 7, 7> null_space_normalized_;
+  Eigen::Matrix<double, 7, 7> null_space_normalized_working_copy_;
+  std::atomic<bool> null_space_updated_ {};
+
+  Eigen::Vector3d position_d_;
+  Eigen::Quaterniond orientation_d_;
+
 };  // FrankaPlanRunner
 
 }  // namespace franka_driver
