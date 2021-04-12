@@ -618,7 +618,7 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
-        comm_interface_->ClearCompliantPushFwdRequest();
+        comm_interface_->ClearCompliantPushRequest();
         continue;
       }
       // no new plan available in the buffer or robot isn't running

@@ -46,22 +46,22 @@
 /// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
 
-#include <drake/common/trajectories/piecewise_polynomial.h>  // for Piecewis...
+#include <drake/common/trajectories/piecewise_polynomial.h>
 
 #include <memory>
-#include <mutex>  // for mutex
+#include <mutex>
 #include <set>
 #include <string>
-#include <thread>  // for thread
+#include <thread>
 #include <tuple>
 
-#include <lcm/lcm-cpp.hpp>  // for lcm
+#include <lcm/lcm-cpp.hpp>
 
-#include "franka/robot_state.h"         // for RobotState
-#include "lcmtypes/robot_spline_t.hpp"  // for robot_spline_t
-#include "robot_msgs/bool_t.hpp"     // for pause_cmd
-#include "robot_msgs/pause_cmd.hpp"     // for pause_cmd
-#include "utils/robot_parameters.h"     // for RobotParameters
+#include "franka/robot_state.h"
+#include "lcmtypes/robot_spline_t.hpp"
+#include "robot_msgs/bool_t.hpp"
+#include "robot_msgs/pause_cmd.hpp"
+#include "utils/robot_parameters.h"
 
 using drake::trajectories::PiecewisePolynomial;
 typedef PiecewisePolynomial<double> PPType;
@@ -101,7 +101,7 @@ class CommunicationInterface {
   }
 
   bool CompliantPushFwdRequested() const { return compliant_push_requested_; }
-  void ClearCompliantPushFwdRequest() { compliant_push_requested_ = false; }
+  void ClearCompliantPushRequest() { compliant_push_requested_ = false; }
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
