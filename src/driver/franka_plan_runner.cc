@@ -344,6 +344,8 @@ int FrankaPlanRunner::RunFranka() {
                                     std::placeholders::_2));
           comm_interface_->PublishPlanComplete(plan_utime_,
                                                true /* = success */);
+          comm_interface_->ClearCompliantPushActive();
+          comm_interface_->ClearCompliantPushStartRequest();
         } catch (const franka::ControlException& ce) {
           // TODO: do we want to print these more frequently?
           // log()->info("\ntau_task:\t{}\ntau_jc:\t{}\ntau_d:\t{}",
@@ -365,6 +367,8 @@ int FrankaPlanRunner::RunFranka() {
             dexai::log()->error("RunFranka: exception in main loop: {}.",
                                 ce.what());
           }
+          comm_interface_->ClearCompliantPushActive();
+          comm_interface_->ClearCompliantPushStartRequest();
           if (!RecoverFromControlException()) {  // plan_ is released/reset
             dexai::log()->critical(
                 "RunFranka: RecoverFromControlException failed");
@@ -372,8 +376,6 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
-        comm_interface_->ClearCompliantPushActive();
-        comm_interface_->ClearCompliantPushStartRequest();
         continue;
       }
       // no new plan available in the buffer or robot isn't running
