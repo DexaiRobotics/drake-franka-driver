@@ -401,6 +401,7 @@ int FrankaPlanRunner::RunFranka() {
 
           std::scoped_lock<std::mutex> lock {null_space_mutex_};
           null_space_normalized = null_space.array() / null_space.norm();
+          null_space_updated = true;
         }};
 
         {
