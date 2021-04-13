@@ -1046,6 +1046,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   if (time_elapsed_us_.size() > 20) {
     time_elapsed_us_.pop_front();
   }
+  comm_interface_->SetRobotData(robot_state, tau_d);
   return ret_torques;
 }
 
