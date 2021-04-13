@@ -77,7 +77,7 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   CONV_SPEED_THRESHOLD = Eigen::VectorXd(dof_);  // segfault without reallocate
   CONV_SPEED_THRESHOLD << 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007;
 
-  // Create a ConstraintSolver, which creates a geometric model_->from
+  // Create a ConstraintSolver, which creates a geometric model from
   // parameters and URDF(s) and keeps it in a fully owned MultiBodyPlant. Once
   // the CS exists, we get robot and scene geometry from it, not from
   // Parameters, which cannot and should not be updated (keep them const).
@@ -318,19 +318,6 @@ int FrankaPlanRunner::RunFranka() {
                     joint_limits_.col(0).transpose(),
                     joint_limits_.col(1).transpose(), q_center_.transpose(),
                     q_half_range_.transpose());
-
-        {
-          std::array<double, 42> jacobian_array =
-              model_->zeroJacobian(franka::Frame::kEndEffector, initial_state);
-          std::array<double, 49> inertia_array = model_->mass(initial_state);
-          Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(
-              jacobian_array.data());
-          Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(
-              inertia_array.data());
-          UpdateNullSpace(jacobian, inertia);
-        }
-
-        null_space_normalized_working_copy_ = null_space_normalized_;
 
         // reset
         time_elapsed_us_.clear();
@@ -980,16 +967,6 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   // Spring damper system with damping ratio=1
   tau_task << jacobian.transpose() * task_wrench;
 
-  std::thread update_thread {&FrankaPlanRunner::UpdateNullSpace, this, jacobian,
-                             inertia};
-  update_thread.detach();
-
-  if (null_space_updated_) {
-    std::scoped_lock<std::mutex> lock {null_space_mutex_};
-    null_space_normalized_working_copy_ = null_space_normalized_;
-    null_space_updated_ = false;
-  }
-
   const auto jc_spring {q_error * (-k_centering)};
   const auto jc_damping {dq * (-2 * sqrt(k_centering))};
 
@@ -1045,8 +1022,16 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   return ret_torques;
 }
 
-// TODO(@syler/@gavin): remove nullspace code?
-void FrankaPlanRunner::UpdateNullSpace(
+/*
+Example usage:
+std::array<double, 42> jacobian_array =
+model_->zeroJacobian(franka::Frame::kEndEffector, initial_state);
+std::array<double, 49> inertia_array = model_->mass(initial_state);
+Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(inertia_array.data());
+Eigen::Matrix<double, 7, 7> null_space = ComputeNullSpace(jacobian, inertia);
+*/
+Eigen::Matrix<double, 7, 7> FrankaPlanRunner::NullSpace(
     const Eigen::Matrix<double, 6, 7> jacobian,
     const Eigen::Matrix<double, 7, 7> inertia) {
   // 7x7
@@ -1063,8 +1048,7 @@ void FrankaPlanRunner::UpdateNullSpace(
   Eigen::Matrix<double, 7, 7> null_space {
       Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv * jacobian};
 
-  std::scoped_lock<std::mutex> lock {null_space_mutex_};
-  null_space_normalized_ = null_space.array() / null_space.norm();
+  return null_space.array() / null_space.norm();
 }
 
 void FrankaPlanRunner::SetCompliantPushParameters(
