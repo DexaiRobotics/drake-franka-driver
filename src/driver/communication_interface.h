@@ -100,8 +100,22 @@ class CommunicationInterface {
     sim_control_exception_triggered_ = false;
   }
 
-  bool CompliantPushFwdRequested() const { return compliant_push_requested_; }
-  void ClearCompliantPushRequest() { compliant_push_requested_ = false; }
+  inline bool CompliantPushStartRequested() const {
+    return compliant_push_start_requested_;
+  }
+
+  void ClearCompliantPushStartRequest() {
+    compliant_push_start_requested_ = false;
+  }
+
+
+  inline bool CompliantPushStopRequested() const {
+    return compliant_push_stop_requested_;
+  }
+
+  void ClearCompliantPushStopRequest() {
+    compliant_push_stop_requested_ = false;
+  }
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
@@ -185,7 +199,8 @@ class CommunicationInterface {
   std::atomic_bool running_ {false};
   std::atomic<bool> sim_control_exception_triggered_ {false};
   std::atomic<bool> cancel_plan_requested_ {false};
-  std::atomic<bool> compliant_push_requested_ {false};
+  std::atomic<bool> compliant_push_start_requested_ {false};
+  std::atomic<bool> compliant_push_stop_requested_ {false};
   std::atomic<bool> is_sim_ {false};
 
   ::lcm::LCM lcm_;

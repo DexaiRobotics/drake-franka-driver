@@ -307,7 +307,6 @@ class FrankaPlanRunner {
 
   double k_jc_ramp_ {0.0};
   const double filter_gain {0.001};
-  int stopped_debounce_counter_ {};
 
   std::unique_ptr<franka::Model> model_ {};
 
