@@ -365,7 +365,11 @@ bool CommunicationInterface::CanReceiveCommands(
 void CommunicationInterface::HandleCompliantPushReq(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::bool_t* msg) {
-  compliant_push_requested_ = msg->data;
+  if (msg->data) {
+    compliant_push_start_requested_ = true;
+  } else {
+    compliant_push_stop_requested_ = true;
+  }
   new_plan_buffer_.plan = std::make_unique<PPType>();
   new_plan_buffer_.utime = msg->utime;
 }

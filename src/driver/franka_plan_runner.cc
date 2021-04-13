@@ -268,7 +268,7 @@ int FrankaPlanRunner::RunFranka() {
       }
       // prevent the plan from being started if robot is not running...
       if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
-          && !comm_interface_->CompliantPushFwdRequested()) {
+          && !comm_interface_->CompliantPushStartRequested()) {
         dexai::log()->info(
             "RunFranka: found a new plan in buffer, attaching callback...");
         status_has_changed = true;
@@ -298,7 +298,7 @@ int FrankaPlanRunner::RunFranka() {
         }
         continue;
       } else if (status_ == RobotStatus::Running
-                 && comm_interface_->CompliantPushFwdRequested()) {
+                 && comm_interface_->CompliantPushStartRequested()) {
         std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
 
         model_ = std::make_unique<franka::Model>(robot_->loadModel());
@@ -335,7 +335,6 @@ int FrankaPlanRunner::RunFranka() {
         // reset
         time_elapsed_us_.clear();
         k_jc_ramp_ = 0.0;
-        stopped_debounce_counter_ = 0;
 
         // define callback for the torque control loop
         try {
@@ -372,7 +371,7 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
-        comm_interface_->ClearCompliantPushRequest();
+        comm_interface_->ClearCompliantPushStartRequest();
         continue;
       }
       // no new plan available in the buffer or robot isn't running
@@ -956,7 +955,6 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
                                              * (error_exp.array() - 1)};
 
   const auto cart_vel {jacobian * dq};
-
   static const std::array<double, 6> wrench_limits_array {10.0, 10.0, 10.0,
                                                           10.0, 10.0, 10.0};
   Eigen::Map<const Eigen::Matrix<double, 6, 1>> wrench_limits {
@@ -1030,23 +1028,11 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   Eigen::Matrix<double, 7, 1>::Map(&tau_d_array[0], 7) = tau_d;
 
   franka::Torques ret_torques {tau_d_array};
-
-  if (cart_vel.head(3).norm() < stopped_max_vel_norm) {
-    stopped_debounce_counter_++;
-  } else {
-    stopped_debounce_counter_ = 0;
-  }
-
-  // (void) debounce_counter_max;
-  if (stopped_debounce_counter_ > debounce_counter_max) {
+  if (comm_interface_->CompliantPushStopRequested()) {
+    comm_interface_->ClearCompliantPushStopRequest();
     ret_torques.motion_finished = true;
     return ret_torques;
   }
-
-  // log()->info("vel: {}\nnorm: {}\tcounter: {}",
-  //   cart_vel.transpose(),
-  //   cart_vel.head(3).norm(),
-  //   stopped_debounce_counter_);
 
   auto end_time {std::chrono::high_resolution_clock::now()};
   time_elapsed_us_.push_back(
