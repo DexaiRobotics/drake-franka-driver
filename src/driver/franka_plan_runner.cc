@@ -325,7 +325,7 @@ int FrankaPlanRunner::RunFranka() {
 
         // define callback for the torque control loop
         try {
-          comm_interface_->SetCompliantPushActive();
+          comm_interface_->SetCompliantPushActive(true);
           robot_->control(std::bind(&FrankaPlanRunner::ImpedanceControlCallback,
                                     this, std::placeholders::_1,
                                     std::placeholders::_2));
@@ -359,7 +359,7 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
-        comm_interface_->ClearCompliantPushActive();
+        comm_interface_->SetCompliantPushActive(false);
         comm_interface_->ClearCompliantPushStartRequest();
         continue;
       }
@@ -983,7 +983,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   tau_d << tau_task + coriolis + tau_joint_centering;
 
   // we print info in a separate thread to keep callback short
-  // TODO(@syler): demote verbosity or remove once
+  // TODO(@syler): demote verbosity or remove once tested
   auto print_info {[tau_task, coriolis, tau_joint_centering, q_diff_from_center,
                     q_diff_from_center_norm, q_error, jc_spring, jc_damping]() {
     log()->info(

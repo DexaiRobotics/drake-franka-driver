@@ -116,14 +116,9 @@ class CommunicationInterface {
     compliant_push_stop_requested_ = false;
   }
 
-  inline void SetCompliantPushActive() {
-    compliant_push_active_ = true;
+  inline void SetCompliantPushActive(bool active) {
+    compliant_push_active_ = active;
   }
-
-  inline void ClearCompliantPushActive() {
-    compliant_push_active_ = false;
-  }
-
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
@@ -210,7 +205,7 @@ class CommunicationInterface {
   std::atomic<bool> compliant_push_start_requested_ {false};
   std::atomic<bool> compliant_push_stop_requested_ {false};
   std::atomic<bool> compliant_push_active_ {false};
-  
+
   std::atomic<bool> is_sim_ {false};
 
   ::lcm::LCM lcm_;
