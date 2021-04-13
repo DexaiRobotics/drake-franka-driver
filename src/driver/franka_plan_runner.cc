@@ -77,26 +77,6 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   CONV_SPEED_THRESHOLD = Eigen::VectorXd(dof_);  // segfault without reallocate
   CONV_SPEED_THRESHOLD << 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007;
 
-  // set compliance parameters
-
-  stiffness_.setZero();
-  stiffness_.topLeftCorner(3, 3)
-      << Eigen::Matrix<double, 3, 3>::Identity().array()
-             * translational_stiffness.replicate(1, 3).array();
-
-  stiffness_.bottomRightCorner(3, 3)
-      << Eigen::Matrix<double, 3, 3>::Identity().array()
-             * rotational_stiffness.replicate(1, 3).array();
-
-  damping_.setZero();
-  damping_.topLeftCorner(3, 3)
-      << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
-             * translational_stiffness_sqrt.replicate(1, 3).array();
-
-  damping_.bottomRightCorner(3, 3)
-      << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
-             * rotational_stiffness_sqrt.replicate(1, 3).array();
-
   // Create a ConstraintSolver, which creates a geometric model_->from
   // parameters and URDF(s) and keeps it in a fully owned MultiBodyPlant. Once
   // the CS exists, we get robot and scene geometry from it, not from
@@ -325,26 +305,11 @@ int FrankaPlanRunner::RunFranka() {
 
         franka::RobotState initial_state = robot_->readOnce();
 
-        // equilibrium point is the initial position
-        Eigen::Affine3d initial_transform(
-            Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
+        // THIS is equivalent of "plan" AKA desired direction of push.
+        // TODO(@syler/@gavin): make this a parameter passed in push request
+        auto desired_move {Eigen::Vector3d(0, 0, 0.050)};
 
-        Eigen::Affine3d desired_xform {initial_transform};
-
-        auto desired_move {
-            Eigen::Vector3d(0, 0, 0.050)};  // THIS is equivalent of "plan" -
-                                            // AKA desired direction of push
-        desired_xform.translate(desired_move);
-
-        const auto initial_trans {initial_transform.translation()};
-        std::cerr << initial_trans.transpose() << std::endl;
-
-        const auto desired_trans {desired_xform.translation()};
-        const auto desired_quat {Eigen::Quaterniond(desired_xform.linear())};
-        std::cerr << desired_trans.transpose() << std::endl;
-
-        position_d_ = desired_xform.translation();
-        orientation_d_ = desired_xform.linear();
+        SetCompliantPushParameters(initial_state, desired_move);
 
         // set collision behavior
         SetCollisionBehaviorSafetyOff();
@@ -1114,4 +1079,54 @@ void FrankaPlanRunner::UpdateNullSpace(
 
   std::scoped_lock<std::mutex> lock {null_space_mutex_};
   null_space_normalized_ = null_space.array() / null_space.norm();
+}
+
+void FrankaPlanRunner::SetCompliantPushParameters(
+    const franka::RobotState& initial_state,
+    const Eigen::Vector3d& desired_ee_translation,
+    const Eigen::Vector3d& translational_stiffness,
+    const Eigen::Vector3d& rotational_stiffness) {
+  // equilibrium point is the initial position
+  Eigen::Affine3d initial_transform(
+      Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
+
+  Eigen::Affine3d desired_xform {initial_transform};
+
+  desired_xform.translate(desired_ee_translation);
+
+  const auto initial_trans {initial_transform.translation()};
+  std::cerr << initial_trans.transpose() << std::endl;
+
+  const auto desired_trans {desired_xform.translation()};
+  const auto desired_quat {Eigen::Quaterniond(desired_xform.linear())};
+  std::cerr << desired_trans.transpose() << std::endl;
+
+  // these member variables get used as a goal in the impedance controll
+  // callback
+  position_d_ = desired_xform.translation();
+  orientation_d_ = desired_xform.linear();
+
+  // set stiffness and damping
+  const Eigen::Vector3d translational_stiffness_sqrt {
+      translational_stiffness.array().sqrt()};
+  const Eigen::Vector3d rotational_stiffness_sqrt {
+      rotational_stiffness.array().sqrt()};
+
+  stiffness_.setZero();
+  stiffness_.topLeftCorner(3, 3)
+      << Eigen::Matrix<double, 3, 3>::Identity().array()
+             * translational_stiffness.replicate(1, 3).array();
+
+  stiffness_.bottomRightCorner(3, 3)
+      << Eigen::Matrix<double, 3, 3>::Identity().array()
+             * rotational_stiffness.replicate(1, 3).array();
+
+  damping_.setZero();
+  damping_.topLeftCorner(3, 3)
+      << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
+             * translational_stiffness_sqrt.replicate(1, 3).array();
+
+  damping_.bottomRightCorner(3, 3)
+      << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
+             * rotational_stiffness_sqrt.replicate(1, 3).array();
 }
