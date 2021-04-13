@@ -108,7 +108,6 @@ class CommunicationInterface {
     compliant_push_start_requested_ = false;
   }
 
-
   inline bool CompliantPushStopRequested() const {
     return compliant_push_stop_requested_;
   }
@@ -116,6 +115,15 @@ class CommunicationInterface {
   void ClearCompliantPushStopRequest() {
     compliant_push_stop_requested_ = false;
   }
+
+  inline void SetCompliantPushActive() {
+    compliant_push_active_ = true;
+  }
+
+  inline void ClearCompliantPushActive() {
+    compliant_push_active_ = false;
+  }
+
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
@@ -201,6 +209,8 @@ class CommunicationInterface {
   std::atomic<bool> cancel_plan_requested_ {false};
   std::atomic<bool> compliant_push_start_requested_ {false};
   std::atomic<bool> compliant_push_stop_requested_ {false};
+  std::atomic<bool> compliant_push_active_ {false};
+  
   std::atomic<bool> is_sim_ {false};
 
   ::lcm::LCM lcm_;
@@ -225,6 +235,7 @@ class CommunicationInterface {
   std::string lcm_user_stop_channel_;
   std::string lcm_compliant_push_req_channel_;
   std::string lcm_brakes_locked_channel_;
+  std::string lcm_compliant_push_active_channel_;
   std::string lcm_sim_driver_event_trigger_channel_;
 
   std::string cancel_plan_source_;

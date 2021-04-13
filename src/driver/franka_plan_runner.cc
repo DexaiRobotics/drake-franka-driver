@@ -369,6 +369,7 @@ int FrankaPlanRunner::RunFranka() {
 
         // define callback for the torque control loop
         try {
+          comm_interface_->SetCompliantPushActive();
           robot_->control(std::bind(&FrankaPlanRunner::ImpedanceControlCallback,
                                     this, std::placeholders::_1,
                                     std::placeholders::_2));
@@ -402,6 +403,7 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
+        comm_interface_->ClearCompliantPushActive();
         comm_interface_->ClearCompliantPushStartRequest();
         continue;
       }
