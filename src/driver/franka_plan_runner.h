@@ -190,8 +190,34 @@ class FrankaPlanRunner {
   void IncreaseFrankaTimeBasedOnStatus(const std::array<double, 7>& vel,
                                        double period_in_seconds);
 
+  // When a robot state is received, the callback function is used to calculate
+  // the response: the desired values for that time step. After sending back the
+  // response, the callback function will be called again with the most recently
+  // received robot state. Since the robot is controlled with a 1 kHz frequency,
+  // the callback functions have to compute their result in a short time frame
+  // in order to be accepted.
+
+  // @param robot_state current robot state
+  // @param period time since last callback invocation, zero on first invocation
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
+
+  /// Set parameters for stiffness and goal direction based on push direction.
+  /// TODO(@anyone): long-term the stiffness can be a parameter of the push
+  /// request
+  void SetCompliantPushParameters(
+      const franka::RobotState& initial_state,
+      const Eigen::Vector3d& desired_ee_translation,
+      const Eigen::Vector3d& translational_stiffness,
+      const Eigen::Vector3d& rotational_stiffness);
+
+  void SetCompliantPushParameters(
+      const franka::RobotState& initial_state,
+      const Eigen::Vector3d& desired_ee_translation) {
+    return SetCompliantPushParameters(initial_state, desired_ee_translation,
+                                      kDefaultTranslationalStiffness,
+                                      kDefaultRotationalStiffness);
+  };
 
   franka::Torques ImpedanceControlCallback(
       const franka::RobotState& robot_state, franka::Duration);
@@ -211,11 +237,6 @@ class FrankaPlanRunner {
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
   std::unique_ptr<ConstraintSolver> constraint_solver_;
-
-  // TODO: remove? Do we need this?
-  std::function<franka::JointPositions(const franka::RobotState&,
-                                       franka::Duration)>
-      joint_position_callback_;
 
   // keeping track of time along plan:
   double franka_time_ {};
@@ -288,14 +309,10 @@ class FrankaPlanRunner {
   Eigen::VectorXd CONV_SPEED_THRESHOLD;
 
   // Compliance parameters
-  const Eigen::Vector3d translational_stiffness {100.0, 100.0, 100.0};
-  const Eigen::Vector3d rotational_stiffness {10.0, 10.0, 50.0};
+  const Eigen::Vector3d kDefaultTranslationalStiffness {100.0, 100.0, 100.0};
+  const Eigen::Vector3d kDefaultRotationalStiffness {10.0, 10.0, 50.0};
 
-  const Eigen::Vector3d translational_stiffness_sqrt {
-      translational_stiffness.array().sqrt()};
-  const Eigen::Vector3d rotational_stiffness_sqrt {
-      rotational_stiffness.array().sqrt()};
-
+  // stiffness and damping for compliant push
   Eigen::Matrix<double, 6, 6> stiffness_, damping_;
 
   const double k_centering {1.0};
@@ -310,8 +327,8 @@ class FrankaPlanRunner {
 
   std::unique_ptr<franka::Model> model_ {};
 
+  // TODO(@syler/@gavin): remove nullspace code?
   std::mutex null_space_mutex_ {};
-
   Eigen::Matrix<double, 7, 7> null_space_normalized_;
   Eigen::Matrix<double, 7, 7> null_space_normalized_working_copy_;
   std::atomic<bool> null_space_updated_ {};
