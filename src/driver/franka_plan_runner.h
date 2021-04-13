@@ -222,8 +222,9 @@ class FrankaPlanRunner {
   franka::Torques ImpedanceControlCallback(
       const franka::RobotState& robot_state, franka::Duration);
 
-  void UpdateNullSpace(const Eigen::Matrix<double, 6, 7> jacobian,
-                       const Eigen::Matrix<double, 7, 7> inertia);
+  Eigen::Matrix<double, 7, 7> NullSpace(
+      const Eigen::Matrix<double, 6, 7> jacobian,
+      const Eigen::Matrix<double, 7, 7> inertia);
 
  private:
   const int dof_;          // degrees of freedom of franka
@@ -261,8 +262,12 @@ class FrankaPlanRunner {
   // frequency components in the region we care about with high fidelity
   const double lcm_publish_rate_ {200.0};  // Hz
 
+  /// upper and lower limit for each joint
   Eigen::MatrixXd joint_limits_;
+
+  /// midpoints between upper and lower joint limit
   Eigen::Matrix<double, 7, 1> q_center_;
+  /// half range between upper and lower limit
   Eigen::Matrix<double, 7, 1> q_half_range_;
 
   float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
@@ -326,12 +331,6 @@ class FrankaPlanRunner {
   const double filter_gain {0.001};
 
   std::unique_ptr<franka::Model> model_ {};
-
-  // TODO(@syler/@gavin): remove nullspace code?
-  std::mutex null_space_mutex_ {};
-  Eigen::Matrix<double, 7, 7> null_space_normalized_;
-  Eigen::Matrix<double, 7, 7> null_space_normalized_working_copy_;
-  std::atomic<bool> null_space_updated_ {};
 
   Eigen::Vector3d position_d_;
   Eigen::Quaterniond orientation_d_;
