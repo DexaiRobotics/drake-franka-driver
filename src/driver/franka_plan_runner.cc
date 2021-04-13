@@ -330,7 +330,11 @@ int FrankaPlanRunner::RunFranka() {
             Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
 
         Eigen::Affine3d desired_xform {initial_transform};
-        desired_xform.translate(Eigen::Vector3d(0, 0, 0.050));
+
+        auto desired_move {
+            Eigen::Vector3d(0, 0, 0.050)};  // THIS is equivalent of "plan" -
+                                            // AKA desired direction of push
+        desired_xform.translate(desired_move);
 
         const auto initial_trans {initial_transform.translation()};
         std::cerr << initial_trans.transpose() << std::endl;
@@ -1036,6 +1040,8 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
 
   tau_d << tau_task + coriolis + tau_joint_centering;
 
+  // we print info in a separate thread to keep callback short
+  // TODO(@syler): demote verbosity or remove once
   auto print_info {[tau_task, coriolis, tau_joint_centering, q_diff_from_center,
                     q_diff_from_center_norm, q_error, jc_spring, jc_damping]() {
     log()->info(
@@ -1088,6 +1094,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   return ret_torques;
 }
 
+// TODO(@syler/@gavin): remove nullspace code?
 void FrankaPlanRunner::UpdateNullSpace(
     const Eigen::Matrix<double, 6, 7> jacobian,
     const Eigen::Matrix<double, 7, 7> inertia) {

@@ -190,11 +190,21 @@ class FrankaPlanRunner {
   void IncreaseFrankaTimeBasedOnStatus(const std::array<double, 7>& vel,
                                        double period_in_seconds);
 
+  // When a robot state is received, the callback function is used to calculate
+  // the response: the desired values for that time step. After sending back the
+  // response, the callback function will be called again with the most recently
+  // received robot state. Since the robot is controlled with a 1 kHz frequency,
+  // the callback functions have to compute their result in a short time frame
+  // in order to be accepted. Callback functions take two parameters:
+
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
 
-  franka::Torques ImpedanceControlCallback(
-      const franka::RobotState& robot_state, franka::Duration);
+  void SetCompliantPushParameters(const Eigen::Vector3d& desired_ee_)
+
+      franka::Torques
+      ImpedanceControlCallback(const franka::RobotState& robot_state,
+                               franka::Duration);
 
   void UpdateNullSpace(const Eigen::Matrix<double, 6, 7> jacobian,
                        const Eigen::Matrix<double, 7, 7> inertia);
@@ -288,14 +298,20 @@ class FrankaPlanRunner {
   Eigen::VectorXd CONV_SPEED_THRESHOLD;
 
   // Compliance parameters
-  const Eigen::Vector3d translational_stiffness {100.0, 100.0, 100.0};
-  const Eigen::Vector3d rotational_stiffness {10.0, 10.0, 50.0};
+  const Eigen::Vector3d translational_stiffness {
+      100.0, 100.0, 100.0};  // long-term these can be passed as parameters in
+                             // the plan we send
+  const Eigen::Vector3d rotational_stiffness {
+      10.0, 10.0,
+      50.0};  // long-term these can be passed as parameters in the plan we send
 
   const Eigen::Vector3d translational_stiffness_sqrt {
       translational_stiffness.array().sqrt()};
   const Eigen::Vector3d rotational_stiffness_sqrt {
       rotational_stiffness.array().sqrt()};
 
+  // TODO(@syler): function to generate desired stiffness, damping from
+  // translational and rotation
   Eigen::Matrix<double, 6, 6> stiffness_, damping_;
 
   const double k_centering {1.0};
@@ -311,8 +327,8 @@ class FrankaPlanRunner {
 
   std::unique_ptr<franka::Model> model_ {};
 
+  // TODO(@syler/@gavin): remove nullspace code?
   std::mutex null_space_mutex_ {};
-
   Eigen::Matrix<double, 7, 7> null_space_normalized_;
   Eigen::Matrix<double, 7, 7> null_space_normalized_working_copy_;
   std::atomic<bool> null_space_updated_ {};
