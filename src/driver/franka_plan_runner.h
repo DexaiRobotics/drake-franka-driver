@@ -333,8 +333,8 @@ class FrankaPlanRunner {
 
   std::unique_ptr<franka::Model> model_ {};
 
-  Eigen::Vector3d position_d_;
-  Eigen::Quaterniond orientation_d_;
+  Eigen::Vector3d desired_position_;
+  Eigen::Quaterniond desired_orientation_;
 
 };  // FrankaPlanRunner
 

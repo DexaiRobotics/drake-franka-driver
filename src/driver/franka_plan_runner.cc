@@ -898,15 +898,16 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   // compute error to desired equilibrium pose
   // position error
   Eigen::Matrix<double, 6, 1> error;
-  error.head(3) << position - position_d_;
+  error.head(3) << position - desired_position_;
 
   // orientation error
   // "difference" quaternion
-  if (orientation_d_.coeffs().dot(orientation.coeffs()) < 0.0) {
+  if (desired_orientation_.coeffs().dot(orientation.coeffs()) < 0.0) {
     orientation.coeffs() << -orientation.coeffs();
   }
   // "difference" quaternion
-  Eigen::Quaterniond error_quaternion(orientation.inverse() * orientation_d_);
+  Eigen::Quaterniond error_quaternion(orientation.inverse()
+                                      * desired_orientation_);
   error.tail(3) << error_quaternion.x(), error_quaternion.y(),
       error_quaternion.z();
   // Transform to base frame
@@ -1070,14 +1071,12 @@ void FrankaPlanRunner::SetCompliantPushParameters(
   const auto initial_trans {initial_transform.translation()};
   std::cerr << initial_trans.transpose() << std::endl;
 
-  const auto desired_trans {desired_xform.translation()};
-  const auto desired_quat {Eigen::Quaterniond(desired_xform.linear())};
-  std::cerr << desired_trans.transpose() << std::endl;
-
-  // these member variables get used as a goal in the impedance controll
+  // these member variables get used as a target in the impedance control
   // callback
-  position_d_ = desired_xform.translation();
-  orientation_d_ = desired_xform.linear();
+  desired_position_ = desired_xform.translation();
+  desired_orientation_ = desired_xform.linear();
+
+  std::cerr << desired_position_.transpose() << std::endl;
 
   // set stiffness and damping
   const Eigen::Vector3d translational_stiffness_sqrt {
