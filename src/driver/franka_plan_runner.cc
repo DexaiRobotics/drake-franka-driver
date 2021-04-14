@@ -52,7 +52,6 @@
 #include <vector>     // for vector
 
 #include <drake/lcmt_iiwa_status.hpp>
-#include <franka/model.h>  // for Model
 
 #include "franka/exception.h"  // for Exception, ControlException
 #include "franka/robot.h"      // for Robot
@@ -78,9 +77,9 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   CONV_SPEED_THRESHOLD = Eigen::VectorXd(dof_);  // segfault without reallocate
   CONV_SPEED_THRESHOLD << 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007;
 
-  // Create a ConstraintSolver, which creates a geometric model from parameters
-  // and URDF(s) and keeps it in a fully owned MultiBodyPlant.
-  // Once the CS exists, we get robot and scene geometry from it, not from
+  // Create a ConstraintSolver, which creates a geometric model from
+  // parameters and URDF(s) and keeps it in a fully owned MultiBodyPlant. Once
+  // the CS exists, we get robot and scene geometry from it, not from
   // Parameters, which cannot and should not be updated (keep them const).
   constraint_solver_ = std::make_unique<ConstraintSolver>(&params_);
 
@@ -93,6 +92,9 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
                      joint_limits_.col(1).transpose());
   dexai::log()->info("Upper Joint limits YAML: {}",
                      params_.robot_high_joint_limits.transpose());
+
+  q_center_ = 0.5 * (joint_limits_.col(0) + joint_limits_.col(1));
+  q_half_range_ = 0.5 * (joint_limits_.col(1) - joint_limits_.col(0));
 
   start_conf_franka_ = Eigen::VectorXd::Zero(dof_);
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
@@ -266,7 +268,7 @@ int FrankaPlanRunner::RunFranka() {
       }
       // prevent the plan from being started if robot is not running...
       if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
-          && !comm_interface_->CompliantPushFwdRequested()) {
+          && !comm_interface_->CompliantPushStartRequested()) {
         dexai::log()->info(
             "RunFranka: found a new plan in buffer, attaching callback...");
         status_has_changed = true;
@@ -296,310 +298,49 @@ int FrankaPlanRunner::RunFranka() {
         }
         continue;
       } else if (status_ == RobotStatus::Running
-                 && comm_interface_->CompliantPushFwdRequested()) {
+                 && comm_interface_->CompliantPushStartRequested()) {
         std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
-        // Compliance parameters
-        static const Eigen::Vector3d translational_stiffness {100.0, 100.0, 100.0};
-        static const Eigen::Vector3d rotational_stiffness {10.0, 10.0, 50.0};
 
-        static const Eigen::Vector3d translational_stiffness_sqrt {translational_stiffness.array().sqrt()};
-        static const Eigen::Vector3d rotational_stiffness_sqrt {rotational_stiffness.array().sqrt()};
-
-        Eigen::Matrix<double, 6, 6> stiffness, damping;
-
-        stiffness.setZero();
-        stiffness.topLeftCorner(3, 3)
-            <<  Eigen::Matrix<double, 3, 3>::Identity().array()
-                * translational_stiffness.replicate(1, 3).array();
-        
-        stiffness.bottomRightCorner(3, 3)
-            << Eigen::Matrix<double, 3, 3>::Identity().array()
-               * rotational_stiffness.replicate(1, 3).array();
-        
-        damping.setZero();
-        damping.topLeftCorner(3, 3) << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
-                                           * translational_stiffness_sqrt.replicate(1, 3).array();
-
-        damping.bottomRightCorner(3, 3)
-            << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
-                   * rotational_stiffness_sqrt.replicate(1, 3).array();
-
-        franka::Model model = robot_->loadModel();
+        model_ = std::make_unique<franka::Model>(robot_->loadModel());
 
         franka::RobotState initial_state = robot_->readOnce();
 
-        // equilibrium point is the initial position
-        Eigen::Affine3d initial_transform(
-            Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
+        // THIS is equivalent of "plan" AKA desired direction of push.
+        // TODO(@syler/@gavin): make this a parameter passed in push request
+        auto desired_move {Eigen::Vector3d(0, 0, 0.050)};
 
-        Eigen::Affine3d desired_xform {initial_transform};
-        desired_xform.translate(Eigen::Vector3d(0, 0, 0.050));
-
-        const auto initial_trans {initial_transform.translation()};
-        std::cerr << initial_trans.transpose() << std::endl;
-
-        const auto desired_trans {desired_xform.translation()};
-        const auto desired_quat {Eigen::Quaterniond(desired_xform.linear())};
-        std::cerr << desired_trans.transpose() << std::endl;
-
-        Eigen::Vector3d position_d(desired_xform.translation());
-        Eigen::Quaterniond orientation_d(desired_xform.linear());
+        SetCompliantPushParameters(initial_state, desired_move);
 
         // set collision behavior
-        robot_->setCollisionBehavior(
-            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
-            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
-            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}},
-            {{100.0, 100.0, 100.0, 100.0, 100.0, 100.0}});
-
-        const Eigen::Matrix<double, 7, 1> q_center {
-            0.5 * (joint_limits_.col(0) + joint_limits_.col(1))};
-
-        const Eigen::Matrix<double, 7, 1> q_half_range {
-            0.5 * (joint_limits_.col(1)-joint_limits_.col(0))};
+        SetCollisionBehaviorSafetyOff();
 
         log()->info("Limits: \n\t{}\n\t{}\nCenter:\n\t{}\nRange/2:\n\t:{}",
                     joint_limits_.col(0).transpose(),
-                    joint_limits_.col(1).transpose(),
-                    q_center.transpose(), q_half_range.transpose());
+                    joint_limits_.col(1).transpose(), q_center_.transpose(),
+                    q_half_range_.transpose());
 
-        const double k_centering {1.0};
-
-        const double stopped_max_vel_norm {0.002};
-        const int debounce_counter_max {30};
-        int stopped_debounce_counter {};
-
-        Eigen::Map<const Eigen::Matrix<double, 7, 1>> torque_limits(
-            kJointTorqueLimits.data());
-        const Eigen::Matrix<double, 7, 1> neg_torque_limits {-torque_limits};
-
-        auto start_time {std::chrono::high_resolution_clock::now()};
-        auto end_time {start_time};
-        std::mutex null_space_mutex_ {};
-        Eigen::Matrix<double, 7, 7> null_space_normalized;
-        std::atomic<bool> null_space_updated {};
-
-        auto update_null_space {[&null_space_normalized, &null_space_mutex_](
-                                    const Eigen::Matrix<double, 6, 7> jacobian,
-                                    const Eigen::Matrix<double, 7, 7> inertia) {
-          // 7x7
-          auto inertia_inv {inertia.inverse()};
-
-          // (6x7 * 7x7 * 7x6)^-1 = 6x6
-          auto inertia_op_space {
-              (jacobian * inertia_inv * jacobian.transpose()).inverse()};
-
-          // 7x7 * 7x6 * 6x6 = 7x6
-          auto dyn_J_inv {inertia_inv * jacobian.transpose()
-                          * inertia_op_space};
-
-          // 7x6 * 6x7 = 7x7
-          Eigen::Matrix<double, 7, 7> null_space {
-              Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv * jacobian};
-
-          std::scoped_lock<std::mutex> lock {null_space_mutex_};
-          null_space_normalized = null_space.array() / null_space.norm();
-        }};
-
-        {
-          std::array<double, 42> jacobian_array =
-              model.zeroJacobian(franka::Frame::kEndEffector, initial_state);
-          std::array<double, 49> inertia_array = model.mass(initial_state);
-          Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(
-              jacobian_array.data());
-          Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(
-              inertia_array.data());
-          update_null_space(jacobian, inertia);
-        }
-
-
-        Eigen::Matrix<double, 7, 7> null_space_normalized_working_copy {
-            null_space_normalized};
-
-         // compute control
-        Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7), tau_joint_centering(7);
-
-        std::deque<size_t> time_elapsed_us;
-
-        double k_jc_ramp {0.0};
-        static const double filter_gain {0.001};
+        // reset
+        time_elapsed_us_.clear();
+        k_jc_ramp_ = 0.0;
 
         // define callback for the torque control loop
-        std::function<franka::Torques(const franka::RobotState&,
-                                      franka::Duration)>
-            impedance_control_callback =
-                [&](const franka::RobotState& robot_state,
-                    franka::Duration /*duration*/) -> franka::Torques {
-          start_time = std::chrono::high_resolution_clock::now();
-          // get state variables
-          std::array<double, 7> coriolis_array = model.coriolis(robot_state);
-          std::array<double, 42> jacobian_array =
-              model.zeroJacobian(franka::Frame::kEndEffector, robot_state);
-          std::array<double, 49> inertia_array = model.mass(robot_state);
-
-          // convert to Eigen
-          Eigen::Map<const Eigen::Matrix<double, 7, 1>> coriolis(
-              coriolis_array.data());
-          Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(
-              jacobian_array.data());
-          Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(
-              inertia_array.data());
-          Eigen::Map<const Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
-          Eigen::Map<const Eigen::Matrix<double, 7, 1>> dq(
-              robot_state.dq.data());
-          Eigen::Affine3d transform(
-              Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
-          Eigen::Vector3d position(transform.translation());
-          Eigen::Quaterniond orientation(transform.linear());
-
-          // compute error to desired equilibrium pose
-          // position error
-          Eigen::Matrix<double, 6, 1> error;
-          error.head(3) << position - position_d;
-
-          // orientation error
-          // "difference" quaternion
-          if (orientation_d.coeffs().dot(orientation.coeffs()) < 0.0) {
-            orientation.coeffs() << -orientation.coeffs();
-          }
-          // "difference" quaternion
-          Eigen::Quaterniond error_quaternion(orientation.inverse()
-                                              * orientation_d);
-          error.tail(3) << error_quaternion.x(), error_quaternion.y(),
-              error_quaternion.z();
-          // Transform to base frame
-          error.tail(3) << -transform.linear() * error.tail(3);
-
-          // // 7x7
-          // const auto inertia_inv {inertia.inverse()};
-
-          // // (6x7 * 7x7 * 7x6)^-1 = 6x6
-          // const auto inertia_op_space {
-          //     (jacobian * inertia_inv * jacobian.transpose()).inverse()};
-
-          // // 7x7 * 7x6 * 6x6 = 7x6
-          // const auto dyn_J_inv {inertia_inv * jacobian.transpose()
-          //                       * inertia_op_space};
-
-          // // 7x6 * 6x7 = 7x7
-          // const Eigen::Matrix<double, 7, 7> null_space {
-          //     Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv *
-          //     jacobian};
-          // const Eigen::Matrix<double, 7, 7> null_space_normalized {
-          //     null_space.array() / null_space.norm()};
-
-          // 7x1
-          Eigen::Matrix<double, 7, 1> q_diff_from_center {q - q_center};
-          Eigen::Matrix<double, 7, 1> q_diff_from_center_norm = q_diff_from_center.array() / q_half_range.array();
-
-          // https://www.desmos.com/calculator/8glrxv3bh4
-          const Eigen::Matrix<double, 7, 1> sgn_q_diff {q_diff_from_center_norm.array() / q_diff_from_center_norm.array().abs()};
-          const Eigen::Matrix<double, 7, 1> error_exp {(q_diff_from_center_norm + sgn_q_diff * 0.02).array().pow(50).exp()};
-          const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array() * (error_exp.array()-1)};
-
-          const auto cart_vel {jacobian * dq};
-
-          static const std::array<double, 6> wrench_limits_array {10.0, 10.0, 10.0, 10.0, 10.0, 10.0};
-          Eigen::Map<const Eigen::Matrix<double, 6, 1>> wrench_limits{wrench_limits_array.data()};
-
-          // Eigen::Matrix<double, 6, 1> task_wrench {(-stiffness * error - damping * (cart_vel))};
-          // // log()->info("task_wrench: {}", task_wrench.transpose());
-          // // task_wrench = task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
-          // // log()->info("task_wrench*: {}", task_wrench.transpose());
-
-          Eigen::Matrix<double, 6, 1> task_wrench {(-stiffness * error - damping * (cart_vel))};
-          task_wrench = task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
-
-          // Spring damper system with damping ratio=1
-          tau_task << jacobian.transpose()
-                          * task_wrench;
-
-          std::thread update_thread {update_null_space, jacobian, inertia};
-          update_thread.detach();
-
-          if (null_space_updated) {
-            std::scoped_lock<std::mutex> lock {null_space_mutex_};
-            null_space_normalized_working_copy = null_space_normalized;
-            null_space_updated = false;
-          }
-
-          const auto jc_spring {q_error * (-k_centering)};
-          const auto jc_damping {dq * (-2 * sqrt(k_centering))};
-
-          // 7x7 * 7x1
-          tau_joint_centering
-              << /* null_space_normalized_working_copy * */ (jc_spring + jc_damping);
-          tau_joint_centering = tau_joint_centering * k_jc_ramp;
-          tau_joint_centering = tau_joint_centering.cwiseMin(torque_limits).cwiseMax(-torque_limits);
-
-          k_jc_ramp = k_jc_ramp * (1 - filter_gain) + filter_gain;
-
-          tau_d << tau_task + coriolis + tau_joint_centering;
-
-          auto print_info {[tau_task, coriolis, tau_joint_centering, q_diff_from_center, q_diff_from_center_norm, q_error, jc_spring, jc_damping](){
-            log()->info("\n\tTask:\t{}\n\tCoriolis:\t{}\n\tCentering:\t{}\n\tq_diff:\t{}\n\tq_diff norm:\t{}\n\tq_error:\t{}\n\tjc_spring:\t{}\n\tjc_damping:\t{}",
-            tau_task.transpose(),
-            coriolis.transpose(),
-            tau_joint_centering.transpose(),
-            q_diff_from_center.transpose(),
-            q_diff_from_center_norm.transpose(),
-            q_error.transpose(),
-            jc_spring.transpose(),
-            jc_damping.transpose());
-          }};
-
-          std::thread print_info_thread {print_info};
-          print_info_thread.detach();
-
-          // torque saturation to limits
-          tau_d = tau_d.cwiseMin(torque_limits).cwiseMax(-torque_limits);
-
-          std::array<double, 7> tau_d_array {};
-          Eigen::Matrix<double, 7, 1>::Map(&tau_d_array[0], 7) = tau_d;
-
-          franka::Torques ret_torques {tau_d_array};
-
-          if (cart_vel.head(3).norm() < stopped_max_vel_norm) {
-            stopped_debounce_counter++;
-          } else {
-            stopped_debounce_counter = 0;
-          }
-
-          // (void) debounce_counter_max;
-          if (stopped_debounce_counter > debounce_counter_max) {
-            ret_torques.motion_finished = true;
-            return ret_torques;
-          }
-
-          // log()->info("vel: {}\nnorm: {}\tcounter: {}",
-          //   cart_vel.transpose(),
-          //   cart_vel.head(3).norm(),
-          //   stopped_debounce_counter);
-
-          end_time = std::chrono::high_resolution_clock::now();
-          time_elapsed_us.push_back(
-              std::chrono::duration_cast<std::chrono::microseconds>(
-                  end_time - start_time).count());
-          if (time_elapsed_us.size() > 20) {
-            time_elapsed_us.pop_front();
-          }
-          return ret_torques;
-        };
-
         try {
-          robot_->control(impedance_control_callback);
+          comm_interface_->SetCompliantPushActive(true);
+          robot_->control(std::bind(&FrankaPlanRunner::ImpedanceControlCallback,
+                                    this, std::placeholders::_1,
+                                    std::placeholders::_2));
           comm_interface_->PublishPlanComplete(plan_utime_,
                                                true /* = success */);
         } catch (const franka::ControlException& ce) {
-          
-          log()->info("\ntau_task:\t{}\ntau_jc:\t{}\ntau_d:\t{}",
-            tau_task.transpose(),
-            tau_joint_centering.transpose(),
-            tau_d.transpose());
+          // TODO: do we want to print these more frequently?
+          // log()->info("\ntau_task:\t{}\ntau_jc:\t{}\ntau_d:\t{}",
+          //             tau_task.transpose(), tau_joint_centering.transpose(),
+          //             tau_d.transpose());
 
-          std::for_each(time_elapsed_us.begin(), time_elapsed_us.end(), [](const auto& time_val){
-            log()->info("Took {} us", time_val);
-          });
+          std::for_each(time_elapsed_us_.begin(), time_elapsed_us_.end(),
+                        [](const auto& time_val) {
+                          log()->info("Took {} us", time_val);
+                        });
 
           if (plan_) {  // broadcast exception details over LCM
             dexai::log()->warn(
@@ -618,7 +359,8 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
-        comm_interface_->ClearCompliantPushRequest();
+        comm_interface_->SetCompliantPushActive(false);
+        comm_interface_->ClearCompliantPushStartRequest();
         continue;
       }
       // no new plan available in the buffer or robot isn't running
@@ -1132,4 +874,232 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     //     plan_utime_);
   }
   return output_to_franka;
+}
+
+franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
+    const franka::RobotState& robot_state, franka::Duration) {
+  auto start_time {std::chrono::high_resolution_clock::now()};
+  // get state variables
+  std::array<double, 7> coriolis_array = model_->coriolis(robot_state);
+  std::array<double, 42> jacobian_array =
+      model_->zeroJacobian(franka::Frame::kEndEffector, robot_state);
+  std::array<double, 49> inertia_array = model_->mass(robot_state);
+
+  // convert to Eigen
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
+  Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+  Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(inertia_array.data());
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
+  Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
+  Eigen::Vector3d position(transform.translation());
+  Eigen::Quaterniond orientation(transform.linear());
+
+  // compute error to desired equilibrium pose
+  // position error
+  Eigen::Matrix<double, 6, 1> error;
+  error.head(3) << position - position_d_;
+
+  // orientation error
+  // "difference" quaternion
+  if (orientation_d_.coeffs().dot(orientation.coeffs()) < 0.0) {
+    orientation.coeffs() << -orientation.coeffs();
+  }
+  // "difference" quaternion
+  Eigen::Quaterniond error_quaternion(orientation.inverse() * orientation_d_);
+  error.tail(3) << error_quaternion.x(), error_quaternion.y(),
+      error_quaternion.z();
+  // Transform to base frame
+  error.tail(3) << -transform.linear() * error.tail(3);
+
+  // // 7x7
+  // const auto inertia_inv {inertia.inverse()};
+
+  // // (6x7 * 7x7 * 7x6)^-1 = 6x6
+  // const auto inertia_op_space {
+  //     (jacobian * inertia_inv * jacobian.transpose()).inverse()};
+
+  // // 7x7 * 7x6 * 6x6 = 7x6
+  // const auto dyn_J_inv {inertia_inv * jacobian.transpose()
+  //                       * inertia_op_space};
+
+  // // 7x6 * 6x7 = 7x7
+  // const Eigen::Matrix<double, 7, 7> null_space {
+  //     Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv *
+  //     jacobian};
+  // const Eigen::Matrix<double, 7, 7> null_space_normalized_ {
+  //     null_space.array() / null_space.norm()};
+
+  // 7x1
+  Eigen::Matrix<double, 7, 1> q_diff_from_center {q - q_center_};
+  Eigen::Matrix<double, 7, 1> q_diff_from_center_norm =
+      q_diff_from_center.array() / q_half_range_.array();
+
+  // https://www.desmos.com/calculator/8glrxv3bh4
+  const Eigen::Matrix<double, 7, 1> sgn_q_diff {
+      q_diff_from_center_norm.array() / q_diff_from_center_norm.array().abs()};
+  const Eigen::Matrix<double, 7, 1> error_exp {
+      (q_diff_from_center_norm + sgn_q_diff * 0.02).array().pow(50).exp()};
+  const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array()
+                                             * (error_exp.array() - 1)};
+
+  const auto cart_vel {jacobian * dq};
+  static const std::array<double, 6> wrench_limits_array {10.0, 10.0, 10.0,
+                                                          10.0, 10.0, 10.0};
+  Eigen::Map<const Eigen::Matrix<double, 6, 1>> wrench_limits {
+      wrench_limits_array.data()};
+
+  // Eigen::Matrix<double, 6, 1> task_wrench {(-stiffness * error -
+  // damping * (cart_vel))};
+  // // log()->info("task_wrench: {}", task_wrench.transpose());
+  // // task_wrench =
+  // task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
+  // // log()->info("task_wrench*: {}", task_wrench.transpose());
+
+  Eigen::Matrix<double, 6, 1> task_wrench {
+      (-stiffness_ * error - damping_ * (cart_vel))};
+  task_wrench = task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
+
+  // compute control
+  Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7), tau_joint_centering(7);
+
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> torque_limits(
+      kImpedanceControlTorqueThreshold.data());
+
+  // Spring damper system with damping ratio=1
+  tau_task << jacobian.transpose() * task_wrench;
+
+  const auto jc_spring {q_error * (-k_centering_)};
+  const auto jc_damping {dq * (-2 * sqrt(k_centering_))};
+
+  // 7x7 * 7x1
+  tau_joint_centering << /* _ * */ (jc_spring + jc_damping);
+  tau_joint_centering = tau_joint_centering * k_jc_ramp_;
+  tau_joint_centering =
+      tau_joint_centering.cwiseMin(torque_limits).cwiseMax(-torque_limits);
+
+  k_jc_ramp_ = k_jc_ramp_ * (1 - filter_gain_) + filter_gain_;
+
+  tau_d << tau_task + coriolis + tau_joint_centering;
+
+  // we print info in a separate thread to keep callback short
+  // TODO(@syler): demote verbosity or remove once tested
+  auto print_info {[tau_task, coriolis, tau_joint_centering, q_diff_from_center,
+                    q_diff_from_center_norm, q_error, jc_spring, jc_damping]() {
+    log()->info(
+        "\n\tTask:\t{}\n\tCoriolis:\t{}\n\tCentering:\t{}\n\tq_diff:\t{"
+        "}\n\tq_diff "
+        "norm:\t{}\n\tq_error:\t{}\n\tjc_spring:\t{}\n\tjc_damping:\t{"
+        "}",
+        tau_task.transpose(), coriolis.transpose(),
+        tau_joint_centering.transpose(), q_diff_from_center.transpose(),
+        q_diff_from_center_norm.transpose(), q_error.transpose(),
+        jc_spring.transpose(), jc_damping.transpose());
+  }};
+
+  std::thread print_info_thread {print_info};
+  print_info_thread.detach();
+
+  // torque saturation to limits
+  tau_d = tau_d.cwiseMin(torque_limits).cwiseMax(-torque_limits);
+
+  std::array<double, 7> tau_d_array {};
+  Eigen::Matrix<double, 7, 1>::Map(&tau_d_array[0], 7) = tau_d;
+
+  franka::Torques ret_torques {tau_d_array};
+  if (comm_interface_->CompliantPushStopRequested()) {
+    comm_interface_->ClearCompliantPushStopRequest();
+    ret_torques.motion_finished = true;
+    return ret_torques;
+  }
+
+  auto end_time {std::chrono::high_resolution_clock::now()};
+  time_elapsed_us_.push_back(
+      std::chrono::duration_cast<std::chrono::microseconds>(end_time
+                                                            - start_time)
+          .count());
+  if (time_elapsed_us_.size() > 20) {
+    time_elapsed_us_.pop_front();
+  }
+  comm_interface_->SetRobotData(robot_state, tau_d);
+  return ret_torques;
+}
+
+/*
+Example usage:
+std::array<double, 42> jacobian_array =
+model_->zeroJacobian(franka::Frame::kEndEffector, initial_state);
+std::array<double, 49> inertia_array = model_->mass(initial_state);
+Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(inertia_array.data());
+Eigen::Matrix<double, 7, 7> null_space = ComputeNullSpace(jacobian, inertia);
+*/
+Eigen::Matrix<double, 7, 7> FrankaPlanRunner::NullSpace(
+    const Eigen::Matrix<double, 6, 7> jacobian,
+    const Eigen::Matrix<double, 7, 7> inertia) {
+  // 7x7
+  auto inertia_inv {inertia.inverse()};
+
+  // (6x7 * 7x7 * 7x6)^-1 = 6x6
+  auto inertia_op_space {
+      (jacobian * inertia_inv * jacobian.transpose()).inverse()};
+
+  // 7x7 * 7x6 * 6x6 = 7x6
+  auto dyn_J_inv {inertia_inv * jacobian.transpose() * inertia_op_space};
+
+  // 7x6 * 6x7 = 7x7
+  Eigen::Matrix<double, 7, 7> null_space {
+      Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv * jacobian};
+
+  return null_space.array() / null_space.norm();
+}
+
+void FrankaPlanRunner::SetCompliantPushParameters(
+    const franka::RobotState& initial_state,
+    const Eigen::Vector3d& desired_ee_translation,
+    const Eigen::Vector3d& translational_stiffness,
+    const Eigen::Vector3d& rotational_stiffness) {
+  // equilibrium point is the initial position
+  Eigen::Affine3d initial_transform(
+      Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
+
+  Eigen::Affine3d desired_xform {initial_transform};
+
+  desired_xform.translate(desired_ee_translation);
+
+  const auto initial_trans {initial_transform.translation()};
+  std::cerr << initial_trans.transpose() << std::endl;
+
+  const auto desired_trans {desired_xform.translation()};
+  const auto desired_quat {Eigen::Quaterniond(desired_xform.linear())};
+  std::cerr << desired_trans.transpose() << std::endl;
+
+  // these member variables get used as a goal in the impedance controll
+  // callback
+  position_d_ = desired_xform.translation();
+  orientation_d_ = desired_xform.linear();
+
+  // set stiffness and damping
+  const Eigen::Vector3d translational_stiffness_sqrt {
+      translational_stiffness.array().sqrt()};
+  const Eigen::Vector3d rotational_stiffness_sqrt {
+      rotational_stiffness.array().sqrt()};
+
+  stiffness_.setZero();
+  stiffness_.topLeftCorner(3, 3)
+      << Eigen::Matrix<double, 3, 3>::Identity().array()
+             * translational_stiffness.replicate(1, 3).array();
+
+  stiffness_.bottomRightCorner(3, 3)
+      << Eigen::Matrix<double, 3, 3>::Identity().array()
+             * rotational_stiffness.replicate(1, 3).array();
+
+  damping_.setZero();
+  damping_.topLeftCorner(3, 3)
+      << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
+             * translational_stiffness_sqrt.replicate(1, 3).array();
+
+  damping_.bottomRightCorner(3, 3)
+      << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
+             * rotational_stiffness_sqrt.replicate(1, 3).array();
 }

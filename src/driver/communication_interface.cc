@@ -82,6 +82,8 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
   lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
   lcm_compliant_push_req_channel_ = params_.robot_name + "_COMPLIANT_PUSH_REQ";
   lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
+  lcm_compliant_push_active_channel_ =
+      params_.robot_name + "_COMPLIANT_PUSH_ACTIVE";
   lcm_sim_driver_event_trigger_channel_ =
       params_.robot_name + "_SIM_EVENT_TRIGGER";
 
@@ -277,6 +279,9 @@ void CommunicationInterface::PublishRobotStatus() {
     }
     PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
                          current_mode == franka::RobotMode::kOther);
+    PublishBoolToChannel(franka_status.utime,
+                         lcm_compliant_push_active_channel_,
+                         compliant_push_active_);
   }
 }
 
@@ -365,7 +370,11 @@ bool CommunicationInterface::CanReceiveCommands(
 void CommunicationInterface::HandleCompliantPushReq(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::bool_t* msg) {
-  compliant_push_requested_ = msg->data;
+  if (msg->data) {
+    compliant_push_start_requested_ = true;
+  } else {
+    compliant_push_stop_requested_ = true;
+  }
   new_plan_buffer_.plan = std::make_unique<PPType>();
   new_plan_buffer_.utime = msg->utime;
 }
