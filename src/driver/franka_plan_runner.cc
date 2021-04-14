@@ -66,11 +66,11 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
       params_ {params},
       ip_addr_ {params.robot_ip},
       is_sim_ {ip_addr_ == "192.168.1.1"},
-      status_ {RobotStatus::Uninitialized} {
+      status_ {RobotStatus::Uninitialized},
+      max_accels_ {params.robot_max_accelerations} {
   // setup communication interface
   comm_interface_ = std::make_unique<CommunicationInterface>(
       params_, lcm_publish_rate_, is_sim_);
-  max_accels_ = params.robot_max_accelerations;
 
   assert(!params_.urdf_filepath.empty()
          && "FrankaPlanRunner ctor: bad params_.urdf_filepath");
