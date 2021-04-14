@@ -426,9 +426,11 @@ int FrankaPlanRunner::RunSim() {
   auto t_last {std::chrono::steady_clock::now()};
 
   status_ = RobotStatus::Running;  // define robot as running at start
+  int callback {};  // 1: JointPositionCallback, 2: ImpedanceControlCallback
 
   while (true) {
-    prev_conf = next_conf.replicate(1, 1);
+    // modify state and trigger publish
+    prev_conf = next_conf;
     {  // set q and dq in robot_state
       std::vector<double> next_conf_vec {utils::e_to_v(next_conf)};
       utils::VectorToArray(next_conf_vec, robot_state.q);
@@ -436,15 +438,18 @@ int FrankaPlanRunner::RunSim() {
     }
     utils::VectorToArray(vel, robot_state.dq);
 
-    if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
-        && !comm_interface_->CompliantPushStartRequested()) {
+    if ((status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
+         && !comm_interface_->CompliantPushStartRequested())
+        || callback == 1) {
+      callback = 1;
       next_conf = utils::v_to_e(
           utils::ArrayToVector(JointPositionCallback(robot_state, period).q));
-      // next_conf_vec = utils::e_to_v(next_conf);
-      // std::vector<double> prev_conf_vec = utils::e_to_v(prev_conf);
       for (int i {}; i < dof_; i++) {
         vel[i] =
             (next_conf[i] - prev_conf[i]) / static_cast<double>(period.toSec());
+      }
+      if (!plan_) {
+        callback = 0;  // converged
       }
     } else if (status_ == RobotStatus::Running
                && comm_interface_->CompliantPushStartRequested()) {
@@ -717,10 +722,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: Discarding plan, mismatched start position."
           " Max distance: {} > {}",
           max_ang_distance, params_.kMediumJointDistance);
-      plan_.release();
-      plan_utime_ = -1;  // reset plan to -1
       comm_interface_->PublishPlanComplete(
           plan_utime_, false, "discarded due to mismatched start conf");
+      plan_.release();
+      plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(franka::JointPositions(robot_state.q));
     } else if (max_ang_distance > params_.kTightJointDistance) {
       dexai::log()->warn(
@@ -826,14 +831,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     }
     // proceed below when not converged
     {  // print joints positions that have diverged
-      auto error_eigen = (end_conf_plan_ - current_conf_franka).cwiseAbs();
+      auto error_eigen {(end_conf_plan_ - current_conf_franka).cwiseAbs()};
       for (std::decay_t<decltype(dof_)> i {}; i < dof_; i++) {
-        if (error_eigen(i) > CONV_ANGLE_THRESHOLD) {
+        if (error_eigen[i] > CONV_ANGLE_THRESHOLD) {
           dexai::log()->warn(
               "JointPositionCallback: plan {} overtime, diverged, joint {} "
               "error: {:.4f} - {:.4f} = {:.4f} > max allowable: {}",
-              plan_utime_, i, end_conf_plan_(i), current_conf_franka(i),
-              error_eigen(i), CONV_ANGLE_THRESHOLD);
+              plan_utime_, i, end_conf_plan_[i], current_conf_franka[i],
+              error_eigen[i], CONV_ANGLE_THRESHOLD);
         }
       }
     }
