@@ -420,45 +420,48 @@ int FrankaPlanRunner::RunSim() {
       -2.5114236381136448, 0.6720116891296624, 1.9928838396072361,
       -1.2954019628351783;
   Eigen::VectorXd prev_conf(dof_);
-  std::vector<double> vel(7, 1);
+  std::vector<double> vel(7, 1);   // for simulating robot_state.dq
   franka::RobotState robot_state;  // internal state; mapping to franka state
   franka::Duration period;
-  std::chrono::milliseconds last_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::system_clock::now().time_since_epoch());
+  auto t_last {std::chrono::steady_clock::now()};
 
   status_ = RobotStatus::Running;  // define robot as running at start
 
   while (true) {
+    prev_conf = next_conf.replicate(1, 1);
+    {  // set q and dq in robot_state
+      std::vector<double> next_conf_vec {utils::e_to_v(next_conf)};
+      utils::VectorToArray(next_conf_vec, robot_state.q);
+      utils::VectorToArray(next_conf_vec, robot_state.q_d);
+    }
+    utils::VectorToArray(vel, robot_state.dq);
+
+    if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
+        && !comm_interface_->CompliantPushStartRequested()) {
+      next_conf = utils::v_to_e(
+          utils::ArrayToVector(JointPositionCallback(robot_state, period).q));
+      // next_conf_vec = utils::e_to_v(next_conf);
+      // std::vector<double> prev_conf_vec = utils::e_to_v(prev_conf);
+      for (int i {}; i < dof_; i++) {
+        vel[i] =
+            (next_conf[i] - prev_conf[i]) / static_cast<double>(period.toSec());
+      }
+    } else if (status_ == RobotStatus::Running
+               && comm_interface_->CompliantPushStartRequested()) {
+    } else {
+      comm_interface_->SetRobotData(robot_state, next_conf);
+    }
+
+    auto t_now {std::chrono::steady_clock::now()};
+    period = franka::Duration(
+        std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last)
+            .count());
+    t_last = t_now;
     // The actual callback control loop runs at 1 kHz, here it's pegged to
     // the lcm_publish_rate_ to avoid excessive CPU usage in simulations.
     // The loop frequency here in no way reflects the real-world frequency.
-    std::this_thread::sleep_for(std::chrono::milliseconds(
-        static_cast<int>(1000.0 / lcm_publish_rate_)));
-
-    std::vector<double> next_conf_vec = utils::e_to_v(next_conf);
-    utils::VectorToArray(next_conf_vec, robot_state.q);
-    utils::VectorToArray(next_conf_vec, robot_state.q_d);
-    utils::VectorToArray(vel, robot_state.dq);
-
-    prev_conf = next_conf.replicate(1, 1);
-    next_conf = utils::v_to_e(
-        utils::ArrayToVector(JointPositionCallback(robot_state, period).q));
-
-    next_conf_vec = utils::e_to_v(next_conf);
-    std::vector<double> prev_conf_vec = utils::e_to_v(prev_conf);
-
-    for (int i {}; i < dof_; i++) {
-      vel[i] = (next_conf_vec[i] - prev_conf_vec[i])
-               / static_cast<double>(period.toSec());
-    }
-
-    std::chrono::milliseconds current_ms =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch());
-    int64_t delta_ms = int64_t((current_ms - last_ms).count());
-    period = franka::Duration(delta_ms);
-    last_ms = current_ms;
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(static_cast<int>(1000 / lcm_publish_rate_)));
   }
   return 0;
 }
