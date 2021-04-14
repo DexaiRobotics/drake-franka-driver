@@ -324,6 +324,7 @@ int FrankaPlanRunner::RunFranka() {
         // define callback for the torque control loop
         try {
           comm_interface_->SetCompliantPushActive(true);
+          comm_interface_->ClearCompliantPushStartRequest();
           robot_->control(std::bind(&FrankaPlanRunner::ImpedanceControlCallback,
                                     this, std::placeholders::_1,
                                     std::placeholders::_2));
@@ -339,11 +340,10 @@ int FrankaPlanRunner::RunFranka() {
             dexai::log()->critical(
                 "RunFranka: RecoverFromControlException failed");
             comm_interface_->PublishDriverStatus(false, ce.what());
+            comm_interface_->SetCompliantPushActive(false);
             return 1;
           }
         }
-        comm_interface_->SetCompliantPushActive(false);
-        comm_interface_->ClearCompliantPushStartRequest();
         continue;
       }
       // no new plan available in the buffer or robot isn't running
@@ -993,6 +993,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   franka::Torques ret_torques {tau_d_array};
   if (comm_interface_->CompliantPushStopRequested()) {
     comm_interface_->ClearCompliantPushStopRequest();
+    comm_interface_->SetCompliantPushActive(false);
     ret_torques.motion_finished = true;
     return ret_torques;
   }
