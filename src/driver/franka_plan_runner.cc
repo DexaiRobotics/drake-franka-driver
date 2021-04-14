@@ -359,6 +359,8 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
+        plan_.release();
+        plan_utime_ = -1;  // reset plan utime to -1
         comm_interface_->SetCompliantPushActive(false);
         comm_interface_->ClearCompliantPushStartRequest();
         continue;
