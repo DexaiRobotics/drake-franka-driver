@@ -320,15 +320,16 @@ class FrankaPlanRunner {
   // stiffness and damping for compliant push
   Eigen::Matrix<double, 6, 6> stiffness_, damping_;
 
-  const double k_centering {1.0};
-
-  const double stopped_max_vel_norm {0.002};
-  const int debounce_counter_max {30};
-
-  std::deque<size_t> time_elapsed_us_;
-
+  // joint centering gain for spring damper system
+  const double k_centering_ {1.0};
+  // filter gain to control joint centering gain growth over time
+  const double filter_gain_ {0.001};
+  // actual gain for joint centering, controls how much torque is applied in an
+  // attempt to center joints - starts at zero and ramps up over time
   double k_jc_ramp_ {0.0};
-  const double filter_gain {0.001};
+
+  // store the length of time it took to complete the last callbacks to debug
+  std::deque<size_t> time_elapsed_us_;
 
   std::unique_ptr<franka::Model> model_ {};
 

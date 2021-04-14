@@ -969,8 +969,8 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   // Spring damper system with damping ratio=1
   tau_task << jacobian.transpose() * task_wrench;
 
-  const auto jc_spring {q_error * (-k_centering)};
-  const auto jc_damping {dq * (-2 * sqrt(k_centering))};
+  const auto jc_spring {q_error * (-k_centering_)};
+  const auto jc_damping {dq * (-2 * sqrt(k_centering_))};
 
   // 7x7 * 7x1
   tau_joint_centering << /* _ * */ (jc_spring + jc_damping);
@@ -978,7 +978,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   tau_joint_centering =
       tau_joint_centering.cwiseMin(torque_limits).cwiseMax(-torque_limits);
 
-  k_jc_ramp_ = k_jc_ramp_ * (1 - filter_gain) + filter_gain;
+  k_jc_ramp_ = k_jc_ramp_ * (1 - filter_gain_) + filter_gain_;
 
   tau_d << tau_task + coriolis + tau_joint_centering;
 
