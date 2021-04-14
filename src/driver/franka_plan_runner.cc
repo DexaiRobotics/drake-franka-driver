@@ -299,7 +299,7 @@ int FrankaPlanRunner::RunFranka() {
         continue;
       } else if (status_ == RobotStatus::Running
                  && comm_interface_->CompliantPushStartRequested()) {
-        std::tie(std::ignore, plan_utime_) = comm_interface_->PopNewPlan();
+        std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
 
         model_ = std::make_unique<franka::Model>(robot_->loadModel());
 
