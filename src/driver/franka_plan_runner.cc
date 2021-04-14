@@ -299,8 +299,6 @@ int FrankaPlanRunner::RunFranka() {
         continue;
       } else if (status_ == RobotStatus::Running
                  && comm_interface_->CompliantPushStartRequested()) {
-        std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
-
         model_ = std::make_unique<franka::Model>(robot_->loadModel());
 
         franka::RobotState initial_state = robot_->readOnce();
@@ -329,29 +327,14 @@ int FrankaPlanRunner::RunFranka() {
           robot_->control(std::bind(&FrankaPlanRunner::ImpedanceControlCallback,
                                     this, std::placeholders::_1,
                                     std::placeholders::_2));
-          comm_interface_->PublishPlanComplete(plan_utime_,
-                                               true /* = success */);
         } catch (const franka::ControlException& ce) {
-          // TODO: do we want to print these more frequently?
-          // log()->info("\ntau_task:\t{}\ntau_jc:\t{}\ntau_d:\t{}",
-          //             tau_task.transpose(), tau_joint_centering.transpose(),
-          //             tau_d.transpose());
-
           std::for_each(time_elapsed_us_.begin(), time_elapsed_us_.end(),
                         [](const auto& time_val) {
                           log()->info("Took {} us", time_val);
                         });
-
-          if (plan_) {  // broadcast exception details over LCM
-            dexai::log()->warn(
-                "RunFranka: control exception during active plan "
-                "{} at franka_t: {:.4f}, aborting and recovering...",
-                plan_utime_, franka_time_);
-            comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
-          } else {
-            dexai::log()->error("RunFranka: exception in main loop: {}.",
-                                ce.what());
-          }
+          dexai::log()->error(
+              "RunFranka: exception in impedance control callback: {}",
+              ce.what());
           if (!RecoverFromControlException()) {  // plan_ is released/reset
             dexai::log()->critical(
                 "RunFranka: RecoverFromControlException failed");
@@ -359,8 +342,6 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
-        plan_.release();
-        plan_utime_ = -1;  // reset plan utime to -1
         comm_interface_->SetCompliantPushActive(false);
         comm_interface_->ClearCompliantPushStartRequest();
         continue;

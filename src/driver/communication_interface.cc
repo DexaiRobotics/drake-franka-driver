@@ -375,8 +375,6 @@ void CommunicationInterface::HandleCompliantPushReq(
   } else {
     compliant_push_stop_requested_ = true;
   }
-  new_plan_buffer_.plan = std::make_unique<PPType>();
-  new_plan_buffer_.utime = msg->utime;
 }
 
 void CommunicationInterface::HandlePlan(
