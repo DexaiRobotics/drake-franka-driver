@@ -897,24 +897,6 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   // Transform to base frame
   error.tail(3) << -transform.linear() * error.tail(3);
 
-  // // 7x7
-  // const auto inertia_inv {inertia.inverse()};
-
-  // // (6x7 * 7x7 * 7x6)^-1 = 6x6
-  // const auto inertia_op_space {
-  //     (jacobian * inertia_inv * jacobian.transpose()).inverse()};
-
-  // // 7x7 * 7x6 * 6x6 = 7x6
-  // const auto dyn_J_inv {inertia_inv * jacobian.transpose()
-  //                       * inertia_op_space};
-
-  // // 7x6 * 6x7 = 7x7
-  // const Eigen::Matrix<double, 7, 7> null_space {
-  //     Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv *
-  //     jacobian};
-  // const Eigen::Matrix<double, 7, 7> null_space_normalized_ {
-  //     null_space.array() / null_space.norm()};
-
   // 7x1
   Eigen::Matrix<double, 7, 1> q_diff_from_center {q - q_center_};
   Eigen::Matrix<double, 7, 1> q_diff_from_center_norm =
@@ -933,13 +915,6 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
                                                           10.0, 10.0, 10.0};
   Eigen::Map<const Eigen::Matrix<double, 6, 1>> wrench_limits {
       wrench_limits_array.data()};
-
-  // Eigen::Matrix<double, 6, 1> task_wrench {(-stiffness * error -
-  // damping * (cart_vel))};
-  // // log()->info("task_wrench: {}", task_wrench.transpose());
-  // // task_wrench =
-  // task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
-  // // log()->info("task_wrench*: {}", task_wrench.transpose());
 
   Eigen::Matrix<double, 6, 1> task_wrench {
       (-stiffness_ * error - damping_ * (cart_vel))};
