@@ -10,7 +10,6 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wshadow=local")
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
 
 # threads
-set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 # find drake
@@ -116,7 +115,7 @@ set(TEST_SOURCES
 set(TEST_LINK_LIBRARIES
   GTest::gtest
   GTest::gtest_main
-  ${CMAKE_THREAD_LIBS_INIT}
+  Threads::Threads
   gflags
   drake::drake
   yaml-cpp
