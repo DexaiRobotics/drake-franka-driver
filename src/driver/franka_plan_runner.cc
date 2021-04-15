@@ -441,6 +441,7 @@ int FrankaPlanRunner::RunSim() {
     if ((status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
          && !comm_interface_->CompliantPushStartRequested())
         || callback == 1) {
+      // position control, callback will update state and publish status
       callback = 1;
       next_conf = utils::v_to_e(
           utils::ArrayToVector(JointPositionCallback(robot_state, period).q));
@@ -449,19 +450,42 @@ int FrankaPlanRunner::RunSim() {
             (next_conf[i] - prev_conf[i]) / static_cast<double>(period.toSec());
       }
       if (!plan_) {
-        callback = 0;  // converged
+        callback = 0;  // finished, and current active plan_ released already
       }
-    } else if (status_ == RobotStatus::Running
-               && comm_interface_->CompliantPushStartRequested()) {
-    } else {
+    } else {  // idle or impedance control, manually update and publish
       comm_interface_->SetRobotData(robot_state, next_conf);
     }
 
-    auto t_now {std::chrono::steady_clock::now()};
-    period = franka::Duration(
-        std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last)
-            .count());
-    t_last = t_now;
+    if ((status_ == RobotStatus::Running
+         && comm_interface_->CompliantPushStartRequested())
+        || callback == 2) {
+      if (!callback) {  // first time here
+        dexai::log()->info("Starting sim impedance control...");
+        SetCompliantPushParameters(robot_state, Eigen::Vector3d(0, 0, 0.050));
+        comm_interface_->SetCompliantPushActive(true);
+        comm_interface_->ClearCompliantPushStartRequest();
+        callback = 2;
+      }
+      // keep pushing until stop requested
+      // cannot call the actual ImpedanceControlCallback() function
+      // as model_->coriolis() segfaults in sim
+      if (comm_interface_->CompliantPushStopRequested()) {
+        dexai::log()->info("impedance control stop requested...");
+        comm_interface_->ClearCompliantPushStopRequest();
+        comm_interface_->SetCompliantPushActive(false);
+        callback = 0;
+      } else {
+        dexai::log()->debug("Waiing for stop request for impedance control...");
+      }
+    }
+
+    {  // update period for franka and t_last
+      auto t_now {std::chrono::steady_clock::now()};
+      period = franka::Duration(
+          std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last)
+              .count());
+      t_last = t_now;
+    }
     // The actual callback control loop runs at 1 kHz, here it's pegged to
     // the lcm_publish_rate_ to avoid excessive CPU usage in simulations.
     // The loop frequency here in no way reflects the real-world frequency.

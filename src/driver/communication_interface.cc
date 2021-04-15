@@ -165,7 +165,9 @@ std::tuple<std::unique_ptr<PPType>, int64_t>
 CommunicationInterface::PopNewPlan() {
   if (!HasNewPlan()) {
     throw std::runtime_error(
-        "PopNewPlan: no buffered new plan available to pop!");
+        fmt::format("PopNewPlan: no buffered new plan available to pop; utime "
+                    "in buffer: {}",
+                    new_plan_buffer_.utime));
   }
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr robot_plan_.plan_
@@ -385,7 +387,7 @@ void CommunicationInterface::HandlePlan(
   dexai::log()->info("CommInterface:HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
-  //$ check if in proper mode to receive commands
+  // check if in proper mode to receive commands
   if (const auto current_mode {GetRobotMode()};
       !CanReceiveCommands(current_mode)) {
     const auto err_msg {fmt::format(
