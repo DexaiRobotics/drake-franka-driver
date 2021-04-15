@@ -323,6 +323,7 @@ int FrankaPlanRunner::RunFranka() {
 
         // define callback for the torque control loop
         try {
+          log()->info("CompliantPush START requested.");
           comm_interface_->SetCompliantPushActive(true);
           comm_interface_->ClearCompliantPushStartRequest();
           robot_->control(std::bind(&FrankaPlanRunner::ImpedanceControlCallback,
@@ -992,6 +993,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
 
   franka::Torques ret_torques {tau_d_array};
   if (comm_interface_->CompliantPushStopRequested()) {
+    log()->info("CompliantPush STOP requested.");
     comm_interface_->ClearCompliantPushStopRequest();
     comm_interface_->SetCompliantPushActive(false);
     ret_torques.motion_finished = true;
