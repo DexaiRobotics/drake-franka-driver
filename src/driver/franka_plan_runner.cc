@@ -934,9 +934,8 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
 
   // 7x7 * 7x1
   tau_joint_centering << (jc_spring + jc_damping) * k_jc_ramp_;
-  tau_joint_centering =
-      tau_joint_centering.cwiseMin(torque_limits).cwiseMax(-torque_limits);
 
+  // linear ramp up from 0 to 1 on start
   k_jc_ramp_ = k_jc_ramp_ * (1 - filter_gain_) + filter_gain_;
 
   tau_d << tau_task + coriolis + tau_joint_centering;
