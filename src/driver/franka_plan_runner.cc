@@ -66,11 +66,11 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
       params_ {params},
       ip_addr_ {params.robot_ip},
       is_sim_ {ip_addr_ == "192.168.1.1"},
-      status_ {RobotStatus::Uninitialized} {
+      status_ {RobotStatus::Uninitialized},
+      max_accels_ {params.robot_max_accelerations} {
   // setup communication interface
   comm_interface_ = std::make_unique<CommunicationInterface>(
       params_, lcm_publish_rate_, is_sim_);
-  max_accels_ = params.robot_max_accelerations;
 
   assert(!params_.urdf_filepath.empty()
          && "FrankaPlanRunner ctor: bad params_.urdf_filepath");
@@ -420,45 +420,78 @@ int FrankaPlanRunner::RunSim() {
       -2.5114236381136448, 0.6720116891296624, 1.9928838396072361,
       -1.2954019628351783;
   Eigen::VectorXd prev_conf(dof_);
-  std::vector<double> vel(7, 1);
+  std::vector<double> vel(7, 1);   // for simulating robot_state.dq
   franka::RobotState robot_state;  // internal state; mapping to franka state
   franka::Duration period;
-  std::chrono::milliseconds last_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(
-          std::chrono::system_clock::now().time_since_epoch());
+  auto t_last {std::chrono::steady_clock::now()};
 
   status_ = RobotStatus::Running;  // define robot as running at start
+  int callback {};  // 1: JointPositionCallback, 2: ImpedanceControlCallback
 
   while (true) {
+    // modify state and trigger publish
+    prev_conf = next_conf;
+    {  // set q and dq in robot_state
+      std::vector<double> next_conf_vec {utils::e_to_v(next_conf)};
+      utils::VectorToArray(next_conf_vec, robot_state.q);
+      utils::VectorToArray(next_conf_vec, robot_state.q_d);
+    }
+    utils::VectorToArray(vel, robot_state.dq);
+
+    if ((status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
+         && !comm_interface_->CompliantPushStartRequested())
+        || callback == 1) {
+      // position control, callback will update state and publish status
+      callback = 1;
+      next_conf = utils::v_to_e(
+          utils::ArrayToVector(JointPositionCallback(robot_state, period).q));
+      for (int i {}; i < dof_; i++) {
+        vel[i] =
+            (next_conf[i] - prev_conf[i]) / static_cast<double>(period.toSec());
+      }
+      if (!plan_) {
+        callback = 0;  // finished, and current active plan_ released already
+      }
+    } else {  // idle or impedance control, manually update and publish
+      comm_interface_->SetRobotData(robot_state, next_conf);
+    }
+
+    if ((status_ == RobotStatus::Running
+         && comm_interface_->CompliantPushStartRequested())
+        || callback == 2) {
+      if (!callback) {  // first time here
+        dexai::log()->info("Starting sim impedance control...");
+        SetCompliantPushParameters(robot_state, Eigen::Vector3d(0, 0, 0.050));
+        comm_interface_->SetCompliantPushActive(true);
+        comm_interface_->ClearCompliantPushStartRequest();
+        callback = 2;
+      }
+      // keep pushing until stop requested
+      // cannot call the actual ImpedanceControlCallback() function because
+      // in sim there's no Robot instance, no Model instance needed for
+      // impedance calculations
+      if (comm_interface_->CompliantPushStopRequested()) {
+        dexai::log()->info("impedance control stop requested...");
+        comm_interface_->ClearCompliantPushStopRequest();
+        comm_interface_->SetCompliantPushActive(false);
+        callback = 0;
+      } else {
+        dexai::log()->debug("Waiing for stop request for impedance control...");
+      }
+    }
+
+    {  // update period for franka and t_last
+      auto t_now {std::chrono::steady_clock::now()};
+      period = franka::Duration(
+          std::chrono::duration_cast<std::chrono::milliseconds>(t_now - t_last)
+              .count());
+      t_last = t_now;
+    }
     // The actual callback control loop runs at 1 kHz, here it's pegged to
     // the lcm_publish_rate_ to avoid excessive CPU usage in simulations.
     // The loop frequency here in no way reflects the real-world frequency.
-    std::this_thread::sleep_for(std::chrono::milliseconds(
-        static_cast<int>(1000.0 / lcm_publish_rate_)));
-
-    std::vector<double> next_conf_vec = utils::e_to_v(next_conf);
-    utils::VectorToArray(next_conf_vec, robot_state.q);
-    utils::VectorToArray(next_conf_vec, robot_state.q_d);
-    utils::VectorToArray(vel, robot_state.dq);
-
-    prev_conf = next_conf.replicate(1, 1);
-    next_conf = utils::v_to_e(
-        utils::ArrayToVector(JointPositionCallback(robot_state, period).q));
-
-    next_conf_vec = utils::e_to_v(next_conf);
-    std::vector<double> prev_conf_vec = utils::e_to_v(prev_conf);
-
-    for (int i {}; i < dof_; i++) {
-      vel[i] = (next_conf_vec[i] - prev_conf_vec[i])
-               / static_cast<double>(period.toSec());
-    }
-
-    std::chrono::milliseconds current_ms =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::system_clock::now().time_since_epoch());
-    int64_t delta_ms = int64_t((current_ms - last_ms).count());
-    period = franka::Duration(delta_ms);
-    last_ms = current_ms;
+    std::this_thread::sleep_for(
+        std::chrono::milliseconds(static_cast<int>(1000 / lcm_publish_rate_)));
   }
   return 0;
 }
@@ -714,10 +747,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: Discarding plan, mismatched start position."
           " Max distance: {} > {}",
           max_ang_distance, params_.kMediumJointDistance);
-      plan_.release();
-      plan_utime_ = -1;  // reset plan to -1
       comm_interface_->PublishPlanComplete(
           plan_utime_, false, "discarded due to mismatched start conf");
+      plan_.release();
+      plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(franka::JointPositions(robot_state.q));
     } else if (max_ang_distance > params_.kTightJointDistance) {
       dexai::log()->warn(
@@ -791,12 +824,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     Eigen::VectorXd dq_abs {
         utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
             .cwiseAbs()};
-    {
-      // make copies and pass by value
-      const auto plan_utime {plan_utime_};
-      const auto franka_time {franka_time_};
-      auto overtime_warning {[plan_utime, franka_time,
-                                             max_joint_err, dq_abs]() {
+    {  // threaded logging, capture member vars by val
+      auto overtime_warning {[plan_utime = plan_utime_,
+                              franka_time = franka_time_, max_joint_err,
+                              dq_abs]() {
         dexai::log()->warn(
             "JointPositionCallback: plan {} overtime, "
             "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
@@ -825,14 +856,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     }
     // proceed below when not converged
     {  // print joints positions that have diverged
-      auto error_eigen = (end_conf_plan_ - current_conf_franka).cwiseAbs();
+      auto error_eigen {(end_conf_plan_ - current_conf_franka).cwiseAbs()};
       for (std::decay_t<decltype(dof_)> i {}; i < dof_; i++) {
-        if (error_eigen(i) > CONV_ANGLE_THRESHOLD) {
+        if (error_eigen[i] > CONV_ANGLE_THRESHOLD) {
           dexai::log()->warn(
               "JointPositionCallback: plan {} overtime, diverged, joint {} "
               "error: {:.4f} - {:.4f} = {:.4f} > max allowable: {}",
-              plan_utime_, i, end_conf_plan_(i), current_conf_franka(i),
-              error_eigen(i), CONV_ANGLE_THRESHOLD);
+              plan_utime_, i, end_conf_plan_[i], current_conf_franka[i],
+              error_eigen[i], CONV_ANGLE_THRESHOLD);
         }
       }
     }
@@ -863,10 +894,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       return franka::MotionFinished(output_to_franka);
     }
 
-    {
-      // make a copy and pass by value
-      const auto plan_utime {plan_utime_};
-      auto overtime_warning {[plan_utime]() {
+    {  // threaded logging, capture member vars by val
+      auto overtime_warning {[plan_utime = plan_utime_]() {
         dexai::log()->warn(
             "JointPositionCallback: plan {} overtime, diverged or still "
             "moving, within allowed grace period",
