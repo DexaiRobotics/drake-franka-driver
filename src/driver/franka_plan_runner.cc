@@ -301,11 +301,11 @@ int FrankaPlanRunner::RunFranka() {
         continue;
       } else if (status_ == RobotStatus::Running
                  && comm_interface_->CompliantPushStartRequested()) {
-        franka::RobotState initial_state = robot_->readOnce();
+        franka::RobotState initial_state {robot_->readOnce()};
 
         // THIS is equivalent of "plan" AKA desired direction of push.
         // TODO(@syler/@gavin): make this a parameter passed in push request
-        auto desired_move {Eigen::Vector3d(0, 0, 0.050)};
+        static const auto desired_move {Eigen::Vector3d(0, 0, 0.050)};
 
         SetCompliantPushParameters(initial_state, desired_move);
 
