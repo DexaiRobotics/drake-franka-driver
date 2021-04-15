@@ -372,8 +372,10 @@ void CommunicationInterface::HandleCompliantPushReq(
     const robot_msgs::bool_t* msg) {
   if (msg->data) {
     compliant_push_start_requested_ = true;
-  } else {
+  } else if (compliant_push_active_) {
     compliant_push_stop_requested_ = true;
+  } else {
+    log()->warn("CompliantPush not currently active but STOP requested!");
   }
 }
 
