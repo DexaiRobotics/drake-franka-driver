@@ -467,8 +467,9 @@ int FrankaPlanRunner::RunSim() {
         callback = 2;
       }
       // keep pushing until stop requested
-      // cannot call the actual ImpedanceControlCallback() function
-      // as model_->coriolis() segfaults in sim
+      // cannot call the actual ImpedanceControlCallback() function because
+      // in sim there's no Robot instance, no Model instance needed for
+      // impedance calculations
       if (comm_interface_->CompliantPushStopRequested()) {
         dexai::log()->info("impedance control stop requested...");
         comm_interface_->ClearCompliantPushStopRequest();
