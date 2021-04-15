@@ -933,8 +933,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   const auto jc_damping {dq * (-2 * sqrt(k_centering_))};
 
   // 7x7 * 7x1
-  tau_joint_centering << /* _ * */ (jc_spring + jc_damping);
-  tau_joint_centering = tau_joint_centering * k_jc_ramp_;
+  tau_joint_centering << (jc_spring + jc_damping) * k_jc_ramp_;
   tau_joint_centering =
       tau_joint_centering.cwiseMin(torque_limits).cwiseMax(-torque_limits);
 
