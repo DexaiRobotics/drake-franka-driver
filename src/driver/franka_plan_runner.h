@@ -49,6 +49,7 @@
 #include <drake/common/trajectories/piecewise_polynomial.h>  // for Piecewis...
 
 #include <chrono>
+#include <deque>   // for deque<>
 #include <memory>  // for unique ptr
 #include <mutex>   // for mutex
 #include <string>
@@ -155,14 +156,10 @@ class FrankaPlanRunner {
   }
 
   franka::RobotMode GetRobotMode() const {
-    franka::RobotMode current_mode;
-    robot_->read([&current_mode](const franka::RobotState& robot_state) {
-      current_mode = robot_state.robot_mode;
-      return false;
-    });
+    franka::RobotMode robot_mode {robot_->readOnce().robot_mode};
     dexai::log()->debug("GetRobotMode: Franka is in mode: {}",
-                        utils::RobotModeToString(current_mode));
-    return current_mode;
+                        utils::RobotModeToString(robot_mode));
+    return robot_mode;
   }
 
   int RunFranka();
@@ -217,7 +214,7 @@ class FrankaPlanRunner {
     return SetCompliantPushParameters(initial_state, desired_ee_translation,
                                       kDefaultTranslationalStiffness,
                                       kDefaultRotationalStiffness);
-  };
+  }
 
   franka::Torques ImpedanceControlCallback(
       const franka::RobotState& robot_state, franka::Duration);
@@ -335,7 +332,6 @@ class FrankaPlanRunner {
 
   Eigen::Vector3d desired_position_;
   Eigen::Quaterniond desired_orientation_;
-
 };  // FrankaPlanRunner
 
 }  // namespace franka_driver
