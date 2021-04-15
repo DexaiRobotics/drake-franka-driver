@@ -791,10 +791,20 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     Eigen::VectorXd dq_abs {
         utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
             .cwiseAbs()};
-    // dexai::log()->warn(
-    //     "JointPositionCallback: plan {} overtime, "
-    //     "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
-    //     plan_utime_, franka_time_, max_joint_err, dq_abs.norm());
+    {
+      // make copies and pass by value
+      const auto plan_utime {plan_utime_};
+      const auto franka_time {franka_time_};
+      auto overtime_warning {[plan_utime, franka_time,
+                                             max_joint_err, dq_abs]() {
+        dexai::log()->warn(
+            "JointPositionCallback: plan {} overtime, "
+            "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
+            plan_utime, franka_time, max_joint_err, dq_abs.norm());
+      }};
+      std::thread overtime_warning_thread {overtime_warning};
+      overtime_warning_thread.detach();
+    }
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
         && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()
@@ -852,10 +862,19 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(output_to_franka);
     }
-    // dexai::log()->warn(
-    //     "JointPositionCallback: plan {} overtime, diverged or still moving, "
-    //     "within allowed grace period",
-    //     plan_utime_);
+
+    {
+      // make a copy and pass by value
+      const auto plan_utime {plan_utime_};
+      auto overtime_warning {[plan_utime]() {
+        dexai::log()->warn(
+            "JointPositionCallback: plan {} overtime, diverged or still "
+            "moving, within allowed grace period",
+            plan_utime);
+      }};
+      std::thread overtime_warning_thread {overtime_warning};
+      overtime_warning_thread.detach();
+    }
   }
   return output_to_franka;
 }
