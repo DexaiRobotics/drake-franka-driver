@@ -120,7 +120,6 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   }
 
   log()->warn("Collision Safety {}", safety_off_ ? "OFF" : "ON");
-
   if (safety_off_) {
     upper_torque_threshold_ = kHighTorqueThreshold;
     upper_force_threshold_ = kHighForceThreshold;
@@ -163,6 +162,9 @@ int FrankaPlanRunner::RunFranka() {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         continue;
       }
+
+      // robot model for impedance control calculations
+      model_ = std::make_unique<franka::Model>(robot_->loadModel());
 
       auto current_mode {GetRobotMode()};
       if (auto t_now {std::chrono::steady_clock::now()};
@@ -299,8 +301,6 @@ int FrankaPlanRunner::RunFranka() {
         continue;
       } else if (status_ == RobotStatus::Running
                  && comm_interface_->CompliantPushStartRequested()) {
-        model_ = std::make_unique<franka::Model>(robot_->loadModel());
-
         franka::RobotState initial_state = robot_->readOnce();
 
         // THIS is equivalent of "plan" AKA desired direction of push.
