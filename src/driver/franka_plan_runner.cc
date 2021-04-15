@@ -794,12 +794,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     Eigen::VectorXd dq_abs {
         utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
             .cwiseAbs()};
-    {
-      // make copies and pass by value
-      const auto plan_utime {plan_utime_};
-      const auto franka_time {franka_time_};
-      auto overtime_warning {[plan_utime, franka_time,
-                                             max_joint_err, dq_abs]() {
+    {  // threaded logging, capture member vars by val
+      auto overtime_warning {[plan_utime = plan_utime_,
+                              franka_time = franka_time_, max_joint_err,
+                              dq_abs]() {
         dexai::log()->warn(
             "JointPositionCallback: plan {} overtime, "
             "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
@@ -866,10 +864,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       return franka::MotionFinished(output_to_franka);
     }
 
-    {
-      // make a copy and pass by value
-      const auto plan_utime {plan_utime_};
-      auto overtime_warning {[plan_utime]() {
+    {  // threaded logging, capture member vars by val
+      auto overtime_warning {[plan_utime = plan_utime_]() {
         dexai::log()->warn(
             "JointPositionCallback: plan {} overtime, diverged or still "
             "moving, within allowed grace period",
