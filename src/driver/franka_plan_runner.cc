@@ -45,6 +45,8 @@
 
 #include "driver/franka_plan_runner.h"
 
+#include <Eigen/QR>
+
 #include <algorithm>  // for min
 #include <cmath>      // for exp
 #include <vector>     // for vector
@@ -75,9 +77,9 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   CONV_SPEED_THRESHOLD = Eigen::VectorXd(dof_);  // segfault without reallocate
   CONV_SPEED_THRESHOLD << 0.007, 0.007, 0.007, 0.007, 0.007, 0.007, 0.007;
 
-  // Create a ConstraintSolver, which creates a geometric model from parameters
-  // and URDF(s) and keeps it in a fully owned MultiBodyPlant.
-  // Once the CS exists, we get robot and scene geometry from it, not from
+  // Create a ConstraintSolver, which creates a geometric model from
+  // parameters and URDF(s) and keeps it in a fully owned MultiBodyPlant. Once
+  // the CS exists, we get robot and scene geometry from it, not from
   // Parameters, which cannot and should not be updated (keep them const).
   constraint_solver_ = std::make_unique<ConstraintSolver>(&params_);
 
@@ -90,6 +92,9 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
                      joint_limits_.col(1).transpose());
   dexai::log()->info("Upper Joint limits YAML: {}",
                      params_.robot_high_joint_limits.transpose());
+
+  q_center_ = 0.5 * (joint_limits_.col(0) + joint_limits_.col(1));
+  q_half_range_ = 0.5 * (joint_limits_.col(1) - joint_limits_.col(0));
 
   start_conf_franka_ = Eigen::VectorXd::Zero(dof_);
   start_conf_plan_ = Eigen::VectorXd::Zero(dof_);
@@ -115,7 +120,6 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   }
 
   log()->warn("Collision Safety {}", safety_off_ ? "OFF" : "ON");
-
   if (safety_off_) {
     upper_torque_threshold_ = kHighTorqueThreshold;
     upper_force_threshold_ = kHighForceThreshold;
@@ -158,6 +162,9 @@ int FrankaPlanRunner::RunFranka() {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         continue;
       }
+
+      // robot model for impedance control calculations
+      model_ = std::make_unique<franka::Model>(robot_->loadModel());
 
       auto current_mode {GetRobotMode()};
       if (auto t_now {std::chrono::steady_clock::now()};
@@ -262,7 +269,8 @@ int FrankaPlanRunner::RunFranka() {
         t_last_main_loop_log_ = t_now;
       }
       // prevent the plan from being started if robot is not running...
-      if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()) {
+      if (status_ == RobotStatus::Running && comm_interface_->HasNewPlan()
+          && !comm_interface_->CompliantPushStartRequested()) {
         dexai::log()->info(
             "RunFranka: found a new plan in buffer, attaching callback...");
         status_has_changed = true;
@@ -283,6 +291,53 @@ int FrankaPlanRunner::RunFranka() {
             dexai::log()->error("RunFranka: exception in main loop: {}.",
                                 ce.what());
           }
+          if (!RecoverFromControlException()) {  // plan_ is released/reset
+            dexai::log()->critical(
+                "RunFranka: RecoverFromControlException failed");
+            comm_interface_->PublishDriverStatus(false, ce.what());
+            return 1;
+          }
+        }
+        continue;
+      } else if (status_ == RobotStatus::Running
+                 && comm_interface_->CompliantPushStartRequested()) {
+        franka::RobotState initial_state {robot_->readOnce()};
+
+        // THIS is equivalent of "plan" AKA desired direction of push.
+        // TODO(@syler/@gavin): make this a parameter passed in push request
+        static const auto desired_move {Eigen::Vector3d(0, 0, 0.050)};
+
+        SetCompliantPushParameters(initial_state, desired_move);
+
+        // set collision behavior
+        SetCollisionBehaviorSafetyOff();
+
+        log()->info("Limits: \n\t{}\n\t{}\nCenter:\n\t{}\nRange/2:\n\t:{}",
+                    joint_limits_.col(0).transpose(),
+                    joint_limits_.col(1).transpose(), q_center_.transpose(),
+                    q_half_range_.transpose());
+
+        // reset
+        time_elapsed_us_.clear();
+        k_jc_ramp_ = 0.0;
+
+        // define callback for the torque control loop
+        try {
+          log()->info("CompliantPush START requested.");
+          comm_interface_->SetCompliantPushActive(true);
+          comm_interface_->ClearCompliantPushStartRequest();
+          robot_->control(std::bind(&FrankaPlanRunner::ImpedanceControlCallback,
+                                    this, std::placeholders::_1,
+                                    std::placeholders::_2));
+        } catch (const franka::ControlException& ce) {
+          std::for_each(time_elapsed_us_.begin(), time_elapsed_us_.end(),
+                        [](const auto& time_val) {
+                          log()->info("Took {} us", time_val);
+                        });
+          dexai::log()->error(
+              "RunFranka: exception in impedance control callback: {}",
+              ce.what());
+          comm_interface_->SetCompliantPushActive(false);
           if (!RecoverFromControlException()) {  // plan_ is released/reset
             dexai::log()->critical(
                 "RunFranka: RecoverFromControlException failed");
@@ -736,10 +791,20 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     Eigen::VectorXd dq_abs {
         utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
             .cwiseAbs()};
-    dexai::log()->warn(
-        "JointPositionCallback: plan {} overtime, "
-        "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
-        plan_utime_, franka_time_, max_joint_err, dq_abs.norm());
+    {
+      // make copies and pass by value
+      const auto plan_utime {plan_utime_};
+      const auto franka_time {franka_time_};
+      auto overtime_warning {[plan_utime, franka_time,
+                                             max_joint_err, dq_abs]() {
+        dexai::log()->warn(
+            "JointPositionCallback: plan {} overtime, "
+            "franka_t: {:.3f}, max joint err: {:.4f}, speed norm: {:.5f}",
+            plan_utime, franka_time, max_joint_err, dq_abs.norm());
+      }};
+      std::thread overtime_warning_thread {overtime_warning};
+      overtime_warning_thread.detach();
+    }
     // check convergence, return finished if two conditions are met
     if (max_joint_err <= CONV_ANGLE_THRESHOLD
         && (dq_abs.array() <= CONV_SPEED_THRESHOLD.array()).all()
@@ -797,10 +862,221 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(output_to_franka);
     }
-    dexai::log()->warn(
-        "JointPositionCallback: plan {} overtime, diverged or still moving, "
-        "within allowed grace period",
-        plan_utime_);
+
+    {
+      // make a copy and pass by value
+      const auto plan_utime {plan_utime_};
+      auto overtime_warning {[plan_utime]() {
+        dexai::log()->warn(
+            "JointPositionCallback: plan {} overtime, diverged or still "
+            "moving, within allowed grace period",
+            plan_utime);
+      }};
+      std::thread overtime_warning_thread {overtime_warning};
+      overtime_warning_thread.detach();
+    }
   }
   return output_to_franka;
+}
+
+franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
+    const franka::RobotState& robot_state, franka::Duration) {
+  auto start_time {std::chrono::high_resolution_clock::now()};
+  // get state variables
+  std::array<double, 7> coriolis_array = model_->coriolis(robot_state);
+  std::array<double, 42> jacobian_array =
+      model_->zeroJacobian(franka::Frame::kEndEffector, robot_state);
+  std::array<double, 49> inertia_array = model_->mass(robot_state);
+
+  // convert to Eigen
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> coriolis(coriolis_array.data());
+  Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+  Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(inertia_array.data());
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> q(robot_state.q.data());
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> dq(robot_state.dq.data());
+  Eigen::Affine3d transform(Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
+  Eigen::Vector3d position(transform.translation());
+  Eigen::Quaterniond orientation(transform.linear());
+
+  // compute error to desired equilibrium pose
+  // position error
+  Eigen::Matrix<double, 6, 1> error;
+  error.head(3) << position - desired_position_;
+
+  // orientation error
+  // "difference" quaternion
+  if (desired_orientation_.coeffs().dot(orientation.coeffs()) < 0.0) {
+    orientation.coeffs() << -orientation.coeffs();
+  }
+  // "difference" quaternion
+  Eigen::Quaterniond error_quaternion(orientation.inverse()
+                                      * desired_orientation_);
+  error.tail(3) << error_quaternion.x(), error_quaternion.y(),
+      error_quaternion.z();
+  // Transform to base frame
+  error.tail(3) << -transform.linear() * error.tail(3);
+
+  // 7x1
+  Eigen::Matrix<double, 7, 1> q_diff_from_center {q - q_center_};
+  Eigen::Matrix<double, 7, 1> q_diff_from_center_norm =
+      q_diff_from_center.array() / q_half_range_.array();
+
+  // https://www.desmos.com/calculator/8glrxv3bh4
+  const Eigen::Matrix<double, 7, 1> sgn_q_diff {
+      q_diff_from_center_norm.array() / q_diff_from_center_norm.array().abs()};
+  const Eigen::Matrix<double, 7, 1> error_exp {
+      (q_diff_from_center_norm + sgn_q_diff * 0.02).array().pow(50).exp()};
+  const Eigen::Matrix<double, 7, 1> q_error {sgn_q_diff.array()
+                                             * (error_exp.array() - 1)};
+
+  const auto cart_vel {jacobian * dq};
+  static const std::array<double, 6> wrench_limits_array {10.0, 10.0, 10.0,
+                                                          10.0, 10.0, 10.0};
+  Eigen::Map<const Eigen::Matrix<double, 6, 1>> wrench_limits {
+      wrench_limits_array.data()};
+
+  Eigen::Matrix<double, 6, 1> task_wrench {
+      (-stiffness_ * error - damping_ * (cart_vel))};
+  task_wrench = task_wrench.cwiseMin(wrench_limits).cwiseMax(-wrench_limits);
+
+  // compute control
+  Eigen::Matrix<double, 7, 1> tau_task(7), tau_d(7), tau_joint_centering(7);
+
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> torque_limits(
+      kImpedanceControlTorqueThreshold.data());
+
+  // Spring damper system with damping ratio=1
+  tau_task << jacobian.transpose() * task_wrench;
+
+  const auto jc_spring {q_error * (-k_centering_)};
+  const auto jc_damping {dq * (-2 * sqrt(k_centering_))};
+
+  // 7x7 * 7x1
+  tau_joint_centering << (jc_spring + jc_damping) * k_jc_ramp_;
+
+  // linear ramp up from 0 to 1 on start
+  k_jc_ramp_ = k_jc_ramp_ * (1 - filter_gain_) + filter_gain_;
+
+  tau_d << tau_task + coriolis + tau_joint_centering;
+
+  // we print info in a separate thread to keep callback short
+  // TODO(@syler): demote verbosity or remove once tested
+  auto print_info {[tau_task, coriolis, tau_joint_centering, q_diff_from_center,
+                    q_diff_from_center_norm, q_error, jc_spring, jc_damping]() {
+    log()->info(
+        "\n\tTask:\t{}\n\tCoriolis:\t{}\n\tCentering:\t{}\n\tq_diff:\t{"
+        "}\n\tq_diff "
+        "norm:\t{}\n\tq_error:\t{}\n\tjc_spring:\t{}\n\tjc_damping:\t{"
+        "}",
+        tau_task.transpose(), coriolis.transpose(),
+        tau_joint_centering.transpose(), q_diff_from_center.transpose(),
+        q_diff_from_center_norm.transpose(), q_error.transpose(),
+        jc_spring.transpose(), jc_damping.transpose());
+  }};
+
+  std::thread print_info_thread {print_info};
+  print_info_thread.detach();
+
+  // torque saturation to limits
+  tau_d = tau_d.cwiseMin(torque_limits).cwiseMax(-torque_limits);
+
+  std::array<double, 7> tau_d_array {};
+  Eigen::Matrix<double, 7, 1>::Map(&tau_d_array[0], 7) = tau_d;
+
+  franka::Torques ret_torques {tau_d_array};
+  if (comm_interface_->CompliantPushStopRequested()) {
+    log()->info("CompliantPush STOP requested.");
+    comm_interface_->ClearCompliantPushStopRequest();
+    comm_interface_->SetCompliantPushActive(false);
+    ret_torques.motion_finished = true;
+    return ret_torques;
+  }
+
+  auto end_time {std::chrono::high_resolution_clock::now()};
+  time_elapsed_us_.push_back(
+      std::chrono::duration_cast<std::chrono::microseconds>(end_time
+                                                            - start_time)
+          .count());
+  if (time_elapsed_us_.size() > 20) {
+    time_elapsed_us_.pop_front();
+  }
+  comm_interface_->SetRobotData(robot_state, tau_d);
+  return ret_torques;
+}
+
+/*
+Example usage:
+std::array<double, 42> jacobian_array =
+model_->zeroJacobian(franka::Frame::kEndEffector, initial_state);
+std::array<double, 49> inertia_array = model_->mass(initial_state);
+Eigen::Map<const Eigen::Matrix<double, 6, 7>> jacobian(jacobian_array.data());
+Eigen::Map<const Eigen::Matrix<double, 7, 7>> inertia(inertia_array.data());
+Eigen::Matrix<double, 7, 7> null_space = ComputeNullSpace(jacobian, inertia);
+*/
+Eigen::Matrix<double, 7, 7> FrankaPlanRunner::NullSpace(
+    const Eigen::Matrix<double, 6, 7> jacobian,
+    const Eigen::Matrix<double, 7, 7> inertia) {
+  // 7x7
+  auto inertia_inv {inertia.inverse()};
+
+  // (6x7 * 7x7 * 7x6)^-1 = 6x6
+  auto inertia_op_space {
+      (jacobian * inertia_inv * jacobian.transpose()).inverse()};
+
+  // 7x7 * 7x6 * 6x6 = 7x6
+  auto dyn_J_inv {inertia_inv * jacobian.transpose() * inertia_op_space};
+
+  // 7x6 * 6x7 = 7x7
+  Eigen::Matrix<double, 7, 7> null_space {
+      Eigen::Matrix<double, 7, 7>::Identity() - dyn_J_inv * jacobian};
+
+  return null_space.array() / null_space.norm();
+}
+
+void FrankaPlanRunner::SetCompliantPushParameters(
+    const franka::RobotState& initial_state,
+    const Eigen::Vector3d& desired_ee_translation,
+    const Eigen::Vector3d& translational_stiffness,
+    const Eigen::Vector3d& rotational_stiffness) {
+  // equilibrium point is the initial position
+  Eigen::Affine3d initial_transform(
+      Eigen::Matrix4d::Map(initial_state.O_T_EE.data()));
+
+  Eigen::Affine3d desired_xform {initial_transform};
+
+  desired_xform.translate(desired_ee_translation);
+
+  const auto initial_trans {initial_transform.translation()};
+  std::cerr << initial_trans.transpose() << std::endl;
+
+  // these member variables get used as a target in the impedance control
+  // callback
+  desired_position_ = desired_xform.translation();
+  desired_orientation_ = desired_xform.linear();
+
+  std::cerr << desired_position_.transpose() << std::endl;
+
+  // set stiffness and damping
+  const Eigen::Vector3d translational_stiffness_sqrt {
+      translational_stiffness.array().sqrt()};
+  const Eigen::Vector3d rotational_stiffness_sqrt {
+      rotational_stiffness.array().sqrt()};
+
+  stiffness_.setZero();
+  stiffness_.topLeftCorner(3, 3)
+      << Eigen::Matrix<double, 3, 3>::Identity().array()
+             * translational_stiffness.replicate(1, 3).array();
+
+  stiffness_.bottomRightCorner(3, 3)
+      << Eigen::Matrix<double, 3, 3>::Identity().array()
+             * rotational_stiffness.replicate(1, 3).array();
+
+  damping_.setZero();
+  damping_.topLeftCorner(3, 3)
+      << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
+             * translational_stiffness_sqrt.replicate(1, 3).array();
+
+  damping_.bottomRightCorner(3, 3)
+      << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
+             * rotational_stiffness_sqrt.replicate(1, 3).array();
 }

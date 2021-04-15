@@ -60,6 +60,7 @@
 #include "driver/constraint_solver.h"        // for ConstraintSolver
 #include "franka/control_types.h"            // for franka::JointPositions
 #include "franka/duration.h"                 // for franka::Duration
+#include "franka/model.h"                    // for Model
 #include "franka/robot.h"                    // for franka::Robot
 #include "franka/robot_state.h"              // for franka::RobotState
 #include "utils/robot_parameters.h"          // for RobotParameters
@@ -189,8 +190,41 @@ class FrankaPlanRunner {
   void IncreaseFrankaTimeBasedOnStatus(const std::array<double, 7>& vel,
                                        double period_in_seconds);
 
+  // When a robot state is received, the callback function is used to calculate
+  // the response: the desired values for that time step. After sending back the
+  // response, the callback function will be called again with the most recently
+  // received robot state. Since the robot is controlled with a 1 kHz frequency,
+  // the callback functions have to compute their result in a short time frame
+  // in order to be accepted.
+
+  // @param robot_state current robot state
+  // @param period time since last callback invocation, zero on first invocation
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
+
+  /// Set parameters for stiffness and goal direction based on push direction.
+  /// TODO(@anyone): long-term the stiffness can be a parameter of the push
+  /// request
+  void SetCompliantPushParameters(
+      const franka::RobotState& initial_state,
+      const Eigen::Vector3d& desired_ee_translation,
+      const Eigen::Vector3d& translational_stiffness,
+      const Eigen::Vector3d& rotational_stiffness);
+
+  void SetCompliantPushParameters(
+      const franka::RobotState& initial_state,
+      const Eigen::Vector3d& desired_ee_translation) {
+    return SetCompliantPushParameters(initial_state, desired_ee_translation,
+                                      kDefaultTranslationalStiffness,
+                                      kDefaultRotationalStiffness);
+  };
+
+  franka::Torques ImpedanceControlCallback(
+      const franka::RobotState& robot_state, franka::Duration);
+
+  Eigen::Matrix<double, 7, 7> NullSpace(
+      const Eigen::Matrix<double, 6, 7> jacobian,
+      const Eigen::Matrix<double, 7, 7> inertia);
 
  private:
   const int dof_;          // degrees of freedom of franka
@@ -204,10 +238,6 @@ class FrankaPlanRunner {
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
   std::unique_ptr<ConstraintSolver> constraint_solver_;
-
-  std::function<franka::JointPositions(const franka::RobotState&,
-                                       franka::Duration)>
-      joint_position_callback_;
 
   // keeping track of time along plan:
   double franka_time_ {};
@@ -232,7 +262,14 @@ class FrankaPlanRunner {
   // frequency components in the region we care about with high fidelity
   const double lcm_publish_rate_ {200.0};  // Hz
 
+  /// upper and lower limit for each joint
   Eigen::MatrixXd joint_limits_;
+
+  /// midpoints between upper and lower joint limit
+  Eigen::Matrix<double, 7, 1> q_center_;
+  /// half range between upper and lower limit
+  Eigen::Matrix<double, 7, 1> q_half_range_;
+
   float stop_delay_factor_ = 2.0;  // this should be yaml param, previously 0.8
 
   // config of start of plan:
@@ -256,6 +293,8 @@ class FrankaPlanRunner {
                                                     100.0, 100.0, 100.0};
   const std::array<double, 7> kMediumTorqueThreshold {40.0, 40.0, 36.0, 36.0,
                                                       32.0, 28.0, 24.0};
+  const std::array<double, 7> kImpedanceControlTorqueThreshold {
+      87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0};
 
   // Collision force thresholds for (x, y, z, R, P, Y) in [N].
   const std::array<double, 6> kHighForceThreshold {100.0, 100.0, 100.0,
@@ -273,6 +312,30 @@ class FrankaPlanRunner {
   const double CONV_ANGLE_THRESHOLD {1e-3};         // rad, empirical
   const double CONV_SPEED_NORM_THRESHOLD {6.6e-3};  // rad/s, L2
   Eigen::VectorXd CONV_SPEED_THRESHOLD;
+
+  // Compliance parameters
+  const Eigen::Vector3d kDefaultTranslationalStiffness {100.0, 100.0, 100.0};
+  const Eigen::Vector3d kDefaultRotationalStiffness {10.0, 10.0, 50.0};
+
+  // stiffness and damping for compliant push
+  Eigen::Matrix<double, 6, 6> stiffness_, damping_;
+
+  // joint centering gain for spring damper system
+  const double k_centering_ {1.0};
+  // filter gain to control joint centering gain growth over time
+  const double filter_gain_ {0.001};
+  // actual gain for joint centering, controls how much torque is applied in an
+  // attempt to center joints - starts at zero and ramps up over time
+  double k_jc_ramp_ {0.0};
+
+  // store the length of time it took to complete the last callbacks to debug
+  std::deque<size_t> time_elapsed_us_;
+
+  std::unique_ptr<franka::Model> model_ {};
+
+  Eigen::Vector3d desired_position_;
+  Eigen::Quaterniond desired_orientation_;
+
 };  // FrankaPlanRunner
 
 }  // namespace franka_driver
