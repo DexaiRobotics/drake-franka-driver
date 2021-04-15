@@ -30,21 +30,7 @@ find_package(gflags REQUIRED COMPONENTS shared)
 find_package(lcm REQUIRED)
 find_package(fcl REQUIRED)
 
-find_package(Python3 REQUIRED Interpreter Development NumPy)
-message("Python3_VERSION: ${Python3_VERSION}")
-message("Python3_INCLUDE_DIRS: ${Python3_INCLUDE_DIRS}")
-message("Python3_LIBRARY_DIRS: ${Python3_LIBRARY_DIRS}")
-message("Python3_LIBRARIES: ${Python3_LIBRARIES}")
-message("Python3_NumPy_FOUND: ${Python3_NumPy_FOUND}")
-message("Python3_NumPy_INCLUDE_DIRS: ${Python3_NumPy_INCLUDE_DIRS}")
-
-if (DEFINED ENV{SPDLOG_INCLUDE_DIR})
-  set(SPDLOG_INCLUDE_DIR $ENV{SPDLOG_INCLUDE_DIR})
-  message("SPDLOG_INCLUDE_DIR variable taken from environment: " ${SPDLOG_INCLUDE_DIR})
-else()
-  set(SPDLOG_INCLUDE_DIR /opt/drake/include/spdlog)
-  message("SPDLOG_INCLUDE_DIR variable defaulted in CMakeList: " ${SPDLOG_INCLUDE_DIR})
-endif()
+set(SPDLOG_INCLUDE_DIR /opt/drake/include/spdlog)
 
 # copy test data to build directory
 configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
@@ -55,10 +41,7 @@ include_directories(
   ${CMAKE_SOURCE_DIR}/src
   ${SPDLOG_INCLUDE_DIR}
   ${YAML_INCLUDES}
-  ${FILESYSTEM_INCLUDE_DIR}
   ${Franka_INCLUDE_DIRS}
-  ${Python3_INCLUDE_DIRS}
-  ${Python3_NumPy_INCLUDE_DIRS}
   ${GTEST_INCLUDE_DIRS}
 )
 
@@ -94,7 +77,6 @@ target_link_libraries(franka_driver
   drake::drake
   yaml-cpp
   Threads::Threads
-  ${Python3_LIBRARIES}
   fcl
   cnpy
 )
@@ -117,9 +99,7 @@ set(GTEST_SRC_FILES
 
 set(TEST_INCLUDES
   include
-  ${SPDLOG_INCLUDE_DIR}
   ${YAML_INCLUDES}
-  ${FILESYSTEM_INCLUDE_DIR}
   ${GTEST_INCLUDE_DIRS}
 )
 
