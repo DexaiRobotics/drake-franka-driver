@@ -154,6 +154,8 @@ int FrankaPlanRunner::RunFranka() {
     do {  // do-while(!connection_established) loop, execute once first
       try {
         robot_ = std::make_unique<franka::Robot>(ip_addr_);
+        dexai::log()->info("RunFranka: connected to franka server, version {}",
+                           robot_->serverVersion());
       } catch (franka::Exception const& e) {
         // probably something wrong with networking
         auto err_msg {fmt::format("Franka connection error: {}", e.what())};
@@ -370,17 +372,16 @@ int FrankaPlanRunner::RunFranka() {
         t_last_main_loop_log_ = t_now;
       }
     }
-    // only publish robot_status, twice as fast as the lcm publish rate
-    // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
-    robot_->read([this](const franka::RobotState& robot_state) {
+    // only publish robot_status twice as fast as the lcm publish rate
+    {
+      auto robot_state {robot_->readOnce()};
       auto cannonical_robot_state {
           utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
-      // publishing cannonical values over lcm
       comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_);
-      std::this_thread::sleep_for(std::chrono::milliseconds(
-          static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
-      return false;
-    });
+    }
+    // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
+    std::this_thread::sleep_for(std::chrono::milliseconds(
+        static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
   }
   return 0;
 }
