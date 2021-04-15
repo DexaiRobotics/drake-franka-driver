@@ -336,11 +336,11 @@ int FrankaPlanRunner::RunFranka() {
           dexai::log()->error(
               "RunFranka: exception in impedance control callback: {}",
               ce.what());
+          comm_interface_->SetCompliantPushActive(false);
           if (!RecoverFromControlException()) {  // plan_ is released/reset
             dexai::log()->critical(
                 "RunFranka: RecoverFromControlException failed");
             comm_interface_->PublishDriverStatus(false, ce.what());
-            comm_interface_->SetCompliantPushActive(false);
             return 1;
           }
         }
