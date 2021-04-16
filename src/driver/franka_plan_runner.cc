@@ -190,17 +190,13 @@ int FrankaPlanRunner::RunFranka() {
             fmt::format("robot cannot receive commands in mode: {} at startup",
                         utils::RobotModeToString(current_mode))};
         comm_interface_->PublishDriverStatus(false, err_msg);
+        if (current_mode == franka::RobotMode::kUserStopped) {
+          comm_interface_->PublishBoolToChannel(
+              utils::get_current_utime(),
+              comm_interface_->GetUserStopChannelName(), true);
+        }
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
-          t_last_main_loop_log_ = t_now;
-        }
-      } else if (current_mode == franka::RobotMode::kUserStopped) {
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(),
-            comm_interface_->GetUserStopChannelName(), true);
-        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
-          dexai::log()->error(
-              "RunFranka: robot is in User-Stopped mode at startup");
           t_last_main_loop_log_ = t_now;
         }
       } else {  // if we got this far, we are talking to Franka and it is happy
