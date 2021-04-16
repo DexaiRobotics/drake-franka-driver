@@ -154,8 +154,6 @@ int FrankaPlanRunner::RunFranka() {
     do {  // do-while(!connection_established) loop, execute once first
       try {
         robot_ = std::make_unique<franka::Robot>(ip_addr_);
-        dexai::log()->info("RunFranka: connected to franka server, version {}",
-                           robot_->serverVersion());
       } catch (franka::Exception const& e) {
         // probably something wrong with networking
         auto err_msg {fmt::format("Franka connection error: {}", e.what())};
@@ -164,9 +162,6 @@ int FrankaPlanRunner::RunFranka() {
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         continue;
       }
-
-      // robot model for impedance control calculations
-      model_ = std::make_unique<franka::Model>(robot_->loadModel());
 
       auto current_mode {GetRobotMode()};
       if (auto t_now {std::chrono::steady_clock::now()};
@@ -188,22 +183,25 @@ int FrankaPlanRunner::RunFranka() {
               "error recovery for Reflex mode: {}.",
               ce.what());
         }
-      } else if (current_mode != franka::RobotMode::kIdle) {
+      } else if (current_mode == franka::RobotMode::kUserStopped) {
+        auto err_msg {
+            fmt::format("robot cannot receive commands in mode: {} at startup",
+                        utils::RobotModeToString(current_mode))};
+        comm_interface_->PublishDriverStatus(false, err_msg);
+        comm_interface_->PublishBoolToChannel(
+            utils::get_current_utime(),
+            comm_interface_->GetUserStopChannelName(), true);
+        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
+          dexai::log()->error("RunFranka: {}", err_msg);
+          t_last_main_loop_log_ = t_now;
+        }
+      } else if (current_mode != franka::RobotMode::kIdle) {  // any other mode
         auto err_msg {
             fmt::format("robot cannot receive commands in mode: {} at startup",
                         utils::RobotModeToString(current_mode))};
         comm_interface_->PublishDriverStatus(false, err_msg);
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
-          t_last_main_loop_log_ = t_now;
-        }
-      } else if (current_mode == franka::RobotMode::kUserStopped) {
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(),
-            comm_interface_->GetUserStopChannelName(), true);
-        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
-          dexai::log()->error(
-              "RunFranka: robot is in User-Stopped mode at startup");
           t_last_main_loop_log_ = t_now;
         }
       } else {  // if we got this far, we are talking to Franka and it is happy
@@ -216,13 +214,26 @@ int FrankaPlanRunner::RunFranka() {
     } while (!connection_established);
   }
 
+  dexai::log()->info("RunFranka: connected to franka server, version {}",
+                     robot_->serverVersion());
+
   try {  // initilization
     dexai::log()->info("RunFranka: setting default behavior...");
     SetDefaultBehaviorForInit();
+
+    dexai::log()->info("RunFranka: loading robot model...");
+    // robot model for impedance control calculations
+    model_ = std::make_unique<franka::Model>(robot_->loadModel());
+    // WARNING: attempting to load model before successful connection
+    // established (with robot user stopped) and then exiting the program caused
+    // Franka controller server to experience an unrecoverable error requiring a
+    // system restart.
+
+    // set collision behavior
+    SetCollisionBehaviorSafetyOn();
+
     dexai::log()->info("RunFranka: ready.");
     comm_interface_->PublishDriverStatus(true);
-    // Set collision behavior:
-    SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
     // try recovery here unFranka: caught expection during initilization, msg:
     // libfranka: Set Joint Impedance command rejected: command not possible in
