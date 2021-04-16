@@ -113,8 +113,8 @@ void CommunicationInterface::ResetData() {
 
   // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
-  new_plan_buffer_.plan.release();  // unique ptr points to no plan
-  new_plan_buffer_.utime = -1;      // utime set to -1 at start
+  new_plan_buffer_.plan.reset();  // unique ptr points to no plan
+  new_plan_buffer_.utime = -1;    // utime set to -1 at start
   lock_plan.unlock();
 
   // initialize pause as false:
@@ -214,7 +214,7 @@ void CommunicationInterface::PublishPlanComplete(
     log_msg += fmt::format(", error status: {}", plan_status_string);
   }
   dexai::log()->info(log_msg);
-  new_plan_buffer_.plan.release();
+  new_plan_buffer_.plan.reset();
   PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
                           success, plan_status_string);
 }
@@ -450,7 +450,7 @@ void CommunicationInterface::HandlePlan(
         "CommInterface:HandlePlan: "
         "discarding plan {}, mismatched start position with delta: {}.",
         robot_spline->utime, joint_delta.transpose());
-    new_plan_buffer_.plan.release();
+    new_plan_buffer_.plan.reset();
     lock.unlock();
     PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
                         "mismatched_start_position");

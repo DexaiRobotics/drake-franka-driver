@@ -132,7 +132,7 @@ class CommunicationInterface {
   void ClearNewPlan(std::string_view reason) {
     dexai::log()->warn("ClearNewPlan: {}", reason.data());
     PublishPlanComplete(new_plan_buffer_.utime, false, reason.data());
-    new_plan_buffer_.plan.release();
+    new_plan_buffer_.plan.reset();
     new_plan_buffer_.utime = -1;
   }
 
