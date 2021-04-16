@@ -293,6 +293,14 @@ int FrankaPlanRunner::RunFranka() {
                                     this, std::placeholders::_1,
                                     std::placeholders::_2));
         } catch (const franka::ControlException& ce) {
+          std::for_each(time_elapsed_us_.begin(), time_elapsed_us_.end(),
+                        [](const auto& time_val) {
+                          log()->info("Took {} us", time_val);
+                        });
+          dexai::log()->error(
+              "RunFranka: exception in impedance control callback: {}",
+              ce.what());
+
           status_has_changed = true;
           if (plan_) {  // broadcast exception details over LCM
             dexai::log()->warn(
@@ -708,6 +716,8 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
 
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const franka::RobotState& robot_state, franka::Duration period) {
+  auto start_time {std::chrono::high_resolution_clock::now()};
+
   if (comm_interface_->SimControlExceptionTriggered()) {
     dexai::log()->warn(
         "JointPositionCallback: simulated control exception triggered");
@@ -916,6 +926,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       std::thread overtime_warning_thread {overtime_warning};
       overtime_warning_thread.detach();
     }
+  }
+  auto end_time {std::chrono::high_resolution_clock::now()};
+  time_elapsed_us_.push_back(
+      std::chrono::duration_cast<std::chrono::microseconds>(end_time
+                                                            - start_time)
+          .count());
+  if (time_elapsed_us_.size() > 20) {
+    time_elapsed_us_.pop_front();
   }
   return output_to_franka;
 }
