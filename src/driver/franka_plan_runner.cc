@@ -154,8 +154,6 @@ int FrankaPlanRunner::RunFranka() {
     do {  // do-while(!connection_established) loop, execute once first
       try {
         robot_ = std::make_unique<franka::Robot>(ip_addr_);
-        dexai::log()->info("RunFranka: connected to franka server, version {}",
-                           robot_->serverVersion());
       } catch (franka::Exception const& e) {
         // probably something wrong with networking
         auto err_msg {fmt::format("Franka connection error: {}", e.what())};
@@ -208,6 +206,9 @@ int FrankaPlanRunner::RunFranka() {
       }
     } while (!connection_established);
   }
+
+  dexai::log()->info("RunFranka: connected to franka server, version {}",
+                     robot_->serverVersion());
 
   try {  // initilization
     dexai::log()->info("RunFranka: setting default behavior...");
