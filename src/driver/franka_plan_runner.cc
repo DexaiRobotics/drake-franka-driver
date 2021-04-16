@@ -213,10 +213,20 @@ int FrankaPlanRunner::RunFranka() {
   try {  // initilization
     dexai::log()->info("RunFranka: setting default behavior...");
     SetDefaultBehaviorForInit();
+
+    dexai::log()->info("RunFranka: loading robot model...");
+    // robot model for impedance control calculations
+    model_ = std::make_unique<franka::Model>(robot_->loadModel());
+    // WARNING: attempting to load model before successful connection
+    // established (with robot user stopped) and then exiting the program caused
+    // Franka controller server to experience an unrecoverable error requiring a
+    // system restart.
+
+    // set collision behavior
+    SetCollisionBehaviorSafetyOn();
+
     dexai::log()->info("RunFranka: ready.");
     comm_interface_->PublishDriverStatus(true);
-    // Set collision behavior:
-    SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
     // try recovery here unFranka: caught expection during initilization, msg:
     // libfranka: Set Joint Impedance command rejected: command not possible in
@@ -230,13 +240,6 @@ int FrankaPlanRunner::RunFranka() {
 
   status_ = RobotStatus::Running;  // init done, define robot as running
   bool status_has_changed {true};
-
-  // robot model for impedance control calculations
-  model_ = std::make_unique<franka::Model>(robot_->loadModel());
-  // WARNING: attempting to load model before successful connection established
-  // (with robot user stopped) and then exiting the program caused Franka
-  // controller server to experience an unrecoverable error requiring a system
-  // restart.
 
   while (true) {  // main control loop
     // make sure robot is not user-stopped before doing anything else
