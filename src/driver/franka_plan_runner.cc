@@ -232,6 +232,10 @@ int FrankaPlanRunner::RunFranka() {
 
   // robot model for impedance control calculations
   model_ = std::make_unique<franka::Model>(robot_->loadModel());
+  // WARNING: attempting to load model before successful connection established
+  // (with robot user stopped) and then exiting the program caused Franka
+  // controller server to experience an unrecoverable error requiring a system
+  // restart.
 
   while (true) {  // main control loop
     // make sure robot is not user-stopped before doing anything else
