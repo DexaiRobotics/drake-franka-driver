@@ -165,9 +165,6 @@ int FrankaPlanRunner::RunFranka() {
         continue;
       }
 
-      // robot model for impedance control calculations
-      model_ = std::make_unique<franka::Model>(robot_->loadModel());
-
       auto current_mode {GetRobotMode()};
       if (auto t_now {std::chrono::steady_clock::now()};
           current_mode == franka::RobotMode::kReflex) {
@@ -236,6 +233,9 @@ int FrankaPlanRunner::RunFranka() {
 
   status_ = RobotStatus::Running;  // init done, define robot as running
   bool status_has_changed {true};
+
+  // robot model for impedance control calculations
+  model_ = std::make_unique<franka::Model>(robot_->loadModel());
 
   while (true) {  // main control loop
     // make sure robot is not user-stopped before doing anything else
