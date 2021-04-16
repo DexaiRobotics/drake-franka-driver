@@ -293,14 +293,6 @@ int FrankaPlanRunner::RunFranka() {
                                     this, std::placeholders::_1,
                                     std::placeholders::_2));
         } catch (const franka::ControlException& ce) {
-          std::for_each(time_elapsed_us_.begin(), time_elapsed_us_.end(),
-                        [](const auto& time_val) {
-                          log()->info("Took {} us", time_val);
-                        });
-          dexai::log()->error(
-              "RunFranka: exception in impedance control callback: {}",
-              ce.what());
-
           status_has_changed = true;
           if (plan_) {  // broadcast exception details over LCM
             dexai::log()->warn(
@@ -319,6 +311,9 @@ int FrankaPlanRunner::RunFranka() {
             return 1;
           }
         }
+        std::for_each(
+            time_elapsed_us_.begin(), time_elapsed_us_.end(),
+            [](const auto& time_val) { log()->info("Took {} us", time_val); });
         continue;
       } else if (status_ == RobotStatus::Running
                  && comm_interface_->CompliantPushStartRequested()) {
@@ -423,7 +418,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   SetCollisionBehaviorSafetyOn();
   status_ = RobotStatus::Running;
   if (plan_) {
-    plan_.reset();
+    plan_.release();
     plan_utime_ = -1;  // reset plan utime to -1
   }
   return true;
@@ -687,7 +682,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
         comm_interface_->PublishPlanComplete(
             plan_utime_, false,
             fmt::format("plan canceled upon request from source: {}", source));
-        plan_.reset();
+        plan_.release();
         plan_utime_ = -1;  // reset plan to -1
       }
       comm_interface_->ClearCancelPlanRequest();
@@ -771,7 +766,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           max_ang_distance, params_.kMediumJointDistance);
       comm_interface_->PublishPlanComplete(
           plan_utime_, false, "discarded due to mismatched start conf");
-      plan_.reset();
+      plan_.release();
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(franka::JointPositions(robot_state.q));
     } else if (max_ang_distance > params_.kTightJointDistance) {
@@ -868,7 +863,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, overtime, plan_end_time, franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
-      plan_.reset();       // reset unique ptr
+      plan_.release();     // reset unique ptr
       plan_utime_ = -1;    // reset plan to -1
       dexai::log()->info(  // for control exception
           "Joint speeds at convergence:\n\tdq:\t{}\n\texcess:\t{}",
@@ -901,7 +896,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
             plan_utime_, overtime);
         comm_interface_->PublishPlanComplete(
             plan_utime_, true, "position converged with small residual speed");
-        plan_.reset();     // reset unique ptr
+        plan_.release();   // reset unique ptr
         plan_utime_ = -1;  // reset plan to -1
         return franka::MotionFinished(output_to_franka);
       }
@@ -911,7 +906,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "exceeded, still divergent, aborted and unsuccessful",
           plan_utime_, overtime);
       comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
-      plan_.reset();     // reset unique ptr
+      plan_.release();   // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(output_to_franka);
     }
