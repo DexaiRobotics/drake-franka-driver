@@ -163,9 +163,6 @@ int FrankaPlanRunner::RunFranka() {
         continue;
       }
 
-      // robot model for impedance control calculations
-      model_ = std::make_unique<franka::Model>(robot_->loadModel());
-
       auto current_mode {GetRobotMode()};
       if (auto t_now {std::chrono::steady_clock::now()};
           current_mode == franka::RobotMode::kReflex) {
@@ -186,22 +183,25 @@ int FrankaPlanRunner::RunFranka() {
               "error recovery for Reflex mode: {}.",
               ce.what());
         }
-      } else if (current_mode != franka::RobotMode::kIdle) {
+      } else if (current_mode == franka::RobotMode::kUserStopped) {
+        auto err_msg {
+            fmt::format("robot cannot receive commands in mode: {} at startup",
+                        utils::RobotModeToString(current_mode))};
+        comm_interface_->PublishDriverStatus(false, err_msg);
+        comm_interface_->PublishBoolToChannel(
+            utils::get_current_utime(),
+            comm_interface_->GetUserStopChannelName(), true);
+        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
+          dexai::log()->error("RunFranka: {}", err_msg);
+          t_last_main_loop_log_ = t_now;
+        }
+      } else if (current_mode != franka::RobotMode::kIdle) {  // any other mode
         auto err_msg {
             fmt::format("robot cannot receive commands in mode: {} at startup",
                         utils::RobotModeToString(current_mode))};
         comm_interface_->PublishDriverStatus(false, err_msg);
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
-          t_last_main_loop_log_ = t_now;
-        }
-      } else if (current_mode == franka::RobotMode::kUserStopped) {
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(),
-            comm_interface_->GetUserStopChannelName(), true);
-        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
-          dexai::log()->error(
-              "RunFranka: robot is in User-Stopped mode at startup");
           t_last_main_loop_log_ = t_now;
         }
       } else {  // if we got this far, we are talking to Franka and it is happy
@@ -214,13 +214,26 @@ int FrankaPlanRunner::RunFranka() {
     } while (!connection_established);
   }
 
+  dexai::log()->info("RunFranka: connected to franka server, version {}",
+                     robot_->serverVersion());
+
   try {  // initilization
     dexai::log()->info("RunFranka: setting default behavior...");
     SetDefaultBehaviorForInit();
+
+    dexai::log()->info("RunFranka: loading robot model...");
+    // robot model for impedance control calculations
+    model_ = std::make_unique<franka::Model>(robot_->loadModel());
+    // WARNING: attempting to load model before successful connection
+    // established (with robot user stopped) and then exiting the program caused
+    // Franka controller server to experience an unrecoverable error requiring a
+    // system restart.
+
+    // set collision behavior
+    SetCollisionBehaviorSafetyOn();
+
     dexai::log()->info("RunFranka: ready.");
     comm_interface_->PublishDriverStatus(true);
-    // Set collision behavior:
-    SetCollisionBehaviorSafetyOn();
   } catch (const franka::Exception& ex) {
     // try recovery here unFranka: caught expection during initilization, msg:
     // libfranka: Set Joint Impedance command rejected: command not possible in
@@ -370,17 +383,16 @@ int FrankaPlanRunner::RunFranka() {
         t_last_main_loop_log_ = t_now;
       }
     }
-    // only publish robot_status, twice as fast as the lcm publish rate
-    // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
-    robot_->read([this](const franka::RobotState& robot_state) {
+    // only publish robot_status twice as fast as the lcm publish rate
+    {
+      auto robot_state {robot_->readOnce()};
       auto cannonical_robot_state {
           utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
-      // publishing cannonical values over lcm
       comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_);
-      std::this_thread::sleep_for(std::chrono::milliseconds(
-          static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
-      return false;
-    });
+    }
+    // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
+    std::this_thread::sleep_for(std::chrono::milliseconds(
+        static_cast<int>(1000.0 / (lcm_publish_rate_ * 2.0))));
   }
   return 0;
 }
@@ -403,7 +415,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   SetCollisionBehaviorSafetyOn();
   status_ = RobotStatus::Running;
   if (plan_) {
-    plan_.release();
+    plan_.reset();
     plan_utime_ = -1;  // reset plan utime to -1
   }
   return true;
@@ -667,7 +679,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
         comm_interface_->PublishPlanComplete(
             plan_utime_, false,
             fmt::format("plan canceled upon request from source: {}", source));
-        plan_.release();
+        plan_.reset();
         plan_utime_ = -1;  // reset plan to -1
       }
       comm_interface_->ClearCancelPlanRequest();
@@ -749,7 +761,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           max_ang_distance, params_.kMediumJointDistance);
       comm_interface_->PublishPlanComplete(
           plan_utime_, false, "discarded due to mismatched start conf");
-      plan_.release();
+      plan_.reset();
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(franka::JointPositions(robot_state.q));
     } else if (max_ang_distance > params_.kTightJointDistance) {
@@ -846,7 +858,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, overtime, plan_end_time, franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
-      plan_.release();     // reset unique ptr
+      plan_.reset();       // reset unique ptr
       plan_utime_ = -1;    // reset plan to -1
       dexai::log()->info(  // for control exception
           "Joint speeds at convergence:\n\tdq:\t{}\n\texcess:\t{}",
@@ -879,7 +891,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
             plan_utime_, overtime);
         comm_interface_->PublishPlanComplete(
             plan_utime_, true, "position converged with small residual speed");
-        plan_.release();   // reset unique ptr
+        plan_.reset();     // reset unique ptr
         plan_utime_ = -1;  // reset plan to -1
         return franka::MotionFinished(output_to_franka);
       }
@@ -889,7 +901,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "exceeded, still divergent, aborted and unsuccessful",
           plan_utime_, overtime);
       comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
-      plan_.release();   // reset unique ptr
+      plan_.reset();     // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(output_to_franka);
     }
