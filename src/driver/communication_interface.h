@@ -165,6 +165,9 @@ class CommunicationInterface {
                              int8_t data, std::string_view source = "");
 
   std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
+  std::string GetBrakesLockedChannelName() {
+    return lcm_brakes_locked_channel_;
+  }
 
   /// check if robot is in a mode that can receive commands, i.e. not user
   /// stopped or error recovery
