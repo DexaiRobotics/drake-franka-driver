@@ -183,23 +183,22 @@ int FrankaPlanRunner::RunFranka() {
               "error recovery for Reflex mode: {}.",
               ce.what());
         }
-      } else if (current_mode == franka::RobotMode::kUserStopped) {
-        auto err_msg {
-            fmt::format("robot cannot receive commands in mode: {} at startup",
-                        utils::RobotModeToString(current_mode))};
-        comm_interface_->PublishDriverStatus(false, err_msg);
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(),
-            comm_interface_->GetUserStopChannelName(), true);
-        if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
-          dexai::log()->error("RunFranka: {}", err_msg);
-          t_last_main_loop_log_ = t_now;
-        }
       } else if (current_mode != franka::RobotMode::kIdle) {  // any other mode
         auto err_msg {
             fmt::format("robot cannot receive commands in mode: {} at startup",
                         utils::RobotModeToString(current_mode))};
         comm_interface_->PublishDriverStatus(false, err_msg);
+
+        // publish if robot is user stopped or locked on startup
+        comm_interface_->PublishBoolToChannel(
+            utils::get_current_utime(),
+            comm_interface_->GetUserStopChannelName(),
+            current_mode == franka::RobotMode::kUserStopped);
+        comm_interface_->PublishBoolToChannel(
+            utils::get_current_utime(),
+            comm_interface_->GetBrakesLockedChannelName(),
+            current_mode == franka::RobotMode::kOther);
+
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
           t_last_main_loop_log_ = t_now;
