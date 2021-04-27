@@ -303,11 +303,11 @@ int FrankaPlanRunner::RunFranka() {
             dexai::log()->error("RunFranka: exception in main loop: {}.",
                                 ce.what());
           }
-          if (!RecoverFromControlException()) {  // plan_ is released/reset
-            dexai::log()->critical(
-                "RunFranka: RecoverFromControlException failed");
-            comm_interface_->PublishDriverStatus(false, ce.what());
-            return 1;
+          while (!RecoverFromControlException()) {  // plan_ is released/reset
+            // keep trying to recover, expect this will require manual
+            // intervention - this only fails when robot is user stopped or
+            // locked
+            std::this_thread::sleep_for(std::chrono::seconds(1));
           }
         }
         continue;
@@ -398,25 +398,43 @@ int FrankaPlanRunner::RunFranka() {
 
 bool FrankaPlanRunner::RecoverFromControlException() {
   status_ = RobotStatus::Reversing;
-  dexai::log()->warn("RunFranka: turning Safety off...");
+  dexai::log()->warn("RecoverFromControlException: turning safety off...");
   SetCollisionBehaviorSafetyOff();
-  if (auto mode {GetRobotMode()}; mode == franka::RobotMode::kUserStopped) {
-    dexai::log()->warn(
-        "RunFranka: Robot is in mode {}, "
-        "can't run Franka's automaticErrorRecovery!",
-        utils::RobotModeToString(mode));
+  auto current_mode {GetRobotMode()};
+  if ((current_mode == franka::RobotMode::kUserStopped)
+      || (current_mode == franka::RobotMode::kOther)) {
+    // publish if robot is user stopped or locked
+    comm_interface_->PublishBoolToChannel(
+        utils::get_current_utime(), comm_interface_->GetUserStopChannelName(),
+        current_mode == franka::RobotMode::kUserStopped);
+    comm_interface_->PublishBoolToChannel(
+        utils::get_current_utime(),
+        comm_interface_->GetBrakesLockedChannelName(),
+        current_mode == franka::RobotMode::kOther);
+    auto err_msg {
+        fmt::format("cannot perform automatic error recovery in mode: {}",
+                    utils::RobotModeToString(current_mode))};
+    dexai::log()->error("RecoverFromControlException: {}", err_msg);
+    comm_interface_->PublishDriverStatus(false, err_msg);
+    return false;
   } else {
-    dexai::log()->warn("RunFranka: Running Franka's automaticErrorRecovery...");
+    dexai::log()->warn(
+        "RecoverFromControlException: running Franka's automatic error "
+        "recovery...");
     robot_->automaticErrorRecovery();
-    dexai::log()->warn("RunFranka: Finished Franka's automaticErrorRecovery");
+    dexai::log()->warn(
+        "RecoverFromControlException: finished Franka's automatic error "
+        "recovery");
   }
-  dexai::log()->info("RunFranka: Turning Safety on again");
+  dexai::log()->info("RecoverFromControlException: turning safety on again");
   SetCollisionBehaviorSafetyOn();
   status_ = RobotStatus::Running;
   if (plan_) {
     plan_.reset();
     plan_utime_ = -1;  // reset plan utime to -1
   }
+  comm_interface_->PublishDriverStatus(
+      true, "successfully completed automatic error recovery");
   return true;
 }
 
