@@ -417,6 +417,8 @@ bool FrankaPlanRunner::RecoverFromControlException() {
     plan_.reset();
     plan_utime_ = -1;  // reset plan utime to -1
   }
+  comm_interface_->PublishDriverStatus(
+      true, "successfully completed automatic error recovery");
   return true;
 }
 
