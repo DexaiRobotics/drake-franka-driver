@@ -401,8 +401,8 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   dexai::log()->warn("RecoverFromControlException: turning safety off...");
   SetCollisionBehaviorSafetyOff();
   auto current_mode {GetRobotMode()};
-  if ((mode == franka::RobotMode::kUserStopped)
-      || (mode == franka::RobotMode::kOther)) {
+  if ((current_mode == franka::RobotMode::kUserStopped)
+      || (current_mode == franka::RobotMode::kOther)) {
     // publish if robot is user stopped or locked
     comm_interface_->PublishBoolToChannel(
         utils::get_current_utime(), comm_interface_->GetUserStopChannelName(),
@@ -414,7 +414,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
     auto err_msg {
         fmt::format("cannot perform automatic error recovery in mode: {}",
                     utils::RobotModeToString(current_mode))};
-    momap::log()->error("RecoverFromControlException: {}", err_msg);
+    dexai::log()->error("RecoverFromControlException: {}", err_msg);
     comm_interface_->PublishDriverStatus(false, err_msg);
     return false;
   } else {
