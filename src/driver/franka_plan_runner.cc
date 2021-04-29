@@ -152,17 +152,24 @@ int FrankaPlanRunner::RunFranka() {
     // and if it fails, keep trying instead of exiting the program
     bool connection_established {};
     do {  // do-while(!connection_established) loop, execute once first
-      try {
-        robot_ = std::make_unique<franka::Robot>(ip_addr_);
-      } catch (franka::Exception const& e) {
-        // probably something wrong with networking
-        auto err_msg {fmt::format("Franka connection error: {}", e.what())};
-        dexai::log()->error("RunFranka: {}", err_msg);
-        comm_interface_->PublishDriverStatus(false, err_msg);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        continue;
+
+      // if we have not successfully established a network connection to the
+      // Franka, try to connect
+      if (!robot_) {
+        try {
+          robot_ = std::make_unique<franka::Robot>(ip_addr_);
+        } catch (franka::Exception const& e) {
+          // probably something wrong with networking
+          auto err_msg {fmt::format("Franka connection error: {}", e.what())};
+          dexai::log()->error("RunFranka: {}", err_msg);
+          comm_interface_->PublishDriverStatus(false, err_msg);
+          std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+          continue;
+        }
       }
 
+      // first verify that the Franka is in a state that can receive commands
+      // before fully initializing the driver
       auto current_mode {GetRobotMode()};
       if (auto t_now {std::chrono::steady_clock::now()};
           current_mode == franka::RobotMode::kReflex) {
@@ -234,10 +241,6 @@ int FrankaPlanRunner::RunFranka() {
     dexai::log()->info("RunFranka: ready.");
     comm_interface_->PublishDriverStatus(true);
   } catch (const franka::Exception& ex) {
-    // try recovery here unFranka: caught expection during initilization, msg:
-    // libfranka: Set Joint Impedance command rejected: command not possible in
-    // the current mode!
-
     dexai::log()->critical(
         "RunFranka: caught exception during initilization, msg: {}", ex.what());
     comm_interface_->PublishDriverStatus(false, ex.what());
