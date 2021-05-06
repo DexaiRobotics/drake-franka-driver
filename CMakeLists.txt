@@ -71,6 +71,10 @@ add_executable(franka_driver
   src/utils/polynomial_encode_decode.cc
 )
 
+# drake on focal cannot propagate HAVE_SPDLOG
+# https://github.com/RobotLocomotion/drake/issues/15004
+target_compile_definitions(franka_driver PUBLIC HAVE_SPDLOG)
+
 target_link_libraries(franka_driver
   ${Franka_LIBRARIES}
   ${LCM_NAMESPACE}lcm
@@ -130,6 +134,7 @@ foreach(_file ${GTEST_SRC_FILES})
     ${_file}
     ${TEST_SOURCES}
   )
+  target_compile_definitions(${_name} PUBLIC HAVE_SPDLOG)
   target_link_libraries(${_name}
     ${TEST_LINK_LIBRARIES}
   )

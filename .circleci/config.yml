@@ -25,7 +25,6 @@ jobs:
           name: build and test
           command: |
             echo "In build and test: building project . . ."
-            ls ~
             cd ~/project
             git submodule update --init --recursive
             ./setup.sh 2 1 1 0 ### 3 => make -j 2; 1 => build tests; 1 => run ctest; 0 => not debug
