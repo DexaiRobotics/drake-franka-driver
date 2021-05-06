@@ -37,7 +37,6 @@
 #include <unistd.h>
 
 #include <drake/geometry/drake_visualizer.h>
-#include <drake/geometry/geometry_visualization.h>
 #include <drake/math/quaternion.h>
 #include <drake/math/rotation_conversion_gradient.h>
 #include <drake/multibody/inverse_kinematics/inverse_kinematics.h>
