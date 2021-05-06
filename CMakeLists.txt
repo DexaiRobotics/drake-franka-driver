@@ -28,7 +28,10 @@ find_package(GTest REQUIRED)
 find_package(gflags REQUIRED COMPONENTS shared)
 find_package(lcm REQUIRED)
 
-set(SPDLOG_INCLUDE_DIR /opt/drake/include/spdlog)
+if (NOT EXISTS "/usr/include/spdlog/")
+  set(SPDLOG_INCLUDE_DIR "/opt/drake/include/spdlog")
+  message("SPDLOG not found in system, setting SPDLOG_INCLUDE_DIR: " ${SPDLOG_INCLUDE_DIR})
+endif()
 
 # copy test data to build directory
 configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
