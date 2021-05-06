@@ -44,6 +44,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <limits>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "utils/utils.h"
 
@@ -142,7 +145,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   // plant_context_ = &diagram_->GetMutableSubsystemContext(
   //   *mb_plant_, context_);
 
-  // TODO: simulator and derived plant_context_ from simulator is
+  // TODO(@anyone): simulator and derived plant_context_ from simulator is
   // only needed so that something gets published to the drake visualizer.
   // If we don't care about drake visualizing (which is not expensive),
   // then we replace the three commands below with the command above this
@@ -222,7 +225,7 @@ void ConstraintSolver::UpdateModel(
     throw;  // rethrow it again
   }
 
-  // TODO: set this based on visualization level
+  // TODO(@anyone): set this based on visualization level
   // this performs the magic of making the diagram publish to the visualizer.
   // not needed for the actual collision check.
   simulator_->get_system().Publish(simulator_->get_context());
