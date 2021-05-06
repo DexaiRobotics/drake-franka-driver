@@ -80,7 +80,6 @@ repos:
         (?x)^(
             externals/
             |src/examples/
-            |src/lcmtypes/
         )$
       args: [
         --license-filepath,

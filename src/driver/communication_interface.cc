@@ -383,7 +383,7 @@ void CommunicationInterface::HandleCompliantPushReq(
 
 void CommunicationInterface::HandlePlan(
     const ::lcm::ReceiveBuffer*, const std::string&,
-    const lcmtypes::robot_spline_t* robot_spline) {
+    const robot_msgs::robot_spline_t* robot_spline) {
   dexai::log()->info("CommInterface:HandlePlan: Received new plan {}",
                      robot_spline->utime);
 

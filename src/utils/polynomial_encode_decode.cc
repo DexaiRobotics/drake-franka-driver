@@ -42,7 +42,7 @@ using Eigen::VectorXd;
 
 void encodePolynomial(const drake::Polynomiald& polynomial,
                       // NOLINTNEXTLINE(runtime/references)
-                      drake::lcmt_polynomial& msg) {
+                      robot_msgs::lcmt_polynomial& msg) {
   // convert eigen vector to std vector
   std::vector<double> polyvec(polynomial.GetNumberOfCoefficients());
   Eigen::VectorXd::Map(&polyvec[0], polynomial.GetNumberOfCoefficients()) =
@@ -50,7 +50,7 @@ void encodePolynomial(const drake::Polynomiald& polynomial,
   msg.coefficients = polyvec;
   msg.num_coefficients = polynomial.GetNumberOfCoefficients();
 }
-drake::Polynomiald decodePolynomial(const drake::lcmt_polynomial& msg) {
+drake::Polynomiald decodePolynomial(const robot_msgs::lcmt_polynomial& msg) {
   Map<const VectorXd> coefficients(msg.coefficients.data(),
                                    msg.coefficients.size());
   return drake::Polynomiald(coefficients);
@@ -58,7 +58,7 @@ drake::Polynomiald decodePolynomial(const drake::lcmt_polynomial& msg) {
 void encodePiecewisePolynomial(const drake::trajectories::PiecewisePolynomial<
                                    double>& piecewise_polynomial,
                                // NOLINTNEXTLINE(runtime/references)
-                               drake::lcmt_piecewise_polynomial& msg) {
+                               robot_msgs::lcmt_piecewise_polynomial& msg) {
   msg.num_segments = piecewise_polynomial.get_number_of_segments();
   msg.num_breaks = piecewise_polynomial.get_number_of_segments() + 1;
   msg.breaks = piecewise_polynomial.get_segment_times();
@@ -70,7 +70,7 @@ void encodePiecewisePolynomial(const drake::trajectories::PiecewisePolynomial<
   }
 }
 drake::trajectories::PiecewisePolynomial<double> decodePiecewisePolynomial(
-    const drake::lcmt_piecewise_polynomial& msg) {
+    const robot_msgs::lcmt_piecewise_polynomial& msg) {
   using PolyMat =
       drake::trajectories::PiecewisePolynomial<double>::PolynomialMatrix;
   std::vector<PolyMat> polynomial_matrices;

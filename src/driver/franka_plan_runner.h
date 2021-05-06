@@ -55,7 +55,7 @@
 #include <string>
 #include <thread>  // for thread
 
-#include <lcmtypes/robot_spline_t.hpp>  // for robot_spline_t
+#include <robot_msgs/robot_spline_t.hpp>  // for robot_spline_t
 
 #include "driver/communication_interface.h"  // for CommunicationInterface
 #include "driver/constraint_solver.h"        // for ConstraintSolver
