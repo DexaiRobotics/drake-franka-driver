@@ -37,7 +37,6 @@
 #include <unistd.h>
 
 #include <drake/geometry/drake_visualizer.h>
-#include <drake/geometry/geometry_visualization.h>
 #include <drake/math/quaternion.h>
 #include <drake/math/rotation_conversion_gradient.h>
 #include <drake/multibody/inverse_kinematics/inverse_kinematics.h>
@@ -45,6 +44,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <limits>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "utils/utils.h"
 
@@ -121,9 +123,10 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   {
     using drake::multibody::Body;
     std::vector<const Body<double>*> robot_bodies;
-    for (const auto& i : mb_plant.GetBodyIndices(robot_model_idx_)) {
-      robot_bodies.push_back(&mb_plant_->get_body(i));
-    }
+    const auto& indices {mb_plant.GetBodyIndices(robot_model_idx_)};
+    std::transform(indices.begin(), indices.end(),
+                   std::back_inserter(robot_bodies),
+                   [&](auto& i) { return &mb_plant_->get_body(i); });
     // cannot call {} because no {GeometrySet} constructor is available
     drake::geometry::GeometrySet set_robot(
         mb_plant.CollectRegisteredGeometries(robot_bodies));
@@ -143,7 +146,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   // plant_context_ = &diagram_->GetMutableSubsystemContext(
   //   *mb_plant_, context_);
 
-  // TODO: simulator and derived plant_context_ from simulator is
+  // TODO(@anyone): simulator and derived plant_context_ from simulator is
   // only needed so that something gets published to the drake visualizer.
   // If we don't care about drake visualizing (which is not expensive),
   // then we replace the three commands below with the command above this
@@ -223,7 +226,7 @@ void ConstraintSolver::UpdateModel(
     throw;  // rethrow it again
   }
 
-  // TODO: set this based on visualization level
+  // TODO(@anyone): set this based on visualization level
   // this performs the magic of making the diagram publish to the visualizer.
   // not needed for the actual collision check.
   simulator_->get_system().Publish(simulator_->get_context());

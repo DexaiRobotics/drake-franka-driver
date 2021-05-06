@@ -80,7 +80,6 @@ repos:
         (?x)^(
             externals/
             |src/examples/
-            |src/lcmtypes/
         )$
       args: [
         --license-filepath,
@@ -176,7 +175,7 @@ repos:
       args: [-p=build/compile_commands-diff_only.json,
              -enable-clang-static-analyzer,
              -enable-global-analysis,
-             "--extra-arg=-I/usr/include/clang/12/include"]
+             "--extra-arg=-I/usr/include/clang/13/include"]
     - id: clang-tidy
       args: [-p=build/compile_commands-diff_only.json,
              --config-file=.clang-tidy]

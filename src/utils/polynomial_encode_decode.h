@@ -36,20 +36,20 @@
 #include <drake/common/polynomial.h>
 #include <drake/common/trajectories/piecewise_polynomial.h>
 
-#include <drake/lcmt_piecewise_polynomial.hpp>
-#include <drake/lcmt_polynomial.hpp>
-#include <drake/lcmt_polynomial_matrix.hpp>
+#include <robot_msgs/lcmt_piecewise_polynomial.hpp>
+#include <robot_msgs/lcmt_polynomial.hpp>
+#include <robot_msgs/lcmt_polynomial_matrix.hpp>
 
 void encodePolynomial(const drake::Polynomiald& polynomial,
                       // NOLINTNEXTLINE(runtime/references)
-                      drake::lcmt_polynomial& msg);
-drake::Polynomiald decodePolynomial(const drake::lcmt_polynomial& msg);
+                      robot_msgs::lcmt_polynomial& msg);
+drake::Polynomiald decodePolynomial(const robot_msgs::lcmt_polynomial& msg);
 template <int RowsAtCompileTime, int ColsAtCompileTime>
 void encodePolynomialMatrix(
     const Eigen::Matrix<drake::Polynomiald, RowsAtCompileTime,
                         ColsAtCompileTime>& polynomial_matrix,
     // NOLINTNEXTLINE(runtime/references)
-    drake::lcmt_polynomial_matrix& msg) {
+    robot_msgs::lcmt_polynomial_matrix& msg) {
   msg.polynomials.clear();
   msg.polynomials.resize(polynomial_matrix.rows());
   for (int row = 0; row < polynomial_matrix.rows(); ++row) {
@@ -64,7 +64,7 @@ void encodePolynomialMatrix(
 }
 template <int RowsAtCompileTime, int ColsAtCompileTime>
 Eigen::Matrix<drake::Polynomiald, RowsAtCompileTime, ColsAtCompileTime>
-decodePolynomialMatrix(const drake::lcmt_polynomial_matrix& msg) {
+decodePolynomialMatrix(const robot_msgs::lcmt_polynomial_matrix& msg) {
   Eigen::Matrix<drake::Polynomiald, RowsAtCompileTime, ColsAtCompileTime> ret(
       msg.rows, msg.cols);
   for (int row = 0; row < msg.rows; ++row) {
@@ -80,6 +80,6 @@ decodePolynomialMatrix(const drake::lcmt_polynomial_matrix& msg) {
  */
 void encodePiecewisePolynomial(const drake::trajectories::PiecewisePolynomial<
                                    double>& piecewise_polynomial,
-                               drake::lcmt_piecewise_polynomial& msg);
+                               robot_msgs::lcmt_piecewise_polynomial& msg);
 drake::trajectories::PiecewisePolynomial<double> decodePiecewisePolynomial(
-    const drake::lcmt_piecewise_polynomial& msg);
+    const robot_msgs::lcmt_piecewise_polynomial& msg);

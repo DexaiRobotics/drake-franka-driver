@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # BSD 3-Clause License
 #
 # Copyright (c) 2021, Dexai Robotics
@@ -57,4 +58,8 @@ echo "Compile commands exported."
 cd ..
 ./compile_commands_isolate.py
 echo "Compile commands isolated."
+
+echo "Removing warning option '-Wshadow=local' unknown to clang..."
+sed 's/ -Wshadow=local//' build/compile_commands-diff_only.json -i
+
 popd > /dev/null

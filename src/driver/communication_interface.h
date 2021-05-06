@@ -56,11 +56,11 @@
 #include <tuple>
 
 #include <lcm/lcm-cpp.hpp>
+#include <robot_msgs/bool_t.hpp>
+#include <robot_msgs/pause_cmd.hpp>
+#include <robot_msgs/robot_spline_t.hpp>
 
 #include "franka/robot_state.h"
-#include "lcmtypes/robot_spline_t.hpp"
-#include "robot_msgs/bool_t.hpp"
-#include "robot_msgs/pause_cmd.hpp"
 #include "utils/robot_parameters.h"
 
 using drake::trajectories::PiecewisePolynomial;
@@ -188,7 +188,7 @@ class CommunicationInterface {
                                std::string_view message = "");
 
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
-                  const lcmtypes::robot_spline_t* robot_spline);
+                  const robot_msgs::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
                    const robot_msgs::pause_cmd* pause_cmd_msg);
   void HandleCompliantPushReq(const ::lcm::ReceiveBuffer*, const std::string&,

@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+
 # BSD 3-Clause License
 #
 # Copyright (c) 2021, Dexai Robotics
@@ -44,9 +45,9 @@ import os
 import git
 
 build_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
-# get list of changed files in this repo
 repo = git.Repo(".")
-paths_diff = [item.a_path for item in repo.index.diff(None)]
+paths_diff = {item.a_path for item in repo.index.diff(None)}
+paths_diff |= {item.a_path for item in repo.index.diff("HEAD")}
 
 
 def is_in_diff(abs_path):

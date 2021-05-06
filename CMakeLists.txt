@@ -27,9 +27,11 @@ find_package(yaml-cpp REQUIRED COMPONENTS shared)
 find_package(GTest REQUIRED)
 find_package(gflags REQUIRED COMPONENTS shared)
 find_package(lcm REQUIRED)
-find_package(fcl REQUIRED)
 
-set(SPDLOG_INCLUDE_DIR /opt/drake/include/spdlog)
+if (NOT EXISTS "/usr/include/spdlog/")
+  set(SPDLOG_INCLUDE_DIR "/opt/drake/include/spdlog")
+  message("SPDLOG not found in system, setting SPDLOG_INCLUDE_DIR: " ${SPDLOG_INCLUDE_DIR})
+endif()
 
 # copy test data to build directory
 configure_file(tests/data/franka_test.urdf "${CMAKE_CURRENT_BINARY_DIR}" COPYONLY)
@@ -69,6 +71,10 @@ add_executable(franka_driver
   src/utils/polynomial_encode_decode.cc
 )
 
+# drake on focal cannot propagate HAVE_SPDLOG
+# https://github.com/RobotLocomotion/drake/issues/15004
+target_compile_definitions(franka_driver PUBLIC HAVE_SPDLOG)
+
 target_link_libraries(franka_driver
   ${Franka_LIBRARIES}
   ${LCM_NAMESPACE}lcm
@@ -76,7 +82,6 @@ target_link_libraries(franka_driver
   drake::drake
   yaml-cpp
   Threads::Threads
-  fcl
   cnpy
 )
 
@@ -129,6 +134,7 @@ foreach(_file ${GTEST_SRC_FILES})
     ${_file}
     ${TEST_SOURCES}
   )
+  target_compile_definitions(${_name} PUBLIC HAVE_SPDLOG)
   target_link_libraries(${_name}
     ${TEST_LINK_LIBRARIES}
   )
