@@ -22,6 +22,8 @@ cd lcm && mkdir -p build && cd build && cmake ..
 make install -j 12
 ```
 
+`drake` has deprecated some lcmtypes needed here. The `robot_msgs` [repo](https://github.com/DexaiRobotics/robot_msgs) has a copy of them; only the headers in `include/lcmtypes` are needed. See `.circleci/config.yml` and `CMakeLists.txt` for details.
+
 ## Builidng the driver
 
 ```bash
