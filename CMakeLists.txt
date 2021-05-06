@@ -27,7 +27,6 @@ find_package(yaml-cpp REQUIRED COMPONENTS shared)
 find_package(GTest REQUIRED)
 find_package(gflags REQUIRED COMPONENTS shared)
 find_package(lcm REQUIRED)
-find_package(fcl REQUIRED)
 
 set(SPDLOG_INCLUDE_DIR /opt/drake/include/spdlog)
 
@@ -76,7 +75,6 @@ target_link_libraries(franka_driver
   drake::drake
   yaml-cpp
   Threads::Threads
-  fcl
   cnpy
 )
 
