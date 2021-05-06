@@ -123,9 +123,10 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   {
     using drake::multibody::Body;
     std::vector<const Body<double>*> robot_bodies;
-    for (const auto& i : mb_plant.GetBodyIndices(robot_model_idx_)) {
-      robot_bodies.push_back(&mb_plant_->get_body(i));
-    }
+    const auto& indices {mb_plant.GetBodyIndices(robot_model_idx_)};
+    std::transform(indices.begin(), indices.end(),
+                   std::back_inserter(robot_bodies),
+                   [&](auto& i) { return &mb_plant_->get_body(i); });
     // cannot call {} because no {GeometrySet} constructor is available
     drake::geometry::GeometrySet set_robot(
         mb_plant.CollectRegisteredGeometries(robot_bodies));
