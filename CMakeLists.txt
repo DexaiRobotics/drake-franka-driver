@@ -28,6 +28,15 @@ find_package(GTest REQUIRED)
 find_package(gflags REQUIRED COMPONENTS shared)
 find_package(lcm REQUIRED)
 
+# Set ROS Paths for find_package(catkin) to work
+list(APPEND CMAKE_PREFIX_PATH "/opt/ros/$ENV{ROS_DISTRO}")
+# for finding our components in ~/catkin_ws/src, particularly robot_msgs
+list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/catkin_ws/devel")
+# for lcmtypes definitions in robot_msgs
+find_package(catkin REQUIRED COMPONENTS
+  robot_msgs
+)
+
 if (NOT EXISTS "/usr/include/spdlog/")
   set(SPDLOG_INCLUDE_DIR "/opt/drake/include/spdlog")
   message("SPDLOG not found in system, setting SPDLOG_INCLUDE_DIR: " ${SPDLOG_INCLUDE_DIR})
@@ -44,6 +53,7 @@ include_directories(
   ${YAML_INCLUDES}
   ${Franka_INCLUDE_DIRS}
   ${GTEST_INCLUDE_DIRS}
+  ${catkin_INCLUDE_DIRS}
 )
 
 add_executable(send_stop

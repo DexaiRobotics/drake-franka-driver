@@ -19,7 +19,11 @@ jobs:
             mkdir -p ~/catkin_ws/src/
             cd ~/catkin_ws/src/
             git clone git@github.com:DexaiRobotics/robot_msgs.git
-            ln -s ~/catkin_ws/src/robot_msgs/include/lcmtypes/robot_msgs /usr/include/robot_msgs
+            export ROS_MASTER_URI=http://localhost:11311
+            export ROS_HOSTNAME=localhost
+            source /opt/ros/${ROS_DISTRO}/setup.bash
+            cd ~/catkin_ws/
+            catkin_make
       - checkout:
       - run:
           name: build and test
@@ -27,4 +31,5 @@ jobs:
             echo "In build and test: building project . . ."
             cd ~/project
             git submodule update --init --recursive
+            source $HOME/catkin_ws/devel/setup.bash
             ./setup.sh 2 1 1 0 ### 3 => make -j 2; 1 => build tests; 1 => run ctest; 0 => not debug
