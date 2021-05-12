@@ -478,10 +478,20 @@ void CommunicationInterface::HandlePlan(
     auto X_EEcurrent_EEdesired {
         utils::ToRigidTransform(robot_spline->cartesian_goal)};
 
+    franka::RobotState robot_state {};
+    {
+      std::scoped_lock<std::mutex> data_lock {robot_data_mutex_};
+      robot_state = robot_data_.robot_state;
+    }
+    Eigen::Affine3d X_W_EECurrent_eigen(
+        Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
+    auto X_W_EECurrent {utils::ToRigidTransform(X_W_EECurrent_eigen)};
+    drake::math::RigidTransformd X_W_EECurrent_rot_only {X_W_EECurrent.rotation()};
+
     std::vector<double> times_vec {0, 10.0};
     auto cartesian_plan {PosePoly::MakeCubicLinearWithEndLinearVelocity(
         times_vec,
-        {drake::math::RigidTransformd::Identity(), X_EEcurrent_EEdesired})};
+        {drake::math::RigidTransformd::Identity(), X_W_EECurrent_rot_only * X_EEcurrent_EEdesired})};
 
     new_plan_buffer_.cartesian_plan =
         std::make_unique<PosePoly>(cartesian_plan);
