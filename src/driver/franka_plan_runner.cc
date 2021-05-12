@@ -1220,9 +1220,11 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
   // we print info in a separate thread to keep callback short
   // TODO(@syler): demote verbosity or remove once tested
   auto print_info {[X_W_EE_start, X_W_EE_desired]() {
-    log()->info("\nStart xform: {}\n\t Desired xform: {}",
+    log()->info("\nStart xform: {}, {}\n\t Desired xform: {}, {}",
                 X_W_EE_start.translation().transpose(),
-                X_W_EE_desired.translation().transpose());
+                X_W_EE_start.rotation().ToQuaternionAsVector4().transpose(),
+                X_W_EE_desired.translation().transpose(),
+                X_W_EE_desired.rotation().ToQuaternionAsVector4().transpose());
   }};
   std::thread print_info_thread {print_info};
   print_info_thread.detach();
