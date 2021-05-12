@@ -486,12 +486,10 @@ void CommunicationInterface::HandlePlan(
     Eigen::Affine3d X_W_EECurrent_eigen(
         Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
     auto X_W_EECurrent {utils::ToRigidTransform(X_W_EECurrent_eigen)};
-    drake::math::RigidTransformd X_W_EECurrent_rot_only {X_W_EECurrent.rotation()};
 
     std::vector<double> times_vec {0, 10.0};
     auto cartesian_plan {PosePoly::MakeCubicLinearWithEndLinearVelocity(
-        times_vec,
-        {drake::math::RigidTransformd::Identity(), X_W_EECurrent_rot_only * X_EEcurrent_EEdesired})};
+        times_vec, {X_W_EECurrent, X_W_EECurrent * X_EEcurrent_EEdesired})};
 
     new_plan_buffer_.cartesian_plan =
         std::make_unique<PosePoly>(cartesian_plan);
