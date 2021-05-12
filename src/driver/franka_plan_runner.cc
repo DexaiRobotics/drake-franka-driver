@@ -315,6 +315,37 @@ int FrankaPlanRunner::RunFranka() {
         }
         continue;
       } else if (status_ == RobotStatus::Running
+                 && comm_interface_->HasNewCartesianPlan()
+                 && !comm_interface_->CompliantPushStartRequested()) {
+        dexai::log()->info(
+            "RunFranka: found a new plan in buffer, attaching callback...");
+        status_has_changed = true;
+        try {  // Use either joint position or impedance control callback here
+          // blocking
+          robot_->control(std::bind(&FrankaPlanRunner::CartesianPoseCallback,
+                                    this, std::placeholders::_1,
+                                    std::placeholders::_2));
+        } catch (const franka::ControlException& ce) {
+          status_has_changed = true;
+          if (plan_) {  // broadcast exception details over LCM
+            dexai::log()->warn(
+                "RunFranka: control exception during active plan "
+                "{} at franka_t: {:.4f}, aborting and recovering...",
+                plan_utime_, franka_time_);
+            comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
+          } else {
+            dexai::log()->error("RunFranka: exception in main loop: {}.",
+                                ce.what());
+          }
+          while (!RecoverFromControlException()) {  // plan_ is released/reset
+            // keep trying to recover, expect this will require manual
+            // intervention - this only fails when robot is user stopped or
+            // locked
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+          }
+        }
+        continue;
+      } else if (status_ == RobotStatus::Running
                  && comm_interface_->CompliantPushStartRequested()) {
         franka::RobotState initial_state {robot_->readOnce()};
 
@@ -1140,4 +1171,55 @@ void FrankaPlanRunner::SetCompliantPushParameters(
   damping_.bottomRightCorner(3, 3)
       << 2.0 * Eigen::Matrix<double, 3, 3>::Identity().array()
              * rotational_stiffness_sqrt.replicate(1, 3).array();
+}
+
+franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
+    const franka::RobotState& robot_state, franka::Duration period) {
+  // auto start_time {std::chrono::high_resolution_clock::now()};
+
+  IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec());
+
+  if (comm_interface_
+          ->HasNewCartesianPlan()) {  // pop the new plan and set it up
+    std::tie(cartesian_plan_, plan_utime_) =
+        comm_interface_->PopNewCartesianPlan();
+    dexai::log()->info(
+        "JointPositionCallback: popped new plan {} from buffer, "
+        "starting initial timestep...",
+        plan_utime_);
+    // first time step of plan, reset time and start conf
+    franka_time_ = 0.0;
+
+    auto X_W_EE_at_start_array {robot_state.O_T_EE};
+    Eigen::Affine3d X_W_EE_at_start(
+        Eigen::Matrix4d::Map(X_W_EE_at_start_array.data()));
+    start_pose_plan_ = utils::ToRigidTransform(X_W_EE_at_start);
+  }
+
+  // make a copy
+  auto X_W_EE_desired_array {robot_state.O_T_EE};
+  Eigen::Affine3d X_W_EE_desired(
+      Eigen::Matrix4d::Map(X_W_EE_desired_array.data()));
+
+  X_W_EE_desired = utils::ToAffine3d(cartesian_plan_->get_pose(franka_time_));
+
+  // const auto X_W_EE_current {
+  //     utils::affine3d_to_rigidxform(X_W_EE_current_eigen)};
+
+  // hard code for now
+  static const double plan_end_time {10.0};
+
+  // we print info in a separate thread to keep callback short
+  // TODO(@syler): demote verbosity or remove once tested
+  auto print_info {[]() { log()->info("{}", 0); }};
+  std::thread print_info_thread {print_info};
+  print_info_thread.detach();
+
+  // auto end_time {std::chrono::high_resolution_clock::now()};
+  if (franka_time_ >= plan_end_time) {
+    std::cout << std::endl
+              << "Finished motion, shutting down example" << std::endl;
+    return franka::MotionFinished(robot_state.O_T_EE);
+  }
+  return robot_state.O_T_EE;
 }

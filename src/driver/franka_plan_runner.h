@@ -199,6 +199,9 @@ class FrankaPlanRunner {
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
 
+  franka::CartesianPose CartesianPoseCallback(
+      const franka::RobotState& robot_state, franka::Duration period);
+
   /// Set parameters for stiffness and goal direction based on push direction.
   /// TODO(@anyone): long-term the stiffness can be a parameter of the push
   /// request
@@ -233,6 +236,7 @@ class FrankaPlanRunner {
   std::unique_ptr<franka::Robot> robot_ {};
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
+  std::unique_ptr<PosePoly> cartesian_plan_;
   int64_t plan_utime_ = -1;
   std::unique_ptr<ConstraintSolver> constraint_solver_;
 
@@ -279,6 +283,8 @@ class FrankaPlanRunner {
   Eigen::VectorXd start_reversing_conf_franka_;
   // config of franka when plan ends:
   Eigen::VectorXd end_conf_plan_;
+
+  drake::math::RigidTransformd start_pose_plan_;
 
   bool is_joint_pos_offset_available_ {false};
   Eigen::VectorXd joint_pos_offset_;
