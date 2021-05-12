@@ -1216,9 +1216,9 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   // we print info in a separate thread to keep callback short
   // TODO(@syler): demote verbosity or remove once tested
-  auto print_info {[]() { log()->info("{}", 0); }};
-  std::thread print_info_thread {print_info};
-  print_info_thread.detach();
+  // auto print_info {[]() { log()->info("{}", 0); }};
+  // std::thread print_info_thread {print_info};
+  // print_info_thread.detach();
 
   auto end_time {std::chrono::high_resolution_clock::now()};
   if (franka_time_ >= plan_end_time) {
