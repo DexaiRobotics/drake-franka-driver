@@ -71,4 +71,24 @@ drake::lcmt_iiwa_status EigenToLcmStatus(Eigen::VectorXd robot_state);
 franka::RobotState ConvertToCannonical(const franka::RobotState& robot_state,
                                        const Eigen::VectorXd& offsets);
 
+inline drake::math::RigidTransformd ToRigidTransform(
+    const bot_core::position_3d_t& pos3dt) {
+  return {Eigen::Quaterniond(pos3dt.rotation.w, pos3dt.rotation.x,
+                             pos3dt.rotation.y, pos3dt.rotation.z),
+          Eigen::Vector3d(pos3dt.translation.x, pos3dt.translation.y,
+                          pos3dt.translation.z)};
+}
+
+inline drake::math::RigidTransformd ToRigidTransform(
+    const Eigen::Affine3d& xform_eigen) {
+  const Eigen::Matrix4d& mat {xform_eigen.matrix()};
+  return drake::math::RigidTransformd(mat);
+}
+
+inline Eigen::Affine3d ToAffine3d(const drake::math::RigidTransformd& xform) {
+  Eigen::Affine3d result_affine3d {};
+  result_affine3d = xform.GetAsMatrix4();
+  return result_affine3d;
+}
+
 }  //  namespace utils
