@@ -320,6 +320,7 @@ int FrankaPlanRunner::RunFranka() {
         dexai::log()->info(
             "RunFranka: found a new plan in buffer, attaching callback...");
         status_has_changed = true;
+        time_elapsed_us_.clear();
         try {  // Use either joint position or impedance control callback here
           // blocking
           robot_->control(std::bind(&FrankaPlanRunner::CartesianPoseCallback,
@@ -327,6 +328,10 @@ int FrankaPlanRunner::RunFranka() {
                                     std::placeholders::_2));
         } catch (const franka::ControlException& ce) {
           status_has_changed = true;
+          std::for_each(time_elapsed_us_.begin(), time_elapsed_us_.end(),
+                        [](const auto& time_val) {
+                          log()->info("Took {} us", time_val);
+                        });
           if (plan_) {  // broadcast exception details over LCM
             dexai::log()->warn(
                 "RunFranka: control exception during active plan "
@@ -1175,7 +1180,7 @@ void FrankaPlanRunner::SetCompliantPushParameters(
 
 franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
     const franka::RobotState& robot_state, franka::Duration period) {
-  // auto start_time {std::chrono::high_resolution_clock::now()};
+  auto start_time {std::chrono::high_resolution_clock::now()};
 
   IncreaseFrankaTimeBasedOnStatus(robot_state.dq, period.toSec());
 
@@ -1215,11 +1220,23 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
   std::thread print_info_thread {print_info};
   print_info_thread.detach();
 
-  // auto end_time {std::chrono::high_resolution_clock::now()};
+  auto end_time {std::chrono::high_resolution_clock::now()};
   if (franka_time_ >= plan_end_time) {
     std::cout << std::endl
               << "Finished motion, shutting down example" << std::endl;
     return franka::MotionFinished(robot_state.O_T_EE);
   }
+
+  time_elapsed_us_.push_back(
+      std::chrono::duration_cast<std::chrono::microseconds>(end_time
+                                                            - start_time)
+          .count());
+  if (time_elapsed_us_.size() > 20) {
+    time_elapsed_us_.pop_front();
+  }
+
+  Eigen::Map<const Eigen::Matrix<double, 7, 1>> current_conf(
+      robot_state.q.data());
+  comm_interface_->SetRobotData(robot_state, current_conf);
   return robot_state.O_T_EE;
 }
