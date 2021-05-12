@@ -47,6 +47,7 @@
 /// keep track of what source paused it.
 
 #include <drake/common/trajectories/piecewise_polynomial.h>
+#include <drake/common/trajectories/piecewise_pose.h>
 
 #include <memory>
 #include <mutex>
@@ -64,7 +65,10 @@
 #include "utils/robot_parameters.h"
 
 using drake::trajectories::PiecewisePolynomial;
+using drake::trajectories::PiecewisePose;
+
 typedef PiecewisePolynomial<double> PPType;
+typedef PiecewisePose<double> PosePoly;
 
 namespace franka_driver {
 
@@ -80,9 +84,10 @@ struct PauseData {
   std::set<std::string> pause_sources;
 };
 
-struct RobotPiecewisePolynomial {
+struct RobotPlanBuffer {
   int64_t utime;
   std::unique_ptr<PPType> plan;
+  std::unique_ptr<PosePoly> cartesian_plan;
 };
 
 class CommunicationInterface {
@@ -129,14 +134,21 @@ class CommunicationInterface {
     return !(new_plan_buffer_.plan == nullptr);
   }
 
+  bool HasNewCartesianPlan() {
+    std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
+    return !(new_plan_buffer_.cartesian_plan == nullptr);
+  }
+
   void ClearNewPlan(std::string_view reason) {
     dexai::log()->warn("ClearNewPlan: {}", reason.data());
     PublishPlanComplete(new_plan_buffer_.utime, false, reason.data());
     new_plan_buffer_.plan.reset();
+    new_plan_buffer_.cartesian_plan.reset();
     new_plan_buffer_.utime = -1;
   }
 
   std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
+  std::tuple<std::unique_ptr<PosePoly>, int64_t> PopNewCartesianPlan();
 
   // TODO(@anyone): remove franka specific RobotState type and
   // replace with std::array
@@ -216,7 +228,7 @@ class CommunicationInterface {
   // This is a buffer storing the new plan received. Capacility is only 1.
   // Once this plan is popped (taken), this buffer is emptied and avialable
   // to store a new plan, while the current plan may be running.
-  RobotPiecewisePolynomial new_plan_buffer_;
+  RobotPlanBuffer new_plan_buffer_;
   std::mutex robot_plan_mutex_;
 
   RobotData robot_data_;
