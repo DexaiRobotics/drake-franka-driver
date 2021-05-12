@@ -1208,7 +1208,7 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   auto X_W_EE_desired {cartesian_plan_->get_pose(franka_time_)};
   const auto X_W_EE_start {start_pose_plan_};
-
+  const auto franka_time {franka_time_};
   X_W_EE_desired_eigen = utils::ToAffine3d(X_W_EE_desired);
 
   // const auto X_W_EE_current {
@@ -1219,11 +1219,11 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   // we print info in a separate thread to keep callback short
   // TODO(@syler): demote verbosity or remove once tested
-  auto print_info {[X_W_EE_start, X_W_EE_desired]() {
-    log()->info("\nStart xform: {}, {}\n\t Desired xform: {}, {}",
+  auto print_info {[franka_time, X_W_EE_start, X_W_EE_desired]() {
+    log()->info("\nStart xform: {}, {}\nt: {}\t Desired xform: {}, {}",
                 X_W_EE_start.translation().transpose(),
                 X_W_EE_start.rotation().ToQuaternionAsVector4().transpose(),
-                X_W_EE_desired.translation().transpose(),
+                franka_time, X_W_EE_desired.translation().transpose(),
                 X_W_EE_desired.rotation().ToQuaternionAsVector4().transpose());
   }};
   std::thread print_info_thread {print_info};
