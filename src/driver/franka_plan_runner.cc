@@ -1203,10 +1203,13 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   // make a copy
   auto X_W_EE_desired_array {robot_state.O_T_EE};
-  Eigen::Affine3d X_W_EE_desired(
+  Eigen::Affine3d X_W_EE_desired_eigen(
       Eigen::Matrix4d::Map(X_W_EE_desired_array.data()));
 
-  X_W_EE_desired = utils::ToAffine3d(cartesian_plan_->get_pose(franka_time_));
+  auto X_W_EE_desired {cartesian_plan_->get_pose(franka_time_)};
+  const auto X_W_EE_start {start_pose_plan_};
+
+  X_W_EE_desired_eigen = utils::ToAffine3d(X_W_EE_desired);
 
   // const auto X_W_EE_current {
   //     utils::affine3d_to_rigidxform(X_W_EE_current_eigen)};
@@ -1216,9 +1219,13 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   // we print info in a separate thread to keep callback short
   // TODO(@syler): demote verbosity or remove once tested
-  // auto print_info {[]() { log()->info("{}", 0); }};
-  // std::thread print_info_thread {print_info};
-  // print_info_thread.detach();
+  auto print_info {[X_W_EE_start, X_W_EE_desired]() {
+    log()->info("\nStart xform: {}\n\t Desired xform: {}",
+                X_W_EE_start.translation().transpose(),
+                X_W_EE_desired.translation().transpose());
+  }};
+  std::thread print_info_thread {print_info};
+  print_info_thread.detach();
 
   auto end_time {std::chrono::high_resolution_clock::now()};
   if (franka_time_ >= plan_end_time) {
