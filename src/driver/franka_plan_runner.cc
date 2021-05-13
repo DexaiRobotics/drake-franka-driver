@@ -1212,7 +1212,8 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   auto X_W_EE_plan_next {cartesian_plan_->get_pose(franka_time_)};
   const auto& X_W_EE_plan_start {start_pose_plan_};
-  const auto X_EEplanstart_EEplannext {X_W_EE_plan_start.inverse() * X_W_EE_plan_next};
+  const auto X_EEplanstart_EEplannext {X_W_EE_plan_start.inverse()
+                                       * X_W_EE_plan_next};
 
   const auto& X_EEfrankastart {start_pose_franka_};
   const auto X_W_EE_desired {X_EEfrankastart * X_EEplanstart_EEplannext};
@@ -1228,12 +1229,14 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   // we print info in a separate thread to keep callback short
   // TODO(@syler): demote verbosity or remove once tested
-  auto print_info {[franka_time, X_W_EE_current, X_W_EE_desired]() {
+  auto print_info {[franka_time, X_W_EE_current, X_W_EE_desired,
+                    X_W_EE_desired_array]() {
     log()->info("\nCurrent xform: {}, {}\nt: {}\t Desired xform: {}, {}",
                 X_W_EE_current.translation().transpose(),
                 X_W_EE_current.rotation().ToQuaternionAsVector4().transpose(),
                 franka_time, X_W_EE_desired.translation().transpose(),
                 X_W_EE_desired.rotation().ToQuaternionAsVector4().transpose());
+    std::cout << "desired array: " << X_W_EE_desired_array << std::endl;
   }};
   std::thread print_info_thread {print_info};
   print_info_thread.detach();
