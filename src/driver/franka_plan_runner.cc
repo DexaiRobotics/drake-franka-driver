@@ -757,7 +757,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
-    std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
+    std::tie(plan_, plan_utime_, plan_exec_opt_) =
+        comm_interface_->PopNewPlan();
     dexai::log()->info(
         "JointPositionCallback: popped new plan {} from buffer, "
         "starting initial timestep...",

@@ -56,6 +56,7 @@
 #include <thread>  // for thread
 
 #include <robot_msgs/robot_spline_t.hpp>  // for robot_spline_t
+#include <robot_msgs/plan_exec_opts_t.hpp>
 
 #include "driver/communication_interface.h"  // for CommunicationInterface
 #include "driver/constraint_solver.h"        // for ConstraintSolver
@@ -234,6 +235,7 @@ class FrankaPlanRunner {
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
   int64_t plan_utime_ = -1;
+  int64_t plan_exec_opt_ = robot_msgs::plan_exec_opts_t::DEFAULT;
   std::unique_ptr<ConstraintSolver> constraint_solver_;
 
   // keeping track of time along plan:
