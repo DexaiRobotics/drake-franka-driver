@@ -485,11 +485,16 @@ void CommunicationInterface::HandlePlan(
     }
     Eigen::Affine3d X_W_EECurrent_eigen(
         Eigen::Matrix4d::Map(robot_state.O_T_EE.data()));
-    auto X_W_EECurrent {utils::ToRigidTransform(X_W_EECurrent_eigen)};
 
-    std::vector<double> times_vec {0, 10.0};
+    auto X_W_EECurrent {utils::ToRigidTransform(X_W_EECurrent_eigen)};
+    auto X_W_EETarget {X_W_EECurrent * X_EEcurrent_EEdesired};
+
+    std::vector<double> times_vec {0, 1.0, 9.0, 10.0};
     auto cartesian_plan {PosePoly::MakeCubicLinearWithEndLinearVelocity(
-        times_vec, {X_W_EECurrent, X_W_EECurrent * X_EEcurrent_EEdesired})};
+        times_vec, {X_W_EECurrent,
+                    utils::LinearInterpPose(X_W_EECurrent, X_W_EETarget, 0.05),
+                    utils::LinearInterpPose(X_W_EECurrent, X_W_EETarget, 0.95),
+                    X_W_EETarget})};
 
     // log()->warn("PosePoly: ");
     // log()->warn("\tstart: {}\tend: {}", cartesian_plan.start_time(),

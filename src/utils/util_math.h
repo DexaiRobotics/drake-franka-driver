@@ -34,6 +34,7 @@
 /// @file: util_math.h
 #pragma once
 
+#include <drake/math/rigid_transform.h>
 #include "drake/common/trajectories/piecewise_polynomial.h"
 
 typedef drake::trajectories::PiecewisePolynomial<double> PPType;
@@ -100,6 +101,16 @@ bool VectorEpsEq(T a, T b,
     }
   }
   return true;
+}
+
+inline drake::math::RigidTransformd LinearInterpPose(
+    const drake::math::RigidTransformd& X_i,
+    const drake::math::RigidTransformd& X_f, const double frac) {
+  const Eigen::Vector3d &x_i {X_i.translation()}, &x_f {X_f.translation()};
+  const Eigen::Quaterniond q_i {X_i.rotation().ToQuaternion()},
+      q_f {X_f.rotation().ToQuaternion()};
+  return drake::math::RigidTransformd(q_i.slerp(frac, q_f),
+                                      (1 - frac) * x_i + frac * x_f);
 }
 
 }  // namespace utils
