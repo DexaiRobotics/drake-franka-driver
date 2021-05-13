@@ -491,6 +491,15 @@ void CommunicationInterface::HandlePlan(
     auto cartesian_plan {PosePoly::MakeCubicLinearWithEndLinearVelocity(
         times_vec, {X_W_EECurrent, X_W_EECurrent * X_EEcurrent_EEdesired})};
 
+    double t {};
+    while (t < cartesian_plan.end_time()) {
+      auto X_W_EE_desired {cartesian_plan.get_pose(t)};
+      log()->info(
+          "t: {}\txform: {}, {}", t, X_W_EE_desired.translation().transpose(),
+          X_W_EE_desired.rotation().ToQuaternionAsVector4().transpose());
+      t += 0.1;
+    }
+
     new_plan_buffer_.cartesian_plan =
         std::make_unique<PosePoly>(cartesian_plan);
   }
