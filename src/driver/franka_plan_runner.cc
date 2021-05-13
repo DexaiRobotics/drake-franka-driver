@@ -1204,8 +1204,10 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   // make a copy
   auto X_W_EE_desired_array {robot_state.O_T_EE};
-  Eigen::Affine3d X_W_EE_desired_eigen(
-      Eigen::Matrix4d::Map(X_W_EE_desired_array.data()));
+
+  Eigen::Map<Eigen::Matrix4d> X_W_EE_desired_eigen4d (X_W_EE_desired_array.data());
+
+  Eigen::Affine3d X_W_EE_desired_eigen(X_W_EE_desired_eigen4d);
 
   // hack
   auto X_W_EE_current {utils::ToRigidTransform(X_W_EE_desired_eigen)};
@@ -1220,6 +1222,8 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   const auto franka_time {franka_time_};
   X_W_EE_desired_eigen = utils::ToAffine3d(X_W_EE_desired);
+
+  X_W_EE_desired_eigen4d = X_W_EE_desired_eigen.matrix();
 
   // const auto X_W_EE_current {
   //     utils::affine3d_to_rigidxform(X_W_EE_current_eigen)};
