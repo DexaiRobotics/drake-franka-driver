@@ -1189,7 +1189,7 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
     std::tie(cartesian_plan_, plan_utime_) =
         comm_interface_->PopNewCartesianPlan();
     dexai::log()->info(
-        "JointPositionCallback: popped new plan {} from buffer, "
+        "CartesianPoseCallback: popped new plan {} from buffer, "
         "starting initial timestep...",
         plan_utime_);
     // first time step of plan, reset time and start conf
@@ -1231,9 +1231,8 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   auto end_time {std::chrono::high_resolution_clock::now()};
   if (franka_time_ >= plan_end_time) {
-    std::cout << std::endl
-              << "Finished motion, shutting down example" << std::endl;
-    return franka::MotionFinished(robot_state.O_T_EE);
+    log()->info("CartesianPoseCallback: Finished motion.");
+    return franka::MotionFinished(X_W_EE_desired_array);
   }
 
   time_elapsed_us_.push_back(
@@ -1247,5 +1246,5 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
   Eigen::Map<const Eigen::Matrix<double, 7, 1>> current_conf(
       robot_state.q.data());
   comm_interface_->SetRobotData(robot_state, current_conf);
-  return robot_state.O_T_EE;
+  return X_W_EE_desired_array;
 }
