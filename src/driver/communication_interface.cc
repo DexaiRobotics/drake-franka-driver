@@ -492,13 +492,16 @@ void CommunicationInterface::HandlePlan(
         times_vec, {X_W_EECurrent, X_W_EECurrent * X_EEcurrent_EEdesired})};
 
     // log()->warn("PosePoly: ");
-    // log()->warn("\tstart: {}\tend: {}", cartesian_plan.start_time(), cartesian_plan.end_time());
+    // log()->warn("\tstart: {}\tend: {}", cartesian_plan.start_time(),
+    // cartesian_plan.end_time());
     double t {times_vec.front()};
     while (t < times_vec.back()) {
       auto X_W_EE_desired {cartesian_plan.get_pose(t)};
-      log()->info(
-          "t: {}\txform: {}, {}", t, X_W_EE_desired.translation().transpose(),
-          X_W_EE_desired.rotation().ToQuaternionAsVector4().transpose());
+      log()->info("\nt: {}\txform: {}, {}\n\tvel: {}\n\tacc: {}", t,
+                  X_W_EE_desired.translation().transpose(),
+                  X_W_EE_desired.rotation().ToQuaternionAsVector4().transpose(),
+                  cartesian_plan.get_velocity(t).transpose(),
+                  cartesian_plan.get_acceleration(t).transpose());
       t += 0.1;
     }
 
