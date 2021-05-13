@@ -491,7 +491,8 @@ void CommunicationInterface::HandlePlan(
     auto cartesian_plan {PosePoly::MakeCubicLinearWithEndLinearVelocity(
         times_vec, {X_W_EECurrent, X_W_EECurrent * X_EEcurrent_EEdesired})};
 
-    log()->warn("PosePoly: start: {} end: {}", cartesian_plan.start_time(), cartesian_plan.end_time());
+    log()->warn("PosePoly: ");
+    log()->warn("\tstart: {}\tend: {}", cartesian_plan.start_time(), cartesian_plan.end_time());
     double t {cartesian_plan.start_time()};
     while (t < cartesian_plan.end_time()) {
       auto X_W_EE_desired {cartesian_plan.get_pose(t)};
