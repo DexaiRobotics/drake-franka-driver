@@ -121,9 +121,15 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
 
   log()->warn("Collision Safety {}", safety_off_ ? "OFF" : "ON");
   if (safety_off_) {
+    lower_torque_threshold_ = kLowTorqueThreshold;
+    lower_force_threshold_ = kLowForceThreshold;
+
     upper_torque_threshold_ = kHighTorqueThreshold;
     upper_force_threshold_ = kHighForceThreshold;
   } else {
+    lower_torque_threshold_ = kLowTorqueThreshold;
+    lower_force_threshold_ = kLowForceThreshold;
+
     upper_torque_threshold_ = kMediumTorqueThreshold;
     upper_force_threshold_ = kMediumForceThreshold;
   }
