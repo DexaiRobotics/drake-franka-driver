@@ -1233,14 +1233,13 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   // we print info in a separate thread to keep callback short
   // TODO(@syler): demote verbosity or remove once tested
-  auto print_info {[franka_time, X_W_EE_current, X_W_EE_desired,
-                    X_W_EE_desired_array]() {
+  auto print_info {[franka_time, X_W_EE_current, X_W_EE_desired]() {
     log()->info("\nCurrent xform: {}, {}\nt: {}\t Desired xform: {}, {}",
                 X_W_EE_current.translation().transpose(),
                 X_W_EE_current.rotation().ToQuaternionAsVector4().transpose(),
                 franka_time, X_W_EE_desired.translation().transpose(),
                 X_W_EE_desired.rotation().ToQuaternionAsVector4().transpose());
-    std::cout << "desired array: " << X_W_EE_desired_array << std::endl;
+    // std::cout << "desired array: " << X_W_EE_desired_array << std::endl;
   }};
   std::thread print_info_thread {print_info};
   print_info_thread.detach();
