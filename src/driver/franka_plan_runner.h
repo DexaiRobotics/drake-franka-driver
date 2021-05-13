@@ -285,6 +285,7 @@ class FrankaPlanRunner {
   Eigen::VectorXd end_conf_plan_;
 
   drake::math::RigidTransformd start_pose_plan_;
+  drake::math::RigidTransformd start_pose_franka_;
 
   bool is_joint_pos_offset_available_ {false};
   Eigen::VectorXd joint_pos_offset_;

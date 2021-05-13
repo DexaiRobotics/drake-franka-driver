@@ -1194,11 +1194,12 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
         plan_utime_);
     // first time step of plan, reset time and start conf
     franka_time_ = 0.0;
+    start_pose_plan_ = cartesian_plan_->get_pose(franka_time_);
 
     auto X_W_EE_at_start_array {robot_state.O_T_EE};
     Eigen::Affine3d X_W_EE_at_start(
         Eigen::Matrix4d::Map(X_W_EE_at_start_array.data()));
-    start_pose_plan_ = utils::ToRigidTransform(X_W_EE_at_start);
+    start_pose_franka_ = utils::ToRigidTransform(X_W_EE_at_start);
   }
 
   // make a copy
@@ -1206,8 +1207,16 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
   Eigen::Affine3d X_W_EE_desired_eigen(
       Eigen::Matrix4d::Map(X_W_EE_desired_array.data()));
 
-  auto X_W_EE_desired {cartesian_plan_->get_pose(franka_time_)};
-  const auto X_W_EE_start {start_pose_plan_};
+  // hack
+  auto X_W_EE_current {utils::ToRigidTransform(X_W_EE_desired_eigen)};
+
+  auto X_W_EE_plan_next {cartesian_plan_->get_pose(franka_time_)};
+  const auto& X_W_EE_plan_start {start_pose_plan_};
+  const auto X_EEplanstart_EEplannext {X_W_EE_plan_start.inverse() * X_W_EE_plan_next};
+
+  const auto& X_EEfrankastart {start_pose_franka_};
+  const auto X_W_EE_desired {X_EEfrankastart * X_EEplanstart_EEplannext};
+
   const auto franka_time {franka_time_};
   X_W_EE_desired_eigen = utils::ToAffine3d(X_W_EE_desired);
 
@@ -1219,10 +1228,10 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   // we print info in a separate thread to keep callback short
   // TODO(@syler): demote verbosity or remove once tested
-  auto print_info {[franka_time, X_W_EE_start, X_W_EE_desired]() {
-    log()->info("\nStart xform: {}, {}\nt: {}\t Desired xform: {}, {}",
-                X_W_EE_start.translation().transpose(),
-                X_W_EE_start.rotation().ToQuaternionAsVector4().transpose(),
+  auto print_info {[franka_time, X_W_EE_current, X_W_EE_desired]() {
+    log()->info("\nCurrent xform: {}, {}\nt: {}\t Desired xform: {}, {}",
+                X_W_EE_current.translation().transpose(),
+                X_W_EE_current.rotation().ToQuaternionAsVector4().transpose(),
                 franka_time, X_W_EE_desired.translation().transpose(),
                 X_W_EE_desired.rotation().ToQuaternionAsVector4().transpose());
   }};
