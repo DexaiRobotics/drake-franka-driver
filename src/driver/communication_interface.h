@@ -60,6 +60,7 @@
 #include <robot_msgs/bool_t.hpp>
 #include <robot_msgs/pause_cmd.hpp>
 #include <robot_msgs/robot_spline_t.hpp>
+#include <robot_msgs/plan_exec_opts_t.hpp>
 
 #include "franka/robot_state.h"
 #include "utils/robot_parameters.h"
@@ -86,6 +87,7 @@ struct PauseData {
 
 struct RobotPlanBuffer {
   int64_t utime;
+  int16_t exec_opt; 
   std::unique_ptr<PPType> plan;
   std::unique_ptr<PosePoly> cartesian_plan;
 };
@@ -147,8 +149,8 @@ class CommunicationInterface {
     new_plan_buffer_.utime = -1;
   }
 
-  std::tuple<std::unique_ptr<PPType>, int64_t> PopNewPlan();
-  std::tuple<std::unique_ptr<PosePoly>, int64_t> PopNewCartesianPlan();
+  std::tuple<std::unique_ptr<PPType>, int64_t, int16_t> PopNewPlan();
+  std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t> PopNewCartesianPlan();
 
   // TODO(@anyone): remove franka specific RobotState type and
   // replace with std::array

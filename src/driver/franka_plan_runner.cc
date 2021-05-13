@@ -793,7 +793,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
-    std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
+    std::tie(plan_, plan_utime_, plan_exec_opt_) =
+        comm_interface_->PopNewPlan();
     dexai::log()->info(
         "JointPositionCallback: popped new plan {} from buffer, "
         "starting initial timestep...",
@@ -1192,7 +1193,7 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
 
   if (comm_interface_
           ->HasNewCartesianPlan()) {  // pop the new plan and set it up
-    std::tie(cartesian_plan_, plan_utime_) =
+    std::tie(cartesian_plan_, plan_utime_, plan_exec_opt_) =
         comm_interface_->PopNewCartesianPlan();
     dexai::log()->info(
         "CartesianPoseCallback: popped new plan {} from buffer, "
@@ -1211,7 +1212,8 @@ franka::CartesianPose FrankaPlanRunner::CartesianPoseCallback(
   // make a copy
   auto X_W_EE_desired_array {robot_state.O_T_EE};
 
-  Eigen::Map<Eigen::Matrix4d> X_W_EE_desired_eigen4d (X_W_EE_desired_array.data());
+  Eigen::Map<Eigen::Matrix4d> X_W_EE_desired_eigen4d(
+      X_W_EE_desired_array.data());
 
   Eigen::Affine3d X_W_EE_desired_eigen(X_W_EE_desired_eigen4d);
 

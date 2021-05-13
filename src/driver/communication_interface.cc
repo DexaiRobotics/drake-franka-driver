@@ -113,8 +113,10 @@ void CommunicationInterface::ResetData() {
 
   // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
-  new_plan_buffer_.plan.reset();  // unique ptr points to no plan
-  new_plan_buffer_.utime = -1;    // utime set to -1 at start
+  new_plan_buffer_.plan.reset();            // unique ptr points to no plan
+  new_plan_buffer_.cartesian_plan.reset();  // unique ptr points to no plan
+  new_plan_buffer_.utime = -1;              // utime set to -1 at start
+  new_plan_buffer_.exec_opt = robot_msgs::plan_exec_opts_t::DEFAULT;
   lock_plan.unlock();
 
   // initialize pause as false:
@@ -161,7 +163,7 @@ void CommunicationInterface::StopInterface() {
   ResetData();
 }
 
-std::tuple<std::unique_ptr<PPType>, int64_t>
+std::tuple<std::unique_ptr<PPType>, int64_t, int16_t>
 CommunicationInterface::PopNewPlan() {
   if (!HasNewPlan()) {
     throw std::runtime_error(
@@ -171,10 +173,11 @@ CommunicationInterface::PopNewPlan() {
   }
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr robot_plan_.plan_
-  return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime};
+  return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime,
+          new_plan_buffer_.exec_opt};
 }
 
-std::tuple<std::unique_ptr<PosePoly>, int64_t>
+std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t>
 CommunicationInterface::PopNewCartesianPlan() {
   if (!HasNewCartesianPlan()) {
     throw std::runtime_error(
@@ -184,7 +187,8 @@ CommunicationInterface::PopNewCartesianPlan() {
   }
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr robot_plan_.plan_
-  return {std::move(new_plan_buffer_.cartesian_plan), new_plan_buffer_.utime};
+  return {std::move(new_plan_buffer_.cartesian_plan), new_plan_buffer_.utime,
+          new_plan_buffer_.exec_opt};
 }
 
 franka::RobotState CommunicationInterface::GetRobotState() {
@@ -422,6 +426,8 @@ void CommunicationInterface::HandlePlan(
   }
 
   new_plan_buffer_.utime = robot_spline->utime;
+  new_plan_buffer_.exec_opt = robot_spline->exec_opt;
+
   // publish confirmation that plan was received with same utime
   PublishTriggerToChannel(new_plan_buffer_.utime,
                           params_.lcm_plan_received_channel);
