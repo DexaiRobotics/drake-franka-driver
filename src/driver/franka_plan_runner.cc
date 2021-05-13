@@ -891,6 +891,18 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
   output_to_franka = utils::EigenToArray(output_to_franka_eigen);
 
+  if (plan_exec_opt_ == robot_msgs::plan_exec_opts_t::MOVE_UNTIL_STOP) {
+    Eigen::Map<const Eigen::Matrix<double, 6, 1>> cartesian_contact(
+        robot_state.cartesian_contact.data());
+    if ((cartesian_contact.head(3).array() > 0).any()) {
+      comm_interface_->PublishPlanComplete(
+          plan_utime_, true, fmt::format("made contact: {}", cartesian_contact.transpose()));
+      plan_.reset();     // reset unique ptr
+      plan_utime_ = -1;  // reset plan to -1
+      return franka::MotionFinished(output_to_franka);
+    }
+  }
+
   if (auto overtime {franka_time_ - plan_end_time};
       overtime > 0) {  // check for convergence when overtime
     // Maximum change in joint angle between two confs
