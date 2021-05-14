@@ -456,18 +456,17 @@ void CommunicationInterface::HandlePlan(
 
     // Start position == goal position check
     // TODO(@anyone): change to append initial position and respline here
-    Eigen::VectorXd commanded_start =
-        piecewise_polynomial.value(piecewise_polynomial.start_time());
+    Eigen::VectorXd commanded_start {
+        piecewise_polynomial.value(piecewise_polynomial.start_time())};
 
-    auto q = this->GetRobotState().q;
     // TODO(@anyone): move this check to franka plan runner
-    Eigen::VectorXd q_eigen = utils::v_to_e(utils::ArrayToVector(q));
+    Eigen::VectorXd q_eigen {utils::v_to_e(utils::ArrayToVector(this->GetRobotState().q))};
 
-    auto max_angular_distance =
-        utils::max_angular_distance(commanded_start, q_eigen);
+    double max_angular_distance {
+        utils::max_angular_distance(commanded_start, q_eigen)};
     if (max_angular_distance > params_.kMediumJointDistance) {
       // discard the plan if we are too far away from current robot start
-      Eigen::VectorXd joint_delta = q_eigen - commanded_start;
+      auto joint_delta {q_eigen - commanded_start};
       dexai::log()->error(
           "CommInterface:HandlePlan: "
           "discarding plan {}, mismatched start position with delta: {}.",
