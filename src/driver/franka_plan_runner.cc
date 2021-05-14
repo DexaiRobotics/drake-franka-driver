@@ -120,6 +120,8 @@ FrankaPlanRunner::FrankaPlanRunner(const RobotParameters& params)
   }
 
   log()->warn("Collision Safety {}", safety_off_ ? "OFF" : "ON");
+  lower_torque_threshold_ = kLowTorqueThreshold;
+  lower_force_threshold_ = kLowForceThreshold;
   if (safety_off_) {
     upper_torque_threshold_ = kHighTorqueThreshold;
     upper_force_threshold_ = kHighForceThreshold;
@@ -751,7 +753,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
-    std::tie(plan_, plan_utime_) = comm_interface_->PopNewPlan();
+    std::tie(plan_, plan_utime_, plan_exec_opt_, contact_expected_) =
+        comm_interface_->PopNewPlan();
     dexai::log()->info(
         "JointPositionCallback: popped new plan {} from buffer, "
         "starting initial timestep...",
@@ -847,6 +850,27 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         franka_time_);
   }
   output_to_franka = utils::EigenToArray(output_to_franka_eigen);
+
+  // if the robot does not actually make contact along the expected contact
+  // axis until the end of the plan, the driver will publish plan complete.
+  // it is on the user to send a plan that goes past the expected contact
+  // point
+  if (plan_exec_opt_ == robot_msgs::plan_exec_opts_t::MOVE_UNTIL_STOP) {
+    Eigen::Map<const Eigen::Matrix<double, 6, 1>> cartesian_contact(
+        robot_state.cartesian_contact.data());
+
+    const auto expected_contact_bool {contact_expected_.array() > 0};
+    const auto contact_bool {cartesian_contact.head(3).array() > 0};
+
+    if ((expected_contact_bool.cwiseProduct(contact_bool)).all()) {
+      comm_interface_->PublishPlanComplete(
+          plan_utime_, true,
+          fmt::format("made contact: {}", cartesian_contact.transpose()));
+      plan_.reset();     // reset unique ptr
+      plan_utime_ = -1;  // reset plan to -1
+      return franka::MotionFinished(output_to_franka);
+    }
+  }
 
   if (auto overtime {franka_time_ - plan_end_time};
       overtime > 0) {  // check for convergence when overtime

@@ -55,6 +55,7 @@
 #include <string>
 #include <thread>  // for thread
 
+#include <robot_msgs/plan_exec_opts_t.hpp>
 #include <robot_msgs/robot_spline_t.hpp>  // for robot_spline_t
 
 #include "driver/communication_interface.h"  // for CommunicationInterface
@@ -135,9 +136,9 @@ class FrankaPlanRunner {
     // lower_force_thresholds_nominal,
     // upper_force_thresholds_nominal
     robot_->setCollisionBehavior(
-        upper_torque_threshold_, upper_torque_threshold_,
-        upper_torque_threshold_, upper_torque_threshold_,
-        upper_force_threshold_, upper_force_threshold_, upper_force_threshold_,
+        lower_torque_threshold_, upper_torque_threshold_,
+        lower_torque_threshold_, upper_torque_threshold_,
+        lower_force_threshold_, upper_force_threshold_, lower_force_threshold_,
         upper_force_threshold_);
   }
 
@@ -233,7 +234,9 @@ class FrankaPlanRunner {
   std::unique_ptr<franka::Robot> robot_ {};
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
-  int64_t plan_utime_ = -1;
+  int64_t plan_utime_ {-1};
+  int64_t plan_exec_opt_ {robot_msgs::plan_exec_opts_t::DEFAULT};
+  Eigen::Vector3d contact_expected_ {Eigen::Vector3d::Zero()};
   std::unique_ptr<ConstraintSolver> constraint_solver_;
 
   // keeping track of time along plan:
@@ -290,6 +293,8 @@ class FrankaPlanRunner {
                                                     100.0, 100.0, 100.0};
   const std::array<double, 7> kMediumTorqueThreshold {40.0, 40.0, 36.0, 36.0,
                                                       32.0, 28.0, 24.0};
+  const std::array<double, 7> kLowTorqueThreshold {20.0, 20.0, 18.0, 18.0,
+                                                   16.0, 14.0, 12.0};
   const std::array<double, 7> kImpedanceControlTorqueThreshold {
       87.0, 87.0, 87.0, 87.0, 12.0, 12.0, 12.0};
 
@@ -298,9 +303,11 @@ class FrankaPlanRunner {
                                                    100.0, 100.0, 100.0};
   const std::array<double, 6> kMediumForceThreshold {40.0, 40.0, 40.0,
                                                      50.0, 50.0, 50.0};
+  const std::array<double, 6> kLowForceThreshold {20.0, 20.0, 20.0,
+                                                  25.0, 25.0, 25.0};
 
-  std::array<double, 7> upper_torque_threshold_;
-  std::array<double, 6> upper_force_threshold_;
+  std::array<double, 7> lower_torque_threshold_, upper_torque_threshold_;
+  std::array<double, 6> lower_force_threshold_, upper_force_threshold_;
 
   // The following two constants must be tuned together.
   // A higher speed threshold may result in the benign libfranka exception:

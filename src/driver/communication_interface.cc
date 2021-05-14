@@ -113,8 +113,10 @@ void CommunicationInterface::ResetData() {
 
   // initialize plan as empty:
   std::unique_lock<std::mutex> lock_plan(robot_plan_mutex_);
-  new_plan_buffer_.plan.reset();  // unique ptr points to no plan
-  new_plan_buffer_.utime = -1;    // utime set to -1 at start
+  new_plan_buffer_.plan.reset();            // unique ptr points to no plan
+  new_plan_buffer_.cartesian_plan.reset();  // unique ptr points to no plan
+  new_plan_buffer_.utime = -1;              // utime set to -1 at start
+  new_plan_buffer_.exec_opt = robot_msgs::plan_exec_opts_t::DEFAULT;
   lock_plan.unlock();
 
   // initialize pause as false:
@@ -161,7 +163,7 @@ void CommunicationInterface::StopInterface() {
   ResetData();
 }
 
-std::tuple<std::unique_ptr<PPType>, int64_t>
+std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d>
 CommunicationInterface::PopNewPlan() {
   if (!HasNewPlan()) {
     throw std::runtime_error(
@@ -171,7 +173,22 @@ CommunicationInterface::PopNewPlan() {
   }
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr robot_plan_.plan_
-  return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime};
+  return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime,
+          new_plan_buffer_.exec_opt, new_plan_buffer_.contact_expected};
+}
+
+std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t>
+CommunicationInterface::PopNewCartesianPlan() {
+  if (!HasNewCartesianPlan()) {
+    throw std::runtime_error(
+        fmt::format("PopNewPlan: no buffered new plan available to pop; utime "
+                    "in buffer: {}",
+                    new_plan_buffer_.utime));
+  }
+  std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
+  // std::move nullifies the unique ptr robot_plan_.plan_
+  return {std::move(new_plan_buffer_.cartesian_plan), new_plan_buffer_.utime,
+          new_plan_buffer_.exec_opt};
 }
 
 franka::RobotState CommunicationInterface::GetRobotState() {
@@ -215,6 +232,7 @@ void CommunicationInterface::PublishPlanComplete(
   }
   dexai::log()->info(log_msg);
   new_plan_buffer_.plan.reset();
+  new_plan_buffer_.cartesian_plan.reset();
   PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
                           success, plan_status_string);
 }
@@ -408,6 +426,8 @@ void CommunicationInterface::HandlePlan(
   }
 
   new_plan_buffer_.utime = robot_spline->utime;
+  new_plan_buffer_.exec_opt = robot_spline->exec_opt;
+
   // publish confirmation that plan was received with same utime
   PublishTriggerToChannel(new_plan_buffer_.utime,
                           params_.lcm_plan_received_channel);
@@ -416,47 +436,58 @@ void CommunicationInterface::HandlePlan(
       "Published confirmation of received plan {}",
       robot_spline->utime);
 
-  PPType piecewise_polynomial {
-      decodePiecewisePolynomial(robot_spline->piecewise_polynomial)};
+  // Piecewise polynomial
+  if (robot_spline->num_states > 0) {
+    PPType piecewise_polynomial {
+        decodePiecewisePolynomial(robot_spline->piecewise_polynomial)};
 
-  if (piecewise_polynomial.get_number_of_segments() < 1) {
-    dexai::log()->error(
+    if (piecewise_polynomial.get_number_of_segments() < 1) {
+      dexai::log()->error(
+          "CommInterface:HandlePlan: "
+          "Discarding plan, invalid piecewise polynomial.");
+      return;
+    }
+
+    dexai::log()->info(
         "CommInterface:HandlePlan: "
-        "Discarding plan, invalid piecewise polynomial.");
-    return;
+        "plan {}, start time: {:.2f}, end time: {:.2f}",
+        robot_spline->utime, piecewise_polynomial.start_time(),
+        piecewise_polynomial.end_time());
+
+    // Start position == goal position check
+    // TODO(@anyone): change to append initial position and respline here
+    Eigen::VectorXd commanded_start {
+        piecewise_polynomial.value(piecewise_polynomial.start_time())};
+
+    // TODO(@anyone): move this check to franka plan runner
+    Eigen::VectorXd q_eigen {utils::v_to_e(utils::ArrayToVector(this->GetRobotState().q))};
+
+    double max_angular_distance {
+        utils::max_angular_distance(commanded_start, q_eigen)};
+    if (max_angular_distance > params_.kMediumJointDistance) {
+      // discard the plan if we are too far away from current robot start
+      auto joint_delta {q_eigen - commanded_start};
+      dexai::log()->error(
+          "CommInterface:HandlePlan: "
+          "discarding plan {}, mismatched start position with delta: {}.",
+          robot_spline->utime, joint_delta.transpose());
+      new_plan_buffer_.plan.reset();
+      lock.unlock();
+      PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
+                          "mismatched_start_position");
+      return;
+    }
+    new_plan_buffer_.plan = std::make_unique<PPType>(piecewise_polynomial);
+
+    if (new_plan_buffer_.exec_opt
+        == robot_msgs::plan_exec_opts_t::MOVE_UNTIL_STOP) {
+      new_plan_buffer_.contact_expected =
+          utils::ToRigidTransform(robot_spline->cartesian_goal).translation();
+    }
+
+  } else {
+    // Cartesian goal command. Not implemented yet. Ignore for now
   }
-
-  dexai::log()->info(
-      "CommInterface:HandlePlan: "
-      "plan {}, start time: {:.2f}, end time: {:.2f}",
-      robot_spline->utime, piecewise_polynomial.start_time(),
-      piecewise_polynomial.end_time());
-
-  // Start position == goal position check
-  // TODO(@anyone): change to append initial position and respline here
-  Eigen::VectorXd commanded_start =
-      piecewise_polynomial.value(piecewise_polynomial.start_time());
-
-  auto q = this->GetRobotState().q;
-  // TODO(@anyone): move this check to franka plan runner
-  Eigen::VectorXd q_eigen = utils::v_to_e(utils::ArrayToVector(q));
-
-  auto max_angular_distance =
-      utils::max_angular_distance(commanded_start, q_eigen);
-  if (max_angular_distance > params_.kMediumJointDistance) {
-    // discard the plan if we are too far away from current robot start
-    Eigen::VectorXd joint_delta = q_eigen - commanded_start;
-    dexai::log()->error(
-        "CommInterface:HandlePlan: "
-        "discarding plan {}, mismatched start position with delta: {}.",
-        robot_spline->utime, joint_delta.transpose());
-    new_plan_buffer_.plan.reset();
-    lock.unlock();
-    PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
-                        "mismatched_start_position");
-    return;
-  }
-  new_plan_buffer_.plan = std::make_unique<PPType>(piecewise_polynomial);
   lock.unlock();
   dexai::log()->info(
       "CommInterface:HandlePlan: populated buffer with new plan {}",
