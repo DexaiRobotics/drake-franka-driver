@@ -851,6 +851,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
   output_to_franka = utils::EigenToArray(output_to_franka_eigen);
 
+  // if the robot does not actually make contact along the expected contact
+  // axis until the end of the plan, the driver will publish plan complete.
+  // it is on the user to send a plan that goes past the expected contact
+  // point
   if (plan_exec_opt_ == robot_msgs::plan_exec_opts_t::MOVE_UNTIL_STOP) {
     Eigen::Map<const Eigen::Matrix<double, 6, 1>> cartesian_contact(
         robot_state.cartesian_contact.data());
