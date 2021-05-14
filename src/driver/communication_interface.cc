@@ -487,17 +487,7 @@ void CommunicationInterface::HandlePlan(
     }
 
   } else {
-    // Piecewise pose
-    auto X_EEcurrent_EEdesired {
-        utils::ToRigidTransform(robot_spline->cartesian_goal)};
-
-    std::vector<double> times_vec {0, 10.0};
-    auto cartesian_plan {PosePoly::MakeCubicLinearWithEndLinearVelocity(
-        times_vec,
-        {drake::math::RigidTransformd::Identity(), X_EEcurrent_EEdesired})};
-
-    new_plan_buffer_.cartesian_plan =
-        std::make_unique<PosePoly>(cartesian_plan);
+    // Cartesian goal command. Not implemented yet. Ignore for now
   }
   lock.unlock();
   dexai::log()->info(
