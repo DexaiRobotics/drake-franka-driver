@@ -163,7 +163,7 @@ void CommunicationInterface::StopInterface() {
   ResetData();
 }
 
-std::tuple<std::unique_ptr<PPType>, int64_t, int16_t>
+std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d>
 CommunicationInterface::PopNewPlan() {
   if (!HasNewPlan()) {
     throw std::runtime_error(
@@ -174,7 +174,7 @@ CommunicationInterface::PopNewPlan() {
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr robot_plan_.plan_
   return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime,
-          new_plan_buffer_.exec_opt};
+          new_plan_buffer_.exec_opt, new_plan_buffer_.contact_expected};
 }
 
 std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t>
@@ -479,6 +479,13 @@ void CommunicationInterface::HandlePlan(
       return;
     }
     new_plan_buffer_.plan = std::make_unique<PPType>(piecewise_polynomial);
+
+    if (new_plan_buffer_.exec_opt
+        == robot_msgs::plan_exec_opts_t::MOVE_UNTIL_STOP) {
+      new_plan_buffer_.contact_expected =
+          utils::ToRigidTransform(robot_spline->cartesian_goal).translation();
+    }
+
   } else {
     // Piecewise pose
     auto X_EEcurrent_EEdesired {

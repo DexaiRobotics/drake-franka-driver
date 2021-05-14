@@ -757,7 +757,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
-    std::tie(plan_, plan_utime_, plan_exec_opt_) =
+    std::tie(plan_, plan_utime_, plan_exec_opt_, contact_expected_) =
         comm_interface_->PopNewPlan();
     dexai::log()->info(
         "JointPositionCallback: popped new plan {} from buffer, "
@@ -860,7 +860,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         robot_state.cartesian_contact.data());
     if ((cartesian_contact.head(3).array() > 0).any()) {
       comm_interface_->PublishPlanComplete(
-          plan_utime_, true, fmt::format("made contact: {}", cartesian_contact.transpose()));
+          plan_utime_, true,
+          fmt::format("made contact: {}", cartesian_contact.transpose()));
       plan_.reset();     // reset unique ptr
       plan_utime_ = -1;  // reset plan to -1
       return franka::MotionFinished(output_to_franka);
