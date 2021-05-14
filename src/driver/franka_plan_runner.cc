@@ -858,7 +858,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (plan_exec_opt_ == robot_msgs::plan_exec_opts_t::MOVE_UNTIL_STOP) {
     Eigen::Map<const Eigen::Matrix<double, 6, 1>> cartesian_contact(
         robot_state.cartesian_contact.data());
-    if ((cartesian_contact.head(3).array() > 0).any()) {
+
+    const auto expected_contact_bool {contact_expected_.array() > 0};
+    const auto contact_bool {cartesian_contact.head(3).array() > 0};
+
+    if ((expected_contact_bool.cwiseProduct(contact_bool)).all()) {
       comm_interface_->PublishPlanComplete(
           plan_utime_, true,
           fmt::format("made contact: {}", cartesian_contact.transpose()));
