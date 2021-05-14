@@ -98,22 +98,19 @@ inline drake::math::RigidTransformd ToRigidTransform(
  */
 inline drake::math::RigidTransformd ToRigidTransform(
     const Eigen::Affine3d& xform_eigen) {
-  const Eigen::Matrix4d& mat {xform_eigen.matrix()};
-  return drake::math::RigidTransformd(mat);
+  return drake::math::RigidTransformd(xform_eigen.matrix());
 }
 
 /**
  * @brief Utility function that takes converts a pose
  * from `drake::math::RigidTransformd` to `Eigen::Affine3d`
- * which can be mapped to an std::array for efficient 
+ * which can be mapped to an std::array for efficient
  *
  * @param xform pose as `drake::math::RigidTransformd`
  * @return pose as `Eigen::Affine3d`
  */
 inline Eigen::Affine3d ToAffine3d(const drake::math::RigidTransformd& xform) {
-  Eigen::Affine3d result_affine3d {};
-  result_affine3d = xform.GetAsMatrix4();
-  return result_affine3d;
+  return Eigen::Affine3d(xform.GetAsMatrix4());
 }
 
 }  //  namespace utils
