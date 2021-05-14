@@ -129,6 +129,8 @@ drake::lcmt_iiwa_status ConvertToLcmStatus(
   // NOTE: We use the currently unused external joint torques array to send
   // cartesian contact info for testing purposes. This is a temporary workaround
   // until we update the iiwa_status lcm message include these fields
+  // TODO(@anyone): update iiwa_status lcm message and get rid of these
+  // workarounds
   robot_status.joint_torque_external =
       ArrayToVector(robot_state.cartesian_contact);
   robot_status.joint_torque_external.resize(num_joints, 0);
