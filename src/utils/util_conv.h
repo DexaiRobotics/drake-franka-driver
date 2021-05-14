@@ -71,6 +71,14 @@ drake::lcmt_iiwa_status EigenToLcmStatus(Eigen::VectorXd robot_state);
 franka::RobotState ConvertToCannonical(const franka::RobotState& robot_state,
                                        const Eigen::VectorXd& offsets);
 
+/**
+ * @brief Utility function that takes converts a pose
+ * from `bot_core::position_3d_t` to `drake::math::RigidTransformd`
+ * which is more convenient for calculations
+ *
+ * @param pos3dt pose as `bot_core::position_3d_t`
+ * @return pose as `drake::math::RigidTransformd`
+ */
 inline drake::math::RigidTransformd ToRigidTransform(
     const bot_core::position_3d_t& pos3dt) {
   return {Eigen::Quaterniond(pos3dt.rotation.w, pos3dt.rotation.x,
@@ -79,12 +87,29 @@ inline drake::math::RigidTransformd ToRigidTransform(
                           pos3dt.translation.z)};
 }
 
+/**
+ * @brief Utility function that takes converts a pose
+ * from `Eigen::Affine3d` to `drake::math::RigidTransformd`
+ * which is more convenient for calculations and is widely
+ * used in our code base
+ *
+ * @param xform_eigen pose as `Eigen::Affine3d`
+ * @return pose as `drake::math::RigidTransformd`
+ */
 inline drake::math::RigidTransformd ToRigidTransform(
     const Eigen::Affine3d& xform_eigen) {
   const Eigen::Matrix4d& mat {xform_eigen.matrix()};
   return drake::math::RigidTransformd(mat);
 }
 
+/**
+ * @brief Utility function that takes converts a pose
+ * from `drake::math::RigidTransformd` to `Eigen::Affine3d`
+ * which can be mapped to an std::array for efficient 
+ *
+ * @param xform pose as `drake::math::RigidTransformd`
+ * @return pose as `Eigen::Affine3d`
+ */
 inline Eigen::Affine3d ToAffine3d(const drake::math::RigidTransformd& xform) {
   Eigen::Affine3d result_affine3d {};
   result_affine3d = xform.GetAsMatrix4();
