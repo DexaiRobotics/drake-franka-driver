@@ -252,6 +252,32 @@ int FrankaPlanRunner::RunFranka() {
   status_ = RobotStatus::Running;  // init done, define robot as running
   bool status_has_changed {true};
 
+  auto get_lidding_tool_xform {[]() {
+    static const drake::math::RigidTransformd X_NEE_tc {
+        Eigen::Quaterniond(0.0, 0.0, 0.3826833568853094, 0.9238795637760319),
+        Eigen::Vector3d(-0.0022061735177850636, -0.0022061727968189344,
+                        0.09317)};
+
+    static const drake::math::RollPitchYawd rpy_tc_lidding_tool {
+        0, -0.734561058, 0};
+    static const drake::math::RigidTransformd X_tc_lidding_rot_only {
+        rpy_tc_lidding_tool.ToRotationMatrix()};
+    static const Eigen::Vector3d xyz_tc_lidding_tool {
+        0.0304 * 1e-3, 153.8186 * 1e-3, 170.3106 * 1e-3};
+    static const drake::math::RigidTransformd X_tc_lidding_trans_only {
+        xyz_tc_lidding_tool};
+    static const auto X_tc_lidding_tool {X_tc_lidding_rot_only
+                                         * X_tc_lidding_trans_only};
+    return X_NEE_tc * X_tc_lidding_tool;
+  }};
+  const auto X_NEE_liddingEE {get_lidding_tool_xform()};
+
+  std::array<double, 16> X_NEE_liddingEE_array {};
+  Eigen::Map<Eigen::Matrix4d> X_NEE_liddingEE_eigen(
+      X_NEE_liddingEE_array.data());
+  X_NEE_liddingEE_eigen = utils::ToAffine3d(X_NEE_liddingEE).matrix();
+  robot_->setEE(X_NEE_liddingEE_array);
+
   while (true) {  // main control loop
     // make sure robot is not user-stopped before doing anything else
     if (auto mode {GetRobotMode()};
