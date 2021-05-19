@@ -96,7 +96,10 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                      params_.lcm_plan_received_channel);
   dexai::log()->info("Plan complete channel:\t\t\t{}",
                      params_.lcm_plan_complete_channel);
-  dexai::log()->info("Status channel:\t\t\t{}", params_.lcm_status_channel);
+  dexai::log()->info("IIWA Status channel:\t\t\t{}",
+                     params_.lcm_iiwa_status_channel);
+  dexai::log()->info("Robot Status channel:\t\t\t{}",
+                     params_.lcm_robot_status_channel);
   dexai::log()->info("Driver status channel:\t\t\t{}",
                      lcm_driver_status_channel_);
   dexai::log()->info("Pause status channel:\t\t\t{}",
@@ -290,9 +293,9 @@ void CommunicationInterface::PublishRobotStatus() {
     franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
     robot_data_.has_robot_data = false;
     lock.unlock();
-    lcm_.publish(params_.lcm_status_channel, &franka_status);
+    lcm_.publish(params_.lcm_iiwa_status_channel, &franka_status);
 
-    lcm_.publish(params_.lcm_status_channel, &franka_status);
+    lcm_.publish(params_.lcm_robot_status_channel, &robot_status);
 
     PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
                          current_mode == franka::RobotMode::kUserStopped);
