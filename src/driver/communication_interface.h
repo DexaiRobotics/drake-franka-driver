@@ -61,6 +61,7 @@
 #include <robot_msgs/pause_cmd.hpp>
 #include <robot_msgs/plan_exec_opts_t.hpp>
 #include <robot_msgs/robot_spline_t.hpp>
+#include <robot_msgs/robot_status_t.hpp>
 
 #include "franka/robot_state.h"
 #include "utils/robot_parameters.h"

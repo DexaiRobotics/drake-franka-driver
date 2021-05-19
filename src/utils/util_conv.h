@@ -63,7 +63,10 @@ std::string RobotModeToString(franka::RobotMode mode);
 
 std::string RobotStatusToString(RobotStatus status);
 
-drake::lcmt_iiwa_status ConvertToLcmStatus(
+drake::lcmt_iiwa_status ConvertToLcmIiwaStatus(
+    const franka_driver::RobotData& robot_data);
+
+robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
     const franka_driver::RobotData& robot_data);
 
 drake::lcmt_iiwa_status EigenToLcmStatus(Eigen::VectorXd robot_state);
