@@ -151,6 +151,21 @@ robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
   status_msg.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
   status_msg.num_joints = num_joints;
 
+  // vectorss
+  status_msg.tau_J.resize(num_joints, 0);
+  status_msg.tau_J_d.resize(num_joints, 0);
+  status_msg.dtau_J.resize(num_joints, 0);
+  status_msg.q.resize(num_joints, 0);
+  status_msg.q_d.resize(num_joints, 0);
+  status_msg.dq.resize(num_joints, 0);
+  status_msg.dq_d.resize(num_joints, 0);
+  status_msg.ddq_d.resize(num_joints, 0);
+  status_msg.joint_contact.resize(num_joints, 0);
+  status_msg.joint_collision.resize(num_joints, 0);
+  status_msg.tau_ext_hat_filtered.resize(num_joints, 0);
+  status_msg.theta.resize(num_joints, 0);
+  status_msg.dtheta.resize(num_joints, 0);
+
   std::copy(robot_status.O_T_EE.begin(), robot_status.O_T_EE.end(),
             std::begin(status_msg.O_T_EE));
 
