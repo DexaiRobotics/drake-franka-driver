@@ -303,7 +303,7 @@ class FrankaPlanRunner {
                                                    100.0, 100.0, 100.0};
   const std::array<double, 6> kMediumForceThreshold {40.0, 40.0, 40.0,
                                                      50.0, 50.0, 50.0};
-  const std::array<double, 6> kLowForceThreshold {10.0, 10.0, 10.0, 7.0, 7.0, 7.0};
+  const std::array<double, 6> kLowForceThreshold {8.0, 8.0, 8.0, 7.0, 7.0, 7.0};
 
   std::array<double, 7> lower_torque_threshold_, upper_torque_threshold_;
   std::array<double, 6> lower_force_threshold_, upper_force_threshold_;
