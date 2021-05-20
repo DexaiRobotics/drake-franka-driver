@@ -151,7 +151,7 @@ robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
   status_msg.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
   status_msg.num_joints = num_joints;
 
-  // vectorss
+  // vectors
   status_msg.tau_J.resize(num_joints, 0);
   status_msg.tau_J_d.resize(num_joints, 0);
   status_msg.dtau_J.resize(num_joints, 0);
