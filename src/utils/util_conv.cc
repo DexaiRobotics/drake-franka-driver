@@ -259,34 +259,9 @@ robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
 
   status_msg.robot_mode = static_cast<int16_t>(robot_status.robot_mode);
 
-  // switch (robot_status.robot_mode) {
-  //   case franka::RobotMode::kOther:
-  //     status_msg.robot_mode = robot_msgs::robot_modes_t::kOther;
-  //     break;
-  //   case franka::RobotMode::kIdle:
-  //     status_msg.robot_mode = robot_msgs::robot_modes_t::kIdle;
-  //     break;
-  //   case franka::RobotMode::kMove:
-  //     status_msg.robot_mode = robot_msgs::robot_modes_t::kMove;
-  //     break;
-  //   case franka::RobotMode::kGuiding:
-  //     status_msg.robot_mode = robot_msgs::robot_modes_t::kGuiding;
-  //     break;
-  //   case franka::RobotMode::kReflex:
-  //     status_msg.robot_mode = robot_msgs::robot_modes_t::kReflex;
-  //     break;
-  //   case franka::RobotMode::kUserStopped:
-  //     status_msg.robot_mode = robot_msgs::robot_modes_t::kUserStopped;
-  //     break;
-  //   case franka::RobotMode::kAutomaticErrorRecovery:
-  //     status_msg.robot_mode =
-  //         robot_msgs::robot_modes_t::kAutomaticErrorRecovery;
-  //     break;
-  // }
-
-  status_msg.current_plan_utime = 0;
-  status_msg.plan_start_utime = 0;
-  status_msg.plan_exec_frac = 0;
+  status_msg.current_plan_utime = robot_data.current_plan_utime;
+  status_msg.plan_start_utime = robot_data.plan_start_utime;
+  status_msg.plan_exec_frac = robot_data.plan_completion_frac;
 
   return status_msg;
 }
