@@ -143,13 +143,13 @@ robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
   const auto& robot_status {robot_data.robot_state};
 
   robot_msgs::robot_status_t status_msg {};
-  int num_joints {static_cast<int>(robot_status.q.size())};
+  auto num_joints {robot_status.q.size()};
   struct timeval tv {};
   gettimeofday(&tv, NULL);
 
   // int64_t(1000.0 * robot_state.time.toMSec()) :
   status_msg.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
-  status_msg.num_joints = num_joints;
+  status_msg.num_joints = static_cast<int>(num_joints);
 
   // vectors
   status_msg.tau_J.resize(num_joints, 0);
