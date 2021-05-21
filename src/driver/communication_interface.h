@@ -168,8 +168,7 @@ class CommunicationInterface {
   // Set the robot state, blocking
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf,
-                    int64_t current_plan_utime,
-                    int64_t plan_start_utime = -1,
+                    int64_t current_plan_utime, int64_t plan_start_utime = -1,
                     double plan_completion_frac = 0.0);
 
   bool GetPauseStatus();

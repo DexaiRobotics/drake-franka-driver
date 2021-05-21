@@ -240,7 +240,7 @@ class FrankaPlanRunner {
   std::unique_ptr<franka::Robot> robot_ {};
   std::unique_ptr<CommunicationInterface> comm_interface_;
   std::unique_ptr<PPType> plan_;
-  int64_t plan_utime_ {-1}, plan_start_utime_{-1};
+  int64_t plan_utime_ {-1}, plan_start_utime_ {-1};
   int64_t plan_exec_opt_ {robot_msgs::plan_exec_opts_t::DEFAULT};
   Eigen::Vector3d contact_expected_ {Eigen::Vector3d::Zero()};
   std::unique_ptr<ConstraintSolver> constraint_solver_;
