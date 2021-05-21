@@ -98,7 +98,7 @@ std::string RobotStatusToString(RobotStatus status) {
   return status_string;
 }
 
-drake::lcmt_iiwa_status ConvertToLcmStatus(
+drake::lcmt_iiwa_status ConvertToLcmIiwaStatus(
     const franka_driver::RobotData&
         robot_data) {  // franka::RobotState& robot_state) {
   const auto& robot_state = robot_data.robot_state;
@@ -136,6 +136,136 @@ drake::lcmt_iiwa_status ConvertToLcmStatus(
   robot_status.joint_torque_external.resize(num_joints, 0);
 
   return robot_status;
+}
+
+robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
+    const franka_driver::RobotData& robot_data) {
+  const auto& robot_status {robot_data.robot_state};
+
+  robot_msgs::robot_status_t status_msg {};
+  auto num_joints {robot_status.q.size()};
+  struct timeval tv {};
+  gettimeofday(&tv, NULL);
+
+  // int64_t(1000.0 * robot_state.time.toMSec()) :
+  status_msg.utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
+  status_msg.num_joints = static_cast<int>(num_joints);
+
+  // vectors
+  status_msg.tau_J.resize(num_joints, 0);
+  status_msg.tau_J_d.resize(num_joints, 0);
+  status_msg.dtau_J.resize(num_joints, 0);
+  status_msg.q.resize(num_joints, 0);
+  status_msg.q_d.resize(num_joints, 0);
+  status_msg.dq.resize(num_joints, 0);
+  status_msg.dq_d.resize(num_joints, 0);
+  status_msg.ddq_d.resize(num_joints, 0);
+  status_msg.joint_contact.resize(num_joints, 0);
+  status_msg.joint_collision.resize(num_joints, 0);
+  status_msg.tau_ext_hat_filtered.resize(num_joints, 0);
+  status_msg.theta.resize(num_joints, 0);
+  status_msg.dtheta.resize(num_joints, 0);
+
+  std::copy(robot_status.O_T_EE.begin(), robot_status.O_T_EE.end(),
+            std::begin(status_msg.O_T_EE));
+
+  std::copy(robot_status.O_T_EE_d.begin(), robot_status.O_T_EE_d.end(),
+            std::begin(status_msg.O_T_EE_d));
+  std::copy(robot_status.F_T_EE.begin(), robot_status.F_T_EE.end(),
+            std::begin(status_msg.F_T_EE));
+  std::copy(robot_status.F_T_NE.begin(), robot_status.F_T_NE.end(),
+            std::begin(status_msg.F_T_NE));
+  std::copy(robot_status.NE_T_EE.begin(), robot_status.NE_T_EE.end(),
+            std::begin(status_msg.NE_T_EE));
+  std::copy(robot_status.EE_T_K.begin(), robot_status.EE_T_K.end(),
+            std::begin(status_msg.EE_T_K));
+  status_msg.m_ee = robot_status.m_ee;
+  std::copy(robot_status.I_ee.begin(), robot_status.I_ee.end(),
+            std::begin(status_msg.I_ee));
+  std::copy(robot_status.F_x_Cee.begin(), robot_status.F_x_Cee.end(),
+            std::begin(status_msg.F_x_Cee));
+  status_msg.m_load = robot_status.m_load;
+  std::copy(robot_status.I_load.begin(), robot_status.I_load.end(),
+            std::begin(status_msg.I_load));
+  std::copy(robot_status.F_x_Cload.begin(), robot_status.F_x_Cload.end(),
+            std::begin(status_msg.F_x_Cload));
+  status_msg.m_total = robot_status.m_total;
+  std::copy(robot_status.I_total.begin(), robot_status.I_total.end(),
+            std::begin(status_msg.I_total));
+  std::copy(robot_status.F_x_Ctotal.begin(), robot_status.F_x_Ctotal.end(),
+            std::begin(status_msg.F_x_Ctotal));
+  std::copy(robot_status.elbow.begin(), robot_status.elbow.end(),
+            std::begin(status_msg.elbow));
+  std::copy(robot_status.elbow_d.begin(), robot_status.elbow_d.end(),
+            std::begin(status_msg.elbow_d));
+  std::copy(robot_status.elbow_c.begin(), robot_status.elbow_c.end(),
+            std::begin(status_msg.elbow_c));
+  std::copy(robot_status.delbow_c.begin(), robot_status.delbow_c.end(),
+            std::begin(status_msg.delbow_c));
+  std::copy(robot_status.ddelbow_c.begin(), robot_status.ddelbow_c.end(),
+            std::begin(status_msg.ddelbow_c));
+  std::copy(robot_status.tau_J.begin(), robot_status.tau_J.end(),
+            std::begin(status_msg.tau_J));
+  std::copy(robot_status.tau_J_d.begin(), robot_status.tau_J_d.end(),
+            std::begin(status_msg.tau_J_d));
+  std::copy(robot_status.dtau_J.begin(), robot_status.dtau_J.end(),
+            std::begin(status_msg.dtau_J));
+  std::copy(robot_status.q.begin(), robot_status.q.end(),
+            std::begin(status_msg.q));
+  std::copy(robot_status.q_d.begin(), robot_status.q_d.end(),
+            std::begin(status_msg.q_d));
+  std::copy(robot_status.dq.begin(), robot_status.dq.end(),
+            std::begin(status_msg.dq));
+  std::copy(robot_status.dq_d.begin(), robot_status.dq_d.end(),
+            std::begin(status_msg.dq_d));
+  std::copy(robot_status.ddq_d.begin(), robot_status.ddq_d.end(),
+            std::begin(status_msg.ddq_d));
+  std::copy(robot_status.joint_contact.begin(),
+            robot_status.joint_contact.end(),
+            std::begin(status_msg.joint_contact));
+  std::copy(robot_status.cartesian_contact.begin(),
+            robot_status.cartesian_contact.end(),
+            std::begin(status_msg.cartesian_contact));
+  std::copy(robot_status.joint_collision.begin(),
+            robot_status.joint_collision.end(),
+            std::begin(status_msg.joint_collision));
+  std::copy(robot_status.cartesian_collision.begin(),
+            robot_status.cartesian_collision.end(),
+            std::begin(status_msg.cartesian_collision));
+  std::copy(robot_status.tau_ext_hat_filtered.begin(),
+            robot_status.tau_ext_hat_filtered.end(),
+            std::begin(status_msg.tau_ext_hat_filtered));
+  std::copy(robot_status.O_F_ext_hat_K.begin(),
+            robot_status.O_F_ext_hat_K.end(),
+            std::begin(status_msg.O_F_ext_hat_K));
+  std::copy(robot_status.K_F_ext_hat_K.begin(),
+            robot_status.K_F_ext_hat_K.end(),
+            std::begin(status_msg.K_F_ext_hat_K));
+  std::copy(robot_status.O_dP_EE_d.begin(), robot_status.O_dP_EE_d.end(),
+            std::begin(status_msg.O_dP_EE_d));
+  std::copy(robot_status.O_T_EE_c.begin(), robot_status.O_T_EE_c.end(),
+            std::begin(status_msg.O_T_EE_c));
+  std::copy(robot_status.O_dP_EE_c.begin(), robot_status.O_dP_EE_c.end(),
+            std::begin(status_msg.O_dP_EE_c));
+  std::copy(robot_status.O_ddP_EE_c.begin(), robot_status.O_ddP_EE_c.end(),
+            std::begin(status_msg.O_ddP_EE_c));
+  std::copy(robot_status.theta.begin(), robot_status.theta.end(),
+            std::begin(status_msg.theta));
+  std::copy(robot_status.dtheta.begin(), robot_status.dtheta.end(),
+            std::begin(status_msg.dtheta));
+
+  status_msg.control_command_success_rate =
+      status_msg.control_command_success_rate;
+
+  // casting from franka::RobotMode an enum class defined within libfranka
+  // to int16_t for lcm
+  status_msg.robot_mode = static_cast<int16_t>(robot_status.robot_mode);
+
+  status_msg.current_plan_utime = robot_data.current_plan_utime;
+  status_msg.plan_start_utime = robot_data.plan_start_utime;
+  status_msg.plan_exec_frac = robot_data.plan_completion_frac;
+
+  return status_msg;
 }
 
 drake::lcmt_iiwa_status EigenToLcmStatus(Eigen::VectorXd robot_state) {

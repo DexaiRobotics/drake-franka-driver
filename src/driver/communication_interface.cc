@@ -54,7 +54,7 @@
 #include "robot_msgs/pause_cmd.hpp"          // for pause_cmd
 #include "robot_msgs/trigger_t.hpp"          // for trigger_t
 #include "utils/polynomial_encode_decode.h"  // for decodePiecewisePolynomial
-#include "utils/util_conv.h"                 // ConvertToLcmStatus
+#include "utils/util_conv.h"                 // ConvertToLcmIiwaStatus
 #include "utils/util_io.h"                   // for get_current_utime
 
 // using namespace franka_driver;
@@ -96,7 +96,10 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                      params_.lcm_plan_received_channel);
   dexai::log()->info("Plan complete channel:\t\t\t{}",
                      params_.lcm_plan_complete_channel);
-  dexai::log()->info("Status channel:\t\t\t{}", params_.lcm_status_channel);
+  dexai::log()->info("IIWA Status channel:\t\t\t{}",
+                     params_.lcm_iiwa_status_channel);
+  dexai::log()->info("Robot Status channel:\t\t\t{}",
+                     params_.lcm_robot_status_channel);
   dexai::log()->info("Driver status channel:\t\t\t{}",
                      lcm_driver_status_channel_);
   dexai::log()->info("Pause status channel:\t\t\t{}",
@@ -198,11 +201,15 @@ franka::RobotState CommunicationInterface::GetRobotState() {
 
 void CommunicationInterface::SetRobotData(
     const franka::RobotState& robot_state,
-    const Eigen::VectorXd& robot_plan_next_conf) {
+    const Eigen::VectorXd& robot_plan_next_conf, int64_t current_plan_utime,
+    int64_t plan_start_utime, double plan_completion_frac) {
   std::scoped_lock<std::mutex> lock {robot_data_mutex_};
   franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
+  robot_data_.current_plan_utime = current_plan_utime;
+  robot_data_.plan_start_utime = plan_start_utime;
+  robot_data_.plan_completion_frac = plan_completion_frac;
   robot_data_.has_robot_data = true;
   // when running on the real robot, the robot_state passed into this function
   // is retrieved from libfranka and gives us accurate information about the
@@ -281,12 +288,18 @@ void CommunicationInterface::PublishRobotStatus() {
   if (std::unique_lock<std::mutex> lock {robot_data_mutex_};
       robot_data_.has_robot_data) {
     drake::lcmt_iiwa_status franka_status {
-        utils::ConvertToLcmStatus(robot_data_)};
+        utils::ConvertToLcmIiwaStatus(robot_data_)};
+
+    robot_msgs::robot_status_t robot_status {
+        utils::ConvertToRobotStatusLcmMsg(robot_data_)};
+
     // publish data over lcm
     franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
     robot_data_.has_robot_data = false;
     lock.unlock();
-    lcm_.publish(params_.lcm_status_channel, &franka_status);
+    lcm_.publish(params_.lcm_iiwa_status_channel, &franka_status);
+
+    lcm_.publish(params_.lcm_robot_status_channel, &robot_status);
 
     PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
                          current_mode == franka::RobotMode::kUserStopped);
@@ -460,7 +473,8 @@ void CommunicationInterface::HandlePlan(
         piecewise_polynomial.value(piecewise_polynomial.start_time())};
 
     // TODO(@anyone): move this check to franka plan runner
-    Eigen::VectorXd q_eigen {utils::v_to_e(utils::ArrayToVector(this->GetRobotState().q))};
+    Eigen::VectorXd q_eigen {
+        utils::v_to_e(utils::ArrayToVector(this->GetRobotState().q))};
 
     double max_angular_distance {
         utils::max_angular_distance(commanded_start, q_eigen)};

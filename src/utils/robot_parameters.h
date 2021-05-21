@@ -182,7 +182,8 @@ class RobotParameters {
   bool simulated;
 
   // Robot Control Parameters - generated based on hostname
-  std::string lcm_status_channel;
+  std::string lcm_iiwa_status_channel;
+  std::string lcm_robot_status_channel;
   std::string lcm_plan_channel;
   std::string lcm_plan_received_channel;
   std::string lcm_plan_complete_channel;

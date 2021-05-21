@@ -61,6 +61,7 @@
 #include <robot_msgs/pause_cmd.hpp>
 #include <robot_msgs/plan_exec_opts_t.hpp>
 #include <robot_msgs/robot_spline_t.hpp>
+#include <robot_msgs/robot_status_t.hpp>
 
 #include "franka/robot_state.h"
 #include "utils/robot_parameters.h"
@@ -77,6 +78,9 @@ namespace franka_driver {
 struct RobotData {
   std::atomic<bool> has_robot_data;
   franka::RobotState robot_state;
+  int64_t current_plan_utime {};
+  int64_t plan_start_utime {};
+  double plan_completion_frac;
   Eigen::VectorXd robot_plan_next_conf;
 };
 
@@ -163,7 +167,9 @@ class CommunicationInterface {
 
   // Set the robot state, blocking
   void SetRobotData(const franka::RobotState& robot_state,
-                    const Eigen::VectorXd& robot_plan_next_conf);
+                    const Eigen::VectorXd& robot_plan_next_conf,
+                    int64_t current_plan_utime, int64_t plan_start_utime = -1,
+                    double plan_completion_frac = 0.0);
 
   bool GetPauseStatus();
   void SetPauseStatus(bool paused);

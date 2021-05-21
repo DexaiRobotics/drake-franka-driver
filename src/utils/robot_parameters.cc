@@ -132,7 +132,8 @@ bool RobotParameters::GenerateParametersBasedOnRobotName(
   }
 
   // update LCM Channels
-  lcm_status_channel = new_robot_name + "_STATUS";
+  lcm_iiwa_status_channel = new_robot_name + "_STATUS";
+  lcm_robot_status_channel = new_robot_name + "_ROBOT_STATUS";
   lcm_plan_channel = new_robot_name + "_PLAN";
   lcm_plan_received_channel = new_robot_name + "_PLAN_RECEIVED";
   lcm_plan_complete_channel = new_robot_name + "_PLAN_COMPLETE";
@@ -252,7 +253,8 @@ RobotParameters loadYamlParameters(
     }
 
     // Robot Control RobotParameters
-    p.lcm_status_channel = p.robot_name + "_STATUS";
+    p.lcm_iiwa_status_channel = p.robot_name + "_STATUS";
+    p.lcm_robot_status_channel = p.robot_name + "_ROBOT_STATUS";
     p.lcm_plan_channel = p.robot_name + "_PLAN";
     p.lcm_plan_received_channel = p.robot_name + "_PLAN_RECEIVED";
     p.lcm_plan_complete_channel = p.robot_name + "_PLAN_COMPLETE";

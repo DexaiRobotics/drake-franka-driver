@@ -337,6 +337,7 @@ int FrankaPlanRunner::RunFranka() {
         // reset
         time_elapsed_us_.clear();
         k_jc_ramp_ = 0.0;
+        plan_start_utime_ = utils::get_current_utime();
 
         // define callback for the torque control loop
         try {
@@ -392,7 +393,8 @@ int FrankaPlanRunner::RunFranka() {
       auto robot_state {robot_->readOnce()};
       auto cannonical_robot_state {
           utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
-      comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_);
+      comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
+                                    plan_utime_, plan_start_utime_);
     }
     // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
     std::this_thread::sleep_for(std::chrono::milliseconds(
@@ -435,8 +437,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   SetCollisionBehaviorSafetyOn();
   status_ = RobotStatus::Running;
   if (plan_) {
-    plan_.reset();
-    plan_utime_ = -1;  // reset plan utime to -1
+    ResetPlan();
   }
   comm_interface_->PublishDriverStatus(
       true, "successfully completed automatic error recovery");
@@ -487,7 +488,8 @@ int FrankaPlanRunner::RunSim() {
         callback = 0;  // finished, and current active plan_ released already
       }
     } else {  // idle or impedance control, manually update and publish
-      comm_interface_->SetRobotData(robot_state, next_conf);
+      comm_interface_->SetRobotData(robot_state, next_conf, plan_utime_,
+                                    plan_start_utime_);
     }
 
     if ((status_ == RobotStatus::Running
@@ -701,8 +703,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
         comm_interface_->PublishPlanComplete(
             plan_utime_, false,
             fmt::format("plan canceled upon request from source: {}", source));
-        plan_.reset();
-        plan_utime_ = -1;  // reset plan to -1
+        ResetPlan();
       }
       comm_interface_->ClearCancelPlanRequest();
       // check if robot is paused by other sources, or only pausing because the
@@ -755,6 +756,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
     std::tie(plan_, plan_utime_, plan_exec_opt_, contact_expected_) =
         comm_interface_->PopNewPlan();
+    plan_start_utime_ = utils::get_current_utime();
     dexai::log()->info(
         "JointPositionCallback: popped new plan {} from buffer, "
         "starting initial timestep...",
@@ -784,8 +786,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           max_ang_distance, params_.kMediumJointDistance);
       comm_interface_->PublishPlanComplete(
           plan_utime_, false, "discarded due to mismatched start conf");
-      plan_.reset();
-      plan_utime_ = -1;  // reset plan to -1
+      ResetPlan();
       return franka::MotionFinished(franka::JointPositions(robot_state.q));
     } else if (max_ang_distance > params_.kTightJointDistance) {
       dexai::log()->warn(
@@ -803,17 +804,26 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: No plan exists (anymore), exiting "
           "controller...");
     }
-    comm_interface_->SetRobotData(cannonical_robot_state, start_conf_franka_);
+    comm_interface_->SetRobotData(cannonical_robot_state, start_conf_franka_,
+                                  plan_utime_, plan_start_utime_);
     return franka::MotionFinished(output_to_franka);
   }
 
   // read out plan for current franka time from plan:
   next_conf_plan_ = plan_->value(franka_time_);
+
+  const auto plan_end_time = plan_->end_time();
+  // plan_completion_frac is in [0, 1] despite possibly being overtime
+  const double plan_completion_frac {
+      std::min(1.0, franka_time_ / plan_end_time)};
+
   // async in another thread, nonblocking
   std::thread {[&]() {
-    comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_);
+    comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
+                                  plan_utime_, plan_start_utime_,
+                                  plan_completion_frac);
   }}.detach();
-  const auto plan_end_time = plan_->end_time();
+
   Eigen::VectorXd next_conf_combined(7);  // derive the next conf for return
   {
     // We don't track the last callback and delta from it
@@ -825,9 +835,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     Eigen::VectorXd next_conf_franka {start_conf_franka_ + delta_conf_plan};
 
     // Expotentially weigh the next plan and franka confs for faster convergence
-    // plan_completion_frac is in [0, 1] despite possibly being overtime
-    const double plan_completion_frac {
-        std::min(1.0, franka_time_ / plan_end_time)};
     // weight term goes from 1 to nearly 0 as frac goes from 0 to 1
     const double weight_e {std::exp(-15 * plan_completion_frac)};
     next_conf_combined =
@@ -866,8 +873,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       comm_interface_->PublishPlanComplete(
           plan_utime_, true,
           fmt::format("made contact: {}", cartesian_contact.transpose()));
-      plan_.reset();     // reset unique ptr
-      plan_utime_ = -1;  // reset plan to -1
+      ResetPlan();
       return franka::MotionFinished(output_to_franka);
     }
   }
@@ -902,8 +908,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, overtime, plan_end_time, franka_time_);
       comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
-      plan_.reset();       // reset unique ptr
-      plan_utime_ = -1;    // reset plan to -1
+      ResetPlan();
       dexai::log()->info(  // for control exception
           "Joint speeds at convergence:\n\tdq:\t{}\n\texcess:\t{}",
           dq_abs.transpose(),
@@ -935,8 +940,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
             plan_utime_, overtime);
         comm_interface_->PublishPlanComplete(
             plan_utime_, true, "position converged with small residual speed");
-        plan_.reset();     // reset unique ptr
-        plan_utime_ = -1;  // reset plan to -1
+        ResetPlan();
         return franka::MotionFinished(output_to_franka);
       }
       // position hasn't converged, truly diverged, unsuccessful
@@ -945,8 +949,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "exceeded, still divergent, aborted and unsuccessful",
           plan_utime_, overtime);
       comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
-      plan_.reset();     // reset unique ptr
-      plan_utime_ = -1;  // reset plan to -1
+      ResetPlan();
       return franka::MotionFinished(output_to_franka);
     }
 
@@ -1070,6 +1073,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
 
   franka::Torques ret_torques {tau_d_array};
   if (comm_interface_->CompliantPushStopRequested()) {
+    ResetPlan();
     log()->info("CompliantPush STOP requested.");
     comm_interface_->ClearCompliantPushStopRequest();
     comm_interface_->SetCompliantPushActive(false);
@@ -1085,7 +1089,8 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   if (time_elapsed_us_.size() > 20) {
     time_elapsed_us_.pop_front();
   }
-  comm_interface_->SetRobotData(robot_state, tau_d);
+  comm_interface_->SetRobotData(robot_state, tau_d, plan_utime_,
+                                plan_start_utime_);
   return ret_torques;
 }
 
