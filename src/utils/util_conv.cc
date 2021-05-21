@@ -257,6 +257,8 @@ robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
   status_msg.control_command_success_rate =
       status_msg.control_command_success_rate;
 
+  // casting from franka::RobotMode an enum class defined within libfranka
+  // to int16_t for lcm
   status_msg.robot_mode = static_cast<int16_t>(robot_status.robot_mode);
 
   status_msg.current_plan_utime = robot_data.current_plan_utime;
