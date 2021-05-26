@@ -417,7 +417,6 @@ bool CommunicationInterface::CanReceiveCommands(
       return false;
     default:
       dexai::log()->error("CanReceiveCommands: Mode unknown!");
-      PublishDriverStatus(false, "Franka controller mode unknown");
       return false;
   }
 }
@@ -448,6 +447,8 @@ void CommunicationInterface::HandlePlan(
     if (ModeIsValid(current_mode)) {
       break;
     }
+    PublishDriverStatus(false,
+                        "Franka controller is reporting an unknown mode");
     log()->error("HandlePlan: attempt {}/{} to read control mode from Franka",
                  i + 1, max_mode_check_attempts);
     current_mode = GetRobotMode();
