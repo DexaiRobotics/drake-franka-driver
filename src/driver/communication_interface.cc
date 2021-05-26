@@ -396,6 +396,7 @@ bool CommunicationInterface::CanReceiveCommands(
       return false;
     default:
       dexai::log()->error("CanReceiveCommands: Mode unknown!");
+      PublishDriverStatus(false, "Franka controller mode unknown");
       return false;
   }
 }

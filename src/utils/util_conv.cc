@@ -69,6 +69,8 @@ std::string RobotModeToString(franka::RobotMode mode) {
     case franka::RobotMode::kAutomaticErrorRecovery:
       mode_string = "Automatic Error Recovery";
       break;
+    default:
+      mode_string = "Unknown";
   }
   return mode_string;
 }
