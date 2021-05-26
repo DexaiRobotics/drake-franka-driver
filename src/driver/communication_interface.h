@@ -191,6 +191,10 @@ class CommunicationInterface {
     return lcm_brakes_locked_channel_;
   }
 
+  /// check if robot mode corresponds to one of the known control modes from the
+  /// controller, return false if the mode is garbage
+  static bool ModeIsValid(const franka::RobotMode& current_mode);
+
   /// check if robot is in a mode that can receive commands, i.e. not user
   /// stopped or error recovery
   static bool CanReceiveCommands(const franka::RobotMode& current_mode);

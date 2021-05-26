@@ -369,6 +369,27 @@ franka::RobotMode CommunicationInterface::GetRobotMode() {
   return robot_data_.robot_state.robot_mode;
 }
 
+bool CommunicationInterface::ModeIsValid(
+    const franka::RobotMode& current_mode) {
+  switch (current_mode) {
+    case franka::RobotMode::kOther:
+      return true;
+    case franka::RobotMode::kIdle:
+      return true;
+    case franka::RobotMode::kMove:
+      return true;
+    case franka::RobotMode::kGuiding:
+      return true;
+    case franka::RobotMode::kReflex:
+      return true;
+    case franka::RobotMode::kUserStopped:
+      return true;
+    case franka::RobotMode::kAutomaticErrorRecovery:
+      return true;
+  }
+  return false;
+}
+
 bool CommunicationInterface::CanReceiveCommands(
     const franka::RobotMode& current_mode) {
   switch (current_mode) {
@@ -419,9 +440,21 @@ void CommunicationInterface::HandlePlan(
   dexai::log()->info("CommInterface:HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
+  // occasionally the controller will return garbage instead of a valid mode
+  // reading. try querying the mode a few times before giving up
+  auto current_mode {GetRobotMode()};
+  size_t max_mode_check_attempts {5};
+  for (size_t i {}; i < max_mode_check_attempts; i++) {
+    if (ModeIsValid(current_mode)) {
+      break;
+    }
+    log()->error("HandlePlan: attempt {}/{} to read control mode from Franka",
+                 i + 1, max_mode_check_attempts);
+    current_mode = GetRobotMode();
+  }
+
   // check if in proper mode to receive commands
-  if (const auto current_mode {GetRobotMode()};
-      !CanReceiveCommands(current_mode)) {
+  if (!CanReceiveCommands(current_mode)) {
     const auto err_msg {fmt::format(
         "Discarding plan with utime: {}, robot is in wrong mode: {}!",
         robot_spline->utime, utils::RobotModeToString(current_mode))};
