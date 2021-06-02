@@ -387,6 +387,7 @@ bool CommunicationInterface::ModeIsValid(
     case franka::RobotMode::kAutomaticErrorRecovery:
       return true;
   }
+  log()->error("ModeIsValid: got invalid mode: {}", current_mode);
   return false;
 }
 
