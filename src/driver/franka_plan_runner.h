@@ -84,6 +84,10 @@ class FrankaPlanRunner {
   // collision behaviour is set by SetCollisionBehaviorSafetyOn
   // and SetCollisionBehaviorSafetyOff
   void SetDefaultBehaviorForInit() {
+    if (is_sim_) {
+      return;
+    }
+
     robot_->setCollisionBehavior(
         // lower_torque_thresholds_acceleration
         {20, 20, 20, 20, 10, 10, 10},
@@ -121,6 +125,10 @@ class FrankaPlanRunner {
   // TODO(@syler): can we just set the lower threshold to something reasonable
   // and get away with only increasing the upper threshold?
   void SetCollisionBehaviorSafetyOn() {
+    if (is_sim_) {
+      return;
+    }
+
     if (const auto mode {GetRobotMode()}; mode == franka::RobotMode::kMove) {
       throw std::runtime_error("robot is in mode: "
                                + utils::RobotModeToString(mode)
@@ -143,6 +151,10 @@ class FrankaPlanRunner {
   }
 
   void SetCollisionBehaviorSafetyOff() {
+    if (is_sim_) {
+      return;
+    }
+
     if (const auto mode {GetRobotMode()}; mode == franka::RobotMode::kMove) {
       throw std::runtime_error("robot is in mode: "
                                + utils::RobotModeToString(mode)
