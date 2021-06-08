@@ -544,7 +544,7 @@ int FrankaPlanRunner::RunSim() {
 bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
   // TODO(@anyone): get limits from urdf (instead of parameter file)
   // TODO(@anyone): use eigen operator to do these operations
-  static const double eps {1e-4};  // encoder/IK resolution
+  static const double eps {params_.kTightJointDistance / 10};
   bool within_limits {true};
   for (int j {}; j < conf.size(); j++) {
     if (conf(j) > joint_limits_(j, 1) - eps) {
