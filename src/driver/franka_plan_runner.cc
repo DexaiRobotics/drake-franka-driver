@@ -296,6 +296,8 @@ int FrankaPlanRunner::RunFranka() {
           // Set limit_rate = true (default)
           // controller_mode = ControllerMode::kJointImpedance (default)
           // cutoff_frequency = 30 Hz (default is 100 Hz)
+          // Note that at the end of JointPositionCallback we also apply a
+          // 30 Hz low-pass filter.
           robot_->control(
               std::bind(&FrankaPlanRunner::JointPositionCallback, this,
                         std::placeholders::_1, std::placeholders::_2),
