@@ -53,8 +53,9 @@
 
 #include <drake/lcmt_iiwa_status.hpp>
 
-#include "franka/exception.h"  // for Exception, ControlException
-#include "franka/robot.h"      // for Robot
+#include "franka/control_types.h"  // for ControllerMode
+#include "franka/exception.h"      // for Exception, ControlException
+#include "franka/robot.h"          // for Robot+
 #include "utils/util_math.h"
 
 using franka_driver::FrankaPlanRunner;
@@ -154,7 +155,6 @@ int FrankaPlanRunner::RunFranka() {
     // and if it fails, keep trying instead of exiting the program
     bool connection_established {};
     do {  // do-while(!connection_established) loop, execute once first
-
       // if we have not successfully established a network connection to the
       // Franka, try to connect
       if (!robot_) {
@@ -293,9 +293,13 @@ int FrankaPlanRunner::RunFranka() {
         status_has_changed = true;
         try {  // Use either joint position or impedance control callback here
           // blocking
-          robot_->control(std::bind(&FrankaPlanRunner::JointPositionCallback,
-                                    this, std::placeholders::_1,
-                                    std::placeholders::_2));
+          // Set limit_rate = true (default)
+          // controller_mode = ControllerMode::kJointImpedance (default)
+          // cutoff_frequency = 30 Hz (default is 100 Hz)
+          robot_->control(
+              std::bind(&FrankaPlanRunner::JointPositionCallback, this,
+                        std::placeholders::_1, std::placeholders::_2),
+              franka::ControllerMode::kJointImpedance, true, 30);
         } catch (const franka::ControlException& ce) {
           status_has_changed = true;
           if (plan_) {  // broadcast exception details over LCM
