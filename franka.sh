@@ -42,6 +42,23 @@ fi
 # if another driver instance is still somehow running, kill it silently
 pkill -f franka_driver > /dev/null 2>&1
 
+# do not use $HOSTNAME as it is a variable that may have been set in a
+# different environment or overridden
+hostname_first_letter="$(echo $(hostname) | head -c 1)"
+robot_name="FRANKA_${hostname_first_letter^}"
+status_channel="${robot_name}_STATUS"
+echo "Using hostname: $(hostname) to choose Franka name: ${robot_name}"
+
+# check if there is already a driver running. at the start of this script 
+# we try to kill any existing instances, but if there are multiple containers 
+# running on the same machine, or have an instance running on another 
+# networked machine, we don't want to duplicate
+if lcm-echo -n 1 -v 0 --timeout 0.1 ${status_channel}; then
+    echo "A Franka driver instance is already running and publishing to ${status_channel}!"
+    echo "Check other containers and networked machines to find out the source."
+    exit 1
+fi
+
 if ./build/franka_driver $config $@; then
     echo "franka_driver started successfully"
 else
