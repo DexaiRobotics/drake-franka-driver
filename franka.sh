@@ -59,10 +59,6 @@ if lcm-echo -n 1 -v 0 --timeout 0.1 ${status_channel}; then
     exit 1
 fi
 
-if ./build/franka_driver $config $@; then
-    echo "franka_driver started successfully"
-else
-    echo "franka_driver failed to start"
-fi
+./build/franka_driver $config $@
 
 popd
