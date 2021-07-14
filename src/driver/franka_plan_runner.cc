@@ -520,7 +520,7 @@ int FrankaPlanRunner::RunSim() {
         comm_interface_->SetCompliantPushActive(false);
         callback = 0;
       } else {
-        dexai::log()->debug("Waiing for stop request for impedance control...");
+        dexai::log()->debug("Waiting for stop request for impedance control...");
       }
     }
 
@@ -819,6 +819,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   }
 
   // read out plan for current franka time from plan:
+  dexai::log()->info("franka time is {}", franka_time_);
   next_conf_plan_ = plan_->value(franka_time_);
 
   const auto plan_end_time = plan_->end_time();
