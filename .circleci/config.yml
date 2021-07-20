@@ -5,7 +5,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: dexai2/drake-torch:cpu-nightly-ros-latest
+      - image: dexai2/drake-torch:cpu-stable-ros-latest
 
     steps:
       - run:
