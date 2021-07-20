@@ -130,7 +130,8 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     // cannot call {} because no {GeometrySet} constructor is available
     drake::geometry::GeometrySet set_robot(
         mb_plant.CollectRegisteredGeometries(robot_bodies));
-    scene_graph.ExcludeCollisionsWithin(set_robot);
+    scene_graph.collision_filter_manager().Apply(
+        drake::geometry::CollisionFilterDeclaration().ExcludeWithin(set_robot));
   }
 
   // allow for visualization
