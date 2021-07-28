@@ -242,6 +242,8 @@ class FrankaPlanRunner {
     plan_start_utime_ = -1;
   }
 
+  bool IsContinuous(std::unique_ptr<PPType>& plan);
+
  private:
   const int dof_;          // degrees of freedom of franka
   const bool safety_off_;  // torque and force limits to max
@@ -305,6 +307,8 @@ class FrankaPlanRunner {
   Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
+  double allowable_max_angle_error_ =
+      0.001;  // empirically proven, increased to work w/ sim robot
 
   // Collision torque thresholds for each joint in [Nm].
   const std::array<double, 7> kHighTorqueThreshold {100.0, 100.0, 100.0, 100.0,

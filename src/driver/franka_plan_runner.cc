@@ -558,6 +558,23 @@ bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
   return within_limits;
 }
 
+bool FrankaPlanRunner::IsContinuous(std::unique_ptr<PPType>& plan) {
+  // checks if new plan is continuous with current plan
+  // but if there is no current plan, return true immediately
+  if (!plan_) {
+    return true;
+  }
+
+  const Eigen::VectorXd pos_tolerance =
+      (params_.robot_high_joint_limits - params_.robot_low_joint_limits) * 1e-5;
+  const Eigen::VectorXd vel_tolerance = (params_.robot_max_velocities) * 1e-5;
+  const Eigen::VectorXd acc_tolerance =
+      (params_.robot_max_accelerations) * 1e-5;
+
+  return utils::is_continuous(plan_, plan, franka_time_, pos_tolerance,
+                              vel_tolerance, acc_tolerance);
+}
+
 /// Calculate the time to advance while pausing or unpausing
 /// Inputs to method have seconds as their unit.
 /// Algorithm: Uses a logistic growth function:
@@ -763,45 +780,64 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
-    std::tie(plan_, plan_utime_, plan_exec_opt_, contact_expected_) =
-        comm_interface_->PopNewPlan();
-    plan_start_utime_ = utils::get_current_utime();
-    dexai::log()->info(
-        "JointPositionCallback: popped new plan {} from buffer, "
-        "starting initial timestep...",
-        plan_utime_);
-    // first time step of plan, reset time and start conf
-    franka_time_ = 0.0;
-    start_conf_plan_ = plan_->value(franka_time_);
 
-    if (!LimitJoints(start_conf_plan_)) {
-      dexai::log()->warn(
-          "JointPositionCallback: plan {} at franka_time_: {} seconds "
-          "is exceeding the joint limits!",
-          plan_utime_, franka_time_);
+    auto [new_plan, new_plan_utime, new_plan_exec_opt,
+          new_plan_contact_expected] {comm_interface_->PopNewPlan()};
+
+    bool continue_from_current_plan {plan_ != nullptr};
+    if (!continue_from_current_plan || IsContinuous(new_plan)) {
+      plan_ = std::move(new_plan);
+      plan_utime_ = new_plan_utime;
+      plan_exec_opt_ = new_plan_exec_opt;
+      contact_expected_ = new_plan_contact_expected;
+
+      plan_start_utime_ = utils::get_current_utime();
+
+      dexai::log()->info(
+          "JointPositionCallback: popped new plan {} from buffer, "
+          "starting initial timestep...",
+          plan_utime_);
+
+      if (!continue_from_current_plan) {
+        // first time step of plan, reset time and start conf
+        franka_time_ = 0.0;
+      }
+
+      start_conf_plan_ = plan_->value(franka_time_);
+
+      if (!LimitJoints(start_conf_plan_)) {
+        dexai::log()->warn(
+            "JointPositionCallback: plan {} at franka_time_: {} seconds "
+            "is exceeding the joint limits!",
+            plan_utime_, franka_time_);
+      }
+
+      // the current (desired) position of franka is the starting position:
+      start_conf_franka_ = current_conf_franka;
+      end_conf_plan_ = plan_->value(plan_->end_time());
     }
 
-    // the current (desired) position of franka is the starting position:
-    start_conf_franka_ = current_conf_franka;
-    end_conf_plan_ = plan_->value(plan_->end_time());
-
-    // Maximum change in joint angle between two confs
-    auto max_ang_distance =
-        utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
-    if (max_ang_distance > params_.kMediumJointDistance) {
-      dexai::log()->error(
-          "JointPositionCallback: Discarding plan, mismatched start position."
-          " Max distance: {} > {}",
-          max_ang_distance, params_.kMediumJointDistance);
-      comm_interface_->PublishPlanComplete(
-          plan_utime_, false, "discarded due to mismatched start conf");
-      ResetPlan();
-      return franka::MotionFinished(franka::JointPositions(robot_state.q));
-    } else if (max_ang_distance > params_.kTightJointDistance) {
-      dexai::log()->warn(
-          "JointPositionCallback: max angular distance between franka and "
-          "start of plan is larger than 'kTightJointDistance': {} > {}",
-          max_ang_distance, params_.kTightJointDistance);
+    // No need to check for joint distance if continuous
+    // from current active plan
+    if (!continue_from_current_plan) {
+      // Maximum change in joint angle between two confs
+      auto max_ang_distance =
+          utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
+      if (max_ang_distance > params_.kMediumJointDistance) {
+        dexai::log()->error(
+            "JointPositionCallback: Discarding plan, mismatched start position."
+            " Max distance: {} > {}",
+            max_ang_distance, params_.kMediumJointDistance);
+        comm_interface_->PublishPlanComplete(
+            plan_utime_, false, "discarded due to mismatched start conf");
+        ResetPlan();
+        return franka::MotionFinished(franka::JointPositions(robot_state.q));
+      } else if (max_ang_distance > params_.kTightJointDistance) {
+        dexai::log()->warn(
+            "JointPositionCallback: max angular distance between franka and "
+            "start of plan is larger than 'kTightJointDistance': {} > {}",
+            max_ang_distance, params_.kTightJointDistance);
+      }
     }
   }
 
