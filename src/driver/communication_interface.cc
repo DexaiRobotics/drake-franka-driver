@@ -175,7 +175,7 @@ CommunicationInterface::PopNewPlan() {
                     new_plan_buffer_.utime));
   }
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
-  // std::move nullifies the unique ptr robot_plan_.plan_
+  // std::move nullifies the unique ptr new_plan_buffer_.plan
   return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime,
           new_plan_buffer_.exec_opt, new_plan_buffer_.contact_expected};
 }
@@ -189,7 +189,7 @@ CommunicationInterface::PopNewCartesianPlan() {
                     new_plan_buffer_.utime));
   }
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
-  // std::move nullifies the unique ptr robot_plan_.plan_
+  // std::move nullifies the unique ptr new_plan_buffer_.cartesian_plan
   return {std::move(new_plan_buffer_.cartesian_plan), new_plan_buffer_.utime,
           new_plan_buffer_.exec_opt};
 }
