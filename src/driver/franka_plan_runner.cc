@@ -400,7 +400,8 @@ int FrankaPlanRunner::RunFranka() {
       auto cannonical_robot_state {
           utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
       comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
-                                    plan_utime_, plan_start_utime_);
+                                    franka_time_, plan_utime_,
+                                    plan_start_utime_);
     }
     // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
     std::this_thread::sleep_for(std::chrono::milliseconds(
@@ -496,8 +497,8 @@ int FrankaPlanRunner::RunSim() {
         callback = 0;  // finished, and current active plan_ released already
       }
     } else {  // idle or impedance control, manually update and publish
-      comm_interface_->SetRobotData(robot_state, next_conf, plan_utime_,
-                                    plan_start_utime_);
+      comm_interface_->SetRobotData(robot_state, next_conf, franka_time_,
+                                    plan_utime_, plan_start_utime_);
     }
 
     if ((status_ == RobotStatus::Running
@@ -784,7 +785,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     auto [new_plan, new_plan_utime, new_plan_exec_opt,
           new_plan_contact_expected] {comm_interface_->PopNewPlan()};
 
-    bool continue_from_current_plan {plan_ != nullptr};
+    bool continue_from_current_plan {plan_ != nullptr && !new_plan->empty()
+                                     && new_plan->end_time() > franka_time_};
     if (!continue_from_current_plan || IsContinuous(new_plan)) {
       plan_ = std::move(new_plan);
       plan_utime_ = new_plan_utime;
@@ -850,7 +852,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "controller...");
     }
     comm_interface_->SetRobotData(cannonical_robot_state, start_conf_franka_,
-                                  plan_utime_, plan_start_utime_);
+                                  franka_time_, plan_utime_, plan_start_utime_);
     return franka::MotionFinished(output_to_franka);
   }
 
@@ -865,7 +867,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // async in another thread, nonblocking
   std::thread {[&]() {
     comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
-                                  plan_utime_, plan_start_utime_,
+                                  franka_time_, plan_utime_, plan_start_utime_,
                                   plan_completion_frac);
   }}.detach();
 
@@ -1134,7 +1136,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   if (time_elapsed_us_.size() > 20) {
     time_elapsed_us_.pop_front();
   }
-  comm_interface_->SetRobotData(robot_state, tau_d, plan_utime_,
+  comm_interface_->SetRobotData(robot_state, tau_d, franka_time_, plan_utime_,
                                 plan_start_utime_);
   return ret_torques;
 }

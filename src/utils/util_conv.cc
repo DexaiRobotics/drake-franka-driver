@@ -263,6 +263,7 @@ robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
   // to int16_t for lcm
   status_msg.robot_mode = static_cast<int16_t>(robot_status.robot_mode);
 
+  status_msg.robot_time = robot_data.robot_time;
   status_msg.current_plan_utime = robot_data.current_plan_utime;
   status_msg.plan_start_utime = robot_data.plan_start_utime;
   status_msg.plan_exec_frac = robot_data.plan_completion_frac;

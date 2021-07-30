@@ -201,12 +201,13 @@ franka::RobotState CommunicationInterface::GetRobotState() {
 
 void CommunicationInterface::SetRobotData(
     const franka::RobotState& robot_state,
-    const Eigen::VectorXd& robot_plan_next_conf, int64_t current_plan_utime,
+    const Eigen::VectorXd& robot_plan_next_conf, double robot_time, int64_t current_plan_utime,
     int64_t plan_start_utime, double plan_completion_frac) {
   std::scoped_lock<std::mutex> lock {robot_data_mutex_};
   franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
   robot_data_.robot_state = robot_state;
   robot_data_.robot_plan_next_conf = robot_plan_next_conf;
+  robot_data_.robot_time = robot_time;
   robot_data_.current_plan_utime = current_plan_utime;
   robot_data_.plan_start_utime = plan_start_utime;
   robot_data_.plan_completion_frac = plan_completion_frac;
