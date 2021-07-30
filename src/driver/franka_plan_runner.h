@@ -240,6 +240,7 @@ class FrankaPlanRunner {
     plan_.reset();
     plan_utime_ = -1;
     plan_start_utime_ = -1;
+    franka_time_ = 0;
   }
 
   bool IsContinuous(std::unique_ptr<PPType>& plan);
