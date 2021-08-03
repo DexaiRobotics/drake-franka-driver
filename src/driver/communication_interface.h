@@ -78,10 +78,22 @@ namespace franka_driver {
 struct RobotData {
   std::atomic<bool> has_robot_data;
   franka::RobotState robot_state;
+
+  // time in seconds since start
+  // of current plan
   double robot_time {};
+
+  // utime associated with current plan.
+  // defaults to -1 if no plan
   int64_t current_plan_utime {};
+
+  // utime at start of current plan
   int64_t plan_start_utime {};
+
+  // plan completion fraction.
+  // should be in [0, 1]
   double plan_completion_frac;
+  
   Eigen::VectorXd robot_plan_next_conf;
 };
 
