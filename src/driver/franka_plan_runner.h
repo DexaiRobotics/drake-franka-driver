@@ -308,8 +308,9 @@ class FrankaPlanRunner {
   Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
-  double allowable_max_angle_error_ =
-      0.001;  // empirically proven, increased to work w/ sim robot
+
+  // empirically proven, increased to work w/ sim robot
+  static constexpr double allowable_max_angle_error_ {0.001};
 
   // Collision torque thresholds for each joint in [Nm].
   const std::array<double, 7> kHighTorqueThreshold {100.0, 100.0, 100.0, 100.0,
