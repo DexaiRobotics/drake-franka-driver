@@ -87,20 +87,19 @@ Eigen::VectorXd v_to_e(std::vector<int> v) {
 }
 
 bool is_continuous(const std::unique_ptr<PPType>& old_plan,
-                   const std::unique_ptr<PPType>& new_plan, 
-                   double franka_time, 
-                   const Eigen::VectorXd& pos_tolerance, 
-                   const Eigen::VectorXd& vel_tolerance, 
-                   const Eigen::VectorXd& acc_tolerance)
-{
-    std::function is_tolerated = [&](int d, Eigen::VectorXd tolerance)-> bool {
-        Eigen::VectorXd err = (old_plan->derivative(d).value(franka_time) - new_plan->derivative(d).value(franka_time)).cwiseAbs();
-        return (tolerance - err).sum() >= 0.0;
-    };
+                   const std::unique_ptr<PPType>& new_plan, double franka_time,
+                   const Eigen::VectorXd& pos_tolerance,
+                   const Eigen::VectorXd& vel_tolerance,
+                   const Eigen::VectorXd& acc_tolerance) {
+  std::function is_tolerated {[&](int d, Eigen::VectorXd tolerance) -> bool {
+    const auto old_plan_derivative {old_plan->derivative(d).value(franka_time)};
+    const auto new_plan_derivative {new_plan->derivative(d).value(franka_time)};
+    const auto err {(new_plan_derivative - old_plan_derivative).cwiseAbs()};
+    return (tolerance - err).sum() >= 0.0;
+  }};
 
-    return (is_tolerated(0, pos_tolerance) && is_tolerated(1, vel_tolerance) && is_tolerated(2, acc_tolerance));
-
-
+  return (is_tolerated(0, pos_tolerance) && is_tolerated(1, vel_tolerance)
+          && is_tolerated(2, acc_tolerance));
 }
 
 }  //  namespace utils
