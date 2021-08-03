@@ -865,11 +865,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       std::min(1.0, franka_time_ / plan_end_time)};
 
   // async in another thread, nonblocking
-  std::thread {[&]() {
-    comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
-                                  franka_time_, plan_utime_, plan_start_utime_,
-                                  plan_completion_frac);
-  }}.detach();
+  std::thread {[this, cannonical_robot_state, plan_completion_frac](
+                   auto next_conf_plan, auto franka_time, auto plan_utime,
+                   auto plan_start_utime) {
+                 comm_interface_->SetRobotData(
+                     cannonical_robot_state, next_conf_plan, franka_time,
+                     plan_utime, plan_start_utime, plan_completion_frac);
+               },
+               next_conf_plan_, franka_time_, plan_utime_, plan_start_utime_}
+      .detach();
 
   Eigen::VectorXd next_conf_combined(7);  // derive the next conf for return
   {
