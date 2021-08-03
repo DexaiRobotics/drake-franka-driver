@@ -559,7 +559,7 @@ bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
   return within_limits;
 }
 
-bool FrankaPlanRunner::IsContinuous(std::unique_ptr<PPType>& plan) {
+bool FrankaPlanRunner::IsContinuousWithCurrentPlan(std::unique_ptr<PPType>& plan) {
   // checks if new plan is continuous with current plan
   // but if there is no current plan, return true immediately
   if (!plan_) {
@@ -788,7 +788,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
     bool continue_from_current_plan {plan_ != nullptr && !new_plan->empty()
                                      && new_plan->end_time() > franka_time_};
-    if (!continue_from_current_plan || IsContinuous(new_plan)) {
+    if (!continue_from_current_plan || IsContinuousWithCurrentPlan(new_plan)) {
       plan_ = std::move(new_plan);
       plan_utime_ = new_plan_utime;
       plan_exec_opt_ = new_plan_exec_opt;

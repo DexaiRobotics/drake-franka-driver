@@ -243,7 +243,7 @@ class FrankaPlanRunner {
     franka_time_ = 0;
   }
 
-  bool IsContinuous(std::unique_ptr<PPType>& plan);
+  bool IsContinuousWithCurrentPlan(std::unique_ptr<PPType>& plan);
 
  private:
   const int dof_;          // degrees of freedom of franka
