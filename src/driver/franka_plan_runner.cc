@@ -759,6 +759,27 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
   }
 }
 
+bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition() {
+  // Maximum change in joint angle between two confs
+  auto max_ang_distance =
+      utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
+  if (max_ang_distance > params_.kMediumJointDistance) {
+    // far from start conf. return true
+    dexai::log()->error(
+        "JointPositionCallback: Discarding plan, mismatched start position."
+        " Max distance: {} > {}",
+        max_ang_distance, params_.kMediumJointDistance);
+    return true;
+  } else if (max_ang_distance > params_.kTightJointDistance) {
+    dexai::log()->warn(
+        "JointPositionCallback: max angular distance between franka and "
+        "start of plan is larger than 'kTightJointDistance': {} > {}",
+        max_ang_distance, params_.kTightJointDistance);
+  }
+  // not far from start conf. return false
+  return false;
+}
+
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const franka::RobotState& robot_state, franka::Duration period) {
   if (comm_interface_->SimControlExceptionTriggered()) {
@@ -829,25 +850,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
     // No need to check for joint distance if continuous
     // from current active plan
-    if (!has_active_plan) {
-      // Maximum change in joint angle between two confs
-      auto max_ang_distance =
-          utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
-      if (max_ang_distance > params_.kMediumJointDistance) {
-        dexai::log()->error(
-            "JointPositionCallback: Discarding plan, mismatched start position."
-            " Max distance: {} > {}",
-            max_ang_distance, params_.kMediumJointDistance);
-        comm_interface_->PublishPlanComplete(
-            plan_utime_, false, "discarded due to mismatched start conf");
-        ResetPlan();
-        return franka::MotionFinished(franka::JointPositions(robot_state.q));
-      } else if (max_ang_distance > params_.kTightJointDistance) {
-        dexai::log()->warn(
-            "JointPositionCallback: max angular distance between franka and "
-            "start of plan is larger than 'kTightJointDistance': {} > {}",
-            max_ang_distance, params_.kTightJointDistance);
-      }
+    if (!has_active_plan && IsStartFarFromCurrentJointPosition()) {
+      comm_interface_->PublishPlanComplete(
+          plan_utime_, false, "discarded due to mismatched start conf");
+      ResetPlan();
+      return franka::MotionFinished(franka::JointPositions(robot_state.q));
     }
   }
 

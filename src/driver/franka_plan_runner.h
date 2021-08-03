@@ -212,6 +212,10 @@ class FrankaPlanRunner {
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
 
+  // Helper function that returns a bool based on whether start
+  // of the plan is far from current franka conf
+  bool IsStartFarFromCurrentJointPosition();
+
   /// Set parameters for stiffness and goal direction based on push direction.
   /// TODO(@anyone): long-term the stiffness can be a parameter of the push
   /// request
