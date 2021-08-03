@@ -788,9 +788,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     auto [new_plan, new_plan_utime, new_plan_exec_opt,
           new_plan_contact_expected] {comm_interface_->PopNewPlan()};
 
-    bool continue_from_current_plan {plan_ != nullptr && !new_plan->empty()
-                                     && new_plan->end_time() > franka_time_};
-    if (!continue_from_current_plan || IsContinuousWithCurrentPlan(new_plan)) {
+    bool has_active_plan {plan_ != nullptr};
+    bool is_new_plan_valid {!new_plan->empty()
+                            && new_plan->end_time() > franka_time_};
+    if (!has_active_plan
+        || (is_new_plan_valid && IsContinuousWithCurrentPlan(new_plan))) {
       plan_ = std::move(new_plan);
       plan_utime_ = new_plan_utime;
       plan_exec_opt_ = new_plan_exec_opt;
@@ -803,7 +805,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "starting initial timestep...",
           plan_utime_);
 
-      if (!continue_from_current_plan) {
+      if (!has_active_plan) {
         // first time step of plan, reset time and start conf
         franka_time_ = 0.0;
       }
@@ -824,7 +826,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
     // No need to check for joint distance if continuous
     // from current active plan
-    if (!continue_from_current_plan) {
+    if (!has_active_plan) {
       // Maximum change in joint angle between two confs
       auto max_ang_distance =
           utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
