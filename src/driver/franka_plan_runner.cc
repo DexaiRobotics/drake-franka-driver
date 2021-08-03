@@ -793,6 +793,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
                             && new_plan->end_time() > franka_time_};
     if (!has_active_plan
         || (is_new_plan_valid && IsContinuousWithCurrentPlan(new_plan))) {
+      // we either have no active plan
+      // or we have an active plan and the new plan is continuous
+      // with the active plan and therefore can replace it
       plan_ = std::move(new_plan);
       plan_utime_ = new_plan_utime;
       plan_exec_opt_ = new_plan_exec_opt;
