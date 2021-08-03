@@ -559,11 +559,13 @@ bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
   return within_limits;
 }
 
-bool FrankaPlanRunner::IsContinuousWithCurrentPlan(std::unique_ptr<PPType>& plan) {
-  // checks if new plan is continuous with current plan
-  // but if there is no current plan, return true immediately
+bool FrankaPlanRunner::IsContinuousWithCurrentPlan(
+    std::unique_ptr<PPType>& plan) {
+  // checks if new plan is continuous with current plan.
+  // throw if no active plan. this function should not have been
+  // called without an active plan.
   if (!plan_) {
-    return true;
+    throw std::runtime_error {"FPR::IsContinuousWCurrPlan: no active plan!"};
   }
 
   static const Eigen::VectorXd pos_tolerance {
