@@ -95,7 +95,7 @@ bool is_continuous(const std::unique_ptr<PPType>& old_plan,
     const auto old_plan_derivative {old_plan->derivative(d).value(franka_time)};
     const auto new_plan_derivative {new_plan->derivative(d).value(franka_time)};
     const auto err {(new_plan_derivative - old_plan_derivative).cwiseAbs()};
-    return (tolerance - err).sum() >= 0.0;
+    return (err.array() < tolerance.array()).all();
   }};
 
   return (is_tolerated(0, pos_tolerance) && is_tolerated(1, vel_tolerance)
