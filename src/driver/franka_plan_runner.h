@@ -216,6 +216,11 @@ class FrankaPlanRunner {
   // of the plan is far from current franka conf
   bool IsStartFarFromCurrentJointPosition();
 
+  // Helper function to update active plan
+  void UpdateActivePlan(std::unique_ptr<PPType> new_plan,
+                        int64_t new_plan_utime, int64_t new_plan_exec_opt,
+                        const Eigen::Vector3d& new_plan_contact_expected);
+
   /// Set parameters for stiffness and goal direction based on push direction.
   /// TODO(@anyone): long-term the stiffness can be a parameter of the push
   /// request

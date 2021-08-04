@@ -780,6 +780,40 @@ bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition() {
   return false;
 }
 
+void FrankaPlanRunner::UpdateActivePlan(
+    std::unique_ptr<PPType> new_plan, int64_t new_plan_utime,
+    int64_t new_plan_exec_opt,
+    const Eigen::Vector3d& new_plan_contact_expected) {
+  bool has_active_plan {plan_ != nullptr};
+  plan_ = std::move(new_plan);
+  plan_utime_ = new_plan_utime;
+  plan_exec_opt_ = new_plan_exec_opt;
+  contact_expected_ = new_plan_contact_expected;
+
+  plan_start_utime_ = utils::get_current_utime();
+
+  dexai::log()->info(
+      "JointPositionCallback: popped new plan {} from buffer, "
+      "starting initial timestep...",
+      plan_utime_);
+
+  if (!has_active_plan) {
+    // first time step of plan, reset time and start conf
+    franka_time_ = 0.0;
+  }
+
+  start_conf_plan_ = plan_->value(franka_time_);
+
+  if (!LimitJoints(start_conf_plan_)) {
+    dexai::log()->warn(
+        "JointPositionCallback: plan {} at franka_time_: {} seconds "
+        "is exceeding the joint limits!",
+        plan_utime_, franka_time_);
+  }
+
+  end_conf_plan_ = plan_->value(plan_->end_time());
+}
+
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const franka::RobotState& robot_state, franka::Duration period) {
   if (comm_interface_->SimControlExceptionTriggered()) {
@@ -817,35 +851,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       // we either have no active plan
       // or we have an active plan and the new plan is continuous
       // with the active plan and therefore can replace it
-      plan_ = std::move(new_plan);
-      plan_utime_ = new_plan_utime;
-      plan_exec_opt_ = new_plan_exec_opt;
-      contact_expected_ = new_plan_contact_expected;
-
-      plan_start_utime_ = utils::get_current_utime();
-
-      dexai::log()->info(
-          "JointPositionCallback: popped new plan {} from buffer, "
-          "starting initial timestep...",
-          plan_utime_);
-
-      if (!has_active_plan) {
-        // first time step of plan, reset time and start conf
-        franka_time_ = 0.0;
-      }
-
-      start_conf_plan_ = plan_->value(franka_time_);
-
-      if (!LimitJoints(start_conf_plan_)) {
-        dexai::log()->warn(
-            "JointPositionCallback: plan {} at franka_time_: {} seconds "
-            "is exceeding the joint limits!",
-            plan_utime_, franka_time_);
-      }
-
+      UpdateActivePlan(std::move(new_plan), new_plan_utime, new_plan_exec_opt,
+                       new_plan_contact_expected);
       // the current (desired) position of franka is the starting position:
       start_conf_franka_ = current_conf_franka;
-      end_conf_plan_ = plan_->value(plan_->end_time());
     }
 
     // No need to check for joint distance if continuous
