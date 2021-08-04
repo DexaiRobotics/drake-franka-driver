@@ -760,22 +760,24 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
   }
 }
 
-bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition() {
+bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition(
+    const RobotParameters& params, const Eigen::VectorXd& franka_start_conf,
+    const Eigen::VectorXd& start_conf_plan) {
   // Maximum change in joint angle between two confs
-  auto max_ang_distance
-      {utils::max_angular_distance(start_conf_franka_, start_conf_plan_)};
-  if (max_ang_distance > params_.kMediumJointDistance) {
+  auto max_ang_distance {
+      utils::max_angular_distance(franka_start_conf, start_conf_plan)};
+  if (max_ang_distance > params.kMediumJointDistance) {
     // far from start conf. return true
     dexai::log()->error(
         "JointPositionCallback: Discarding plan, mismatched start position."
         " Max distance: {} > {}",
-        max_ang_distance, params_.kMediumJointDistance);
+        max_ang_distance, params.kMediumJointDistance);
     return true;
-  } else if (max_ang_distance > params_.kTightJointDistance) {
+  } else if (max_ang_distance > params.kTightJointDistance) {
     dexai::log()->warn(
         "JointPositionCallback: max angular distance between franka and "
         "start of plan is larger than 'kTightJointDistance': {} > {}",
-        max_ang_distance, params_.kTightJointDistance);
+        max_ang_distance, params.kTightJointDistance);
   }
   // not far from start conf. return false
   return false;
@@ -849,9 +851,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     if (!has_active_plan
         || (is_new_plan_valid && IsContinuousWithCurrentPlan(new_plan))) {
       // If the new plan is coninuous in position, velocity and acceleration
-      // with the current plan at current frank time, replace it with the new plan.
-      // Or if we do not currently have a plan, move the new plan's ownership to the
-      // current plan unique_ptr
+      // with the current plan at current frank time, replace it with the new
+      // plan. Or if we do not currently have a plan, move the new plan's
+      // ownership to the current plan unique_ptr
       UpdateActivePlan(std::move(new_plan), new_plan_utime, new_plan_exec_opt,
                        new_plan_contact_expected);
       // the current (desired) position of franka is the starting position:
@@ -862,7 +864,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // because the new plan is continuous with the old plan, skip this check
     // because IsContinuousWithCurrentPlan checks for continuity in position,
     // velocity, and acceleration
-    if (!has_active_plan && IsStartFarFromCurrentJointPosition()) {
+    if (!has_active_plan
+        && IsStartFarFromCurrentJointPosition(params_, start_conf_franka_,
+                                              start_conf_plan_)) {
       comm_interface_->PublishPlanComplete(
           plan_utime_, false, "discarded due to mismatched start conf");
       ResetPlan();

@@ -216,15 +216,17 @@ class FrankaPlanRunner {
    * @brief Helper function to determine if the start of new plan is far from
    * the current robot conf.
    *
-   * @param new_plan - unique_ptr to new plan
-   * @param new_plan_utime - utime corresponding to the new plan
-   * @param new_plan_exec_opt - execution options associated with the new plan
-   * @param new_plan_contact_expected - unit vector in the direction of expected
+   * @param params - parameters from which to get comparison thresholds
+   * @param franka_start_conf - current robot conf from which the robot will
+   * start executing plan
+   * @param start_conf_plan - start conf of the new plan
    * @return true, if the maximum angular distance between current robot conf
    * and start of new plan is greater than kMediumJointDistance
    * @return false, otherwise
    */
-  bool IsStartFarFromCurrentJointPosition();
+  static bool IsStartFarFromCurrentJointPosition(
+      const RobotParameters& params, const Eigen::VectorXd& franka_start_conf,
+      const Eigen::VectorXd& start_conf_plan);
 
   /**
    * @brief Helper function to copy robot plan, utime associated with the plan,
@@ -279,7 +281,7 @@ class FrankaPlanRunner {
    * @brief Checks if `plan` is continuous in position, velocity, and
    * acceleration with the current robot plan at the current franka time
    *
-   * @param plan - unique_ptr pointing to a new plan which will be checked 
+   * @param plan - unique_ptr pointing to a new plan which will be checked
    * against the current plan
    * @return true, if the new plan is continuous in position, velocity, and
    * acceleration with the current plan at the current franka time
