@@ -49,9 +49,9 @@ robot_name="FRANKA_${hostname_first_letter^}"
 status_channel="${robot_name}_STATUS"
 echo "Using hostname: $(hostname) to choose Franka name: ${robot_name}"
 
-# check if there is already a driver running. at the start of this script 
-# we try to kill any existing instances, but if there are multiple containers 
-# running on the same machine, or have an instance running on another 
+# check if there is already a driver running. at the start of this script
+# we try to kill any existing instances, but if there are multiple containers
+# running on the same machine, or have an instance running on another
 # networked machine, we don't want to duplicate
 if lcm-echo -n 1 -v 0 --timeout 0.1 ${status_channel}; then
     echo "A Franka driver instance is already running and publishing to ${status_channel}!"
