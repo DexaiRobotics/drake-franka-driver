@@ -275,6 +275,16 @@ class FrankaPlanRunner {
     franka_time_ = 0;
   }
 
+  /**
+   * @brief Checks if `plan` is continuous in position, velocity, and
+   * acceleration with the current robot plan at the current franka time
+   *
+   * @param plan - unique_ptr pointing to a new plan which will be checked 
+   * against the current plan
+   * @return true, if the new plan is continuous in position, velocity, and
+   * acceleration with the current plan at the current franka time
+   * @return false, otherwise
+   */
   bool IsContinuousWithCurrentPlan(const std::unique_ptr<PPType>& plan);
 
  private:
