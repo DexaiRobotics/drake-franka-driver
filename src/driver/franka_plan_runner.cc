@@ -568,9 +568,10 @@ bool FrankaPlanRunner::IsContinuousWithCurrentPlan(
   if (!plan_) {
     throw std::runtime_error {"FPR::IsContinuousWCurrPlan: no active plan!"};
   }
-  return utils::is_continuous(
-      plan_, plan, franka_time_, params_.pos_continuity_err_tolerance,
-      params_.vel_continuity_err_tolerance, params_.acc_continuity_err_tolerance);
+  return utils::is_continuous(plan_, plan, franka_time_,
+                              params_.pos_continuity_err_tolerance,
+                              params_.vel_continuity_err_tolerance,
+                              params_.acc_continuity_err_tolerance);
 }
 
 /// Calculate the time to advance while pausing or unpausing
@@ -864,7 +865,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
         dexai::log()->warn(
             "JointPositionCallback: new plan with utime: {} is invalid.\n"
             "franka_time: {}\tplan.end_time: {}",
-            franka_time_, new_plan->end_time());
+            new_plan_utime, franka_time_, new_plan->end_time());
         comm_interface_->PublishPlanComplete(
             new_plan_utime, false, "discarded because plan was invalid");
       } else {
