@@ -769,8 +769,8 @@ bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition(
   if (max_ang_distance > params.kMediumJointDistance) {
     // far from start conf. return true
     dexai::log()->error(
-        "JointPositionCallback: Discarding plan, mismatched start position."
-        " Max distance: {} > {}",
+        "IsStartFarFromCurrentJointPosition: Discarding plan, mismatched start "
+        "position. Max distance: {} > {}",
         max_ang_distance, params.kMediumJointDistance);
     return true;
   }
@@ -779,8 +779,9 @@ bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition(
   // check to print warning. no control logic
   if (max_ang_distance > params.kTightJointDistance) {
     dexai::log()->warn(
-        "JointPositionCallback: max angular distance between franka and "
-        "start of plan is larger than 'kTightJointDistance': {} > {}",
+        "IsStartFarFromCurrentJointPosition: max angular distance between "
+        "franka and start of plan is larger than 'kTightJointDistance': {} > "
+        "{}",
         max_ang_distance, params.kTightJointDistance);
   }
   // not far from start conf. return false
