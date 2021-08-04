@@ -773,7 +773,11 @@ bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition(
         " Max distance: {} > {}",
         max_ang_distance, params.kMediumJointDistance);
     return true;
-  } else if (max_ang_distance > params.kTightJointDistance) {
+  }
+  // always returns false below this
+
+  // check to print warning. no control logic
+  if (max_ang_distance > params.kTightJointDistance) {
     dexai::log()->warn(
         "JointPositionCallback: max angular distance between franka and "
         "start of plan is larger than 'kTightJointDistance': {} > {}",
