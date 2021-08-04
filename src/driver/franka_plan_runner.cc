@@ -571,11 +571,12 @@ bool FrankaPlanRunner::IsContinuousWithCurrentPlan(
 
   static const Eigen::VectorXd pos_tolerance {
       (params_.robot_high_joint_limits - params_.robot_low_joint_limits)
-      * 1e-5};
-  static const Eigen::VectorXd vel_tolerance {params_.robot_max_velocities
-                                              * 1e-5};
-  static const Eigen::VectorXd acc_tolerance {params_.robot_max_accelerations
-                                              * 1e-5};
+      * params_.pos_continuity_tolerance_factor};
+  static const Eigen::VectorXd vel_tolerance {
+      params_.robot_max_velocities * params_.vel_continuity_tolerance_factor};
+  static const Eigen::VectorXd acc_tolerance {
+      params_.robot_max_accelerations
+      * params_.acc_continuity_tolerance_factor};
   return utils::is_continuous(plan_, plan, franka_time_, pos_tolerance,
                               vel_tolerance, acc_tolerance);
 }
