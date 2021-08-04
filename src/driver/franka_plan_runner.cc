@@ -853,8 +853,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     bool has_active_plan {plan_ != nullptr};
     bool is_new_plan_valid {!new_plan->empty()
                             && new_plan->end_time() > franka_time_};
-    if (!has_active_plan
-        || (is_new_plan_valid && IsContinuousWithCurrentPlan(new_plan))) {
+    if (is_new_plan_valid
+        && (!has_active_plan || IsContinuousWithCurrentPlan(new_plan))) {
       // If the new plan is coninuous in position, velocity and acceleration
       // with the current plan at current frank time, replace it with the new
       // plan. Or if we do not currently have a plan, move the new plan's
@@ -863,13 +863,32 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
                        new_plan_contact_expected);
       // the current (desired) position of franka is the starting position:
       start_conf_franka_ = current_conf_franka;
+
+      // print the appropriate warning, send plan complete with success=false
+      // and skip this plan
+    } else {
+      if (!is_new_plan_valid) {
+        dexai::log()->warn(
+            "JointPositionCallback: new plan with utime: {} is invalid");
+        comm_interface_->PublishPlanComplete(
+            new_plan_utime, false, "discarded because plan was invalid");
+      } else {
+        dexai::log()->warn(
+            "JointPositionCallback: new plan with utime: {} is not continuous "
+            "with current plan");
+        comm_interface_->PublishPlanComplete(
+            new_plan_utime, false,
+            fmt::format("discarded because plan is not continuous with current "
+                        "plan utime: {}",
+                        plan_utime_));
+      }
     }
 
     // if we did have an active plan and were able to switch to the new plan
     // because the new plan is continuous with the old plan, skip this check
     // because IsContinuousWithCurrentPlan checks for continuity in position,
     // velocity, and acceleration
-    if (!has_active_plan
+    if (is_new_plan_valid && !has_active_plan
         && IsStartFarFromCurrentJointPosition(params_, start_conf_franka_,
                                               start_conf_plan_)) {
       comm_interface_->PublishPlanComplete(
