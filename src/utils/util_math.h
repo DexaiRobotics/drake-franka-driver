@@ -107,6 +107,20 @@ bool VectorEpsEq(T a, T b,
   return true;
 }
 
+/**
+ * @brief Checks if `new_plan` is continuous in position, velocity, and
+ * acceleration with the `old_plan` at `franka_time`
+ *
+ * @param old_plan - unique_ptr pointing to a old plan
+ * @param new_plan - unique_ptr pointing to a new plan
+ * @param franka_time - time at which the two plans will be compared
+ * @param pos_tolerance - tolerance used for the comparison in position
+ * @param vel_tolerance - tolerance used for the comparison in velocity
+ * @param acc_tolerance - tolerance used for the comparison in acceleration
+ * @return true, if the new plan is continuous in position, velocity, and
+ * acceleration with old at franka time
+ * @return false, otherwise
+ */
 bool is_continuous(const std::unique_ptr<PPType>& old_plan,
                    const std::unique_ptr<PPType>& new_plan, double franka_time,
                    const Eigen::VectorXd& pos_tolerance,
