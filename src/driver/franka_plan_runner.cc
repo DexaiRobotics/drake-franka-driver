@@ -801,7 +801,7 @@ void FrankaPlanRunner::UpdateActivePlan(
   plan_start_utime_ = utils::get_current_utime();
 
   dexai::log()->info(
-      "JointPositionCallback: popped new plan {} from buffer, "
+      "UpdateActivePlan: popped new plan {} from buffer, "
       "starting initial timestep...",
       plan_utime_);
 
@@ -814,7 +814,7 @@ void FrankaPlanRunner::UpdateActivePlan(
 
   if (!LimitJoints(start_conf_plan_)) {
     dexai::log()->warn(
-        "JointPositionCallback: plan {} at franka_time_: {} seconds "
+        "UpdateActivePlan: plan {} at franka_time_: {} seconds "
         "is exceeding the joint limits!",
         plan_utime_, franka_time_);
   }
