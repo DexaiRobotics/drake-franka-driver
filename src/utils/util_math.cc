@@ -31,8 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-///@file: util_math.cc
+/// @file: util_math.cc
 #include "utils/util_math.h"
+
+#include <memory>  // for unique_ptr
+#include <string>  // for string
+#include <vector>  // for vector
 
 #include "utils/dexai_log.h"
 

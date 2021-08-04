@@ -49,6 +49,7 @@
 
 #include <algorithm>  // for min
 #include <cmath>      // for exp
+#include <utility>    // for move
 #include <vector>     // for vector
 
 #include <drake/lcmt_iiwa_status.hpp>
@@ -560,7 +561,7 @@ bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
 }
 
 bool FrankaPlanRunner::IsContinuousWithCurrentPlan(
-    std::unique_ptr<PPType>& plan) {
+    const std::unique_ptr<PPType>& plan) {
   // checks if new plan is continuous with current plan.
   // throw if no active plan. this function should not have been
   // called without an active plan.
@@ -839,7 +840,6 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
-
     auto [new_plan, new_plan_utime, new_plan_exec_opt,
           new_plan_contact_expected] {comm_interface_->PopNewPlan()};
 

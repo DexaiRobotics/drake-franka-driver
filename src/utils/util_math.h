@@ -34,6 +34,11 @@
 /// @file: util_math.h
 #pragma once
 
+#include <limits>  // for numeric_limits
+#include <memory>  // for unique_ptr
+#include <string>  // for string
+#include <vector>  // for vector
+
 #include "drake/common/trajectories/piecewise_polynomial.h"
 
 typedef drake::trajectories::PiecewisePolynomial<double> PPType;
@@ -95,7 +100,7 @@ bool VectorEpsEq(T a, T b,
     return false;
   }
   for (int i = 0; i < a.size(); i++) {
-    if (!EpsEq(double(a(i)), double(b(i)), relTol)) {
+    if (!EpsEq(static_cast<double>(a(i)), static_cast<double>(b(i)), relTol)) {
       return false;
     }
   }
