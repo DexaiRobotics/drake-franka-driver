@@ -869,18 +869,21 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     } else {
       if (!is_new_plan_valid) {
         dexai::log()->warn(
-            "JointPositionCallback: new plan with utime: {} is invalid");
+            "JointPositionCallback: new plan with utime: {} is invalid.\n"
+            "franka_time: {}\tplan.end_time: {}",
+            franka_time_, new_plan->end_time());
         comm_interface_->PublishPlanComplete(
             new_plan_utime, false, "discarded because plan was invalid");
       } else {
         dexai::log()->warn(
             "JointPositionCallback: new plan with utime: {} is not continuous "
-            "with current plan");
+            "with current plan with utime: {} at t={}",
+            new_plan_utime, plan_utime_, franka_time_);
         comm_interface_->PublishPlanComplete(
             new_plan_utime, false,
             fmt::format("discarded because plan is not continuous with current "
-                        "plan utime: {}",
-                        plan_utime_));
+                        "plan utime: {} at t={}",
+                        plan_utime_, franka_time_));
       }
     }
 
