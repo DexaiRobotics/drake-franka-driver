@@ -95,12 +95,15 @@ bool is_continuous(const std::unique_ptr<PPType>& old_plan,
                    const Eigen::VectorXd& pos_tolerance,
                    const Eigen::VectorXd& vel_tolerance,
                    const Eigen::VectorXd& acc_tolerance) {
-  std::function is_tolerated {[&](int d, Eigen::VectorXd tolerance) -> bool {
-    const auto old_plan_derivative {old_plan->derivative(d).value(franka_time)};
-    const auto new_plan_derivative {new_plan->derivative(d).value(franka_time)};
-    const auto err {(new_plan_derivative - old_plan_derivative).cwiseAbs()};
-    return (err.array() < tolerance.array()).all();
-  }};
+  std::function is_tolerated {
+      [&](int order, Eigen::VectorXd tolerance) -> bool {
+        const auto old_plan_derivative {
+            old_plan->derivative(order).value(franka_time)};
+        const auto new_plan_derivative {
+            new_plan->derivative(order).value(franka_time)};
+        const auto err {(new_plan_derivative - old_plan_derivative).cwiseAbs()};
+        return (err.array() < tolerance.array()).all();
+      }};
 
   return (is_tolerated(0, pos_tolerance) && is_tolerated(1, vel_tolerance)
           && is_tolerated(2, acc_tolerance));

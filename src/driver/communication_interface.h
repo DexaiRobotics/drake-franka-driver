@@ -92,7 +92,7 @@ struct RobotData {
 
   // plan completion fraction.
   // should be in [0, 1]
-  double plan_completion_frac;
+  double plan_completion_frac {};
 
   Eigen::VectorXd robot_plan_next_conf;
 };

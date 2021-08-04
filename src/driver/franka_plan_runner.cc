@@ -762,8 +762,8 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
 
 bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition() {
   // Maximum change in joint angle between two confs
-  auto max_ang_distance =
-      utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
+  auto max_ang_distance
+      {utils::max_angular_distance(start_conf_franka_, start_conf_plan_)};
   if (max_ang_distance > params_.kMediumJointDistance) {
     // far from start conf. return true
     dexai::log()->error(
@@ -785,7 +785,7 @@ void FrankaPlanRunner::UpdateActivePlan(
     std::unique_ptr<PPType> new_plan, int64_t new_plan_utime,
     int64_t new_plan_exec_opt,
     const Eigen::Vector3d& new_plan_contact_expected) {
-  bool has_active_plan {plan_ != nullptr};
+  const bool has_active_plan {plan_ != nullptr};
   plan_ = std::move(new_plan);
   plan_utime_ = new_plan_utime;
   plan_exec_opt_ = new_plan_exec_opt;
@@ -857,8 +857,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       start_conf_franka_ = current_conf_franka;
     }
 
-    // No need to check for joint distance if continuous
-    // from current active plan
+    // if we did have an active plan and were able to switch to the new plan
+    // because the new plan is continuous with the old plan, skip this check
+    // because IsContinuousWithCurrentPlan checks for continuity in position,
+    // velocity, and acceleration
     if (!has_active_plan && IsStartFarFromCurrentJointPosition()) {
       comm_interface_->PublishPlanComplete(
           plan_utime_, false, "discarded due to mismatched start conf");

@@ -212,11 +212,34 @@ class FrankaPlanRunner {
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
 
-  // Helper function that returns a bool based on whether start
-  // of the plan is far from current franka conf
+  /**
+   * @brief Helper function to determine if the start of new plan is far from
+   * the current robot conf.
+   *
+   * @param new_plan - unique_ptr to new plan
+   * @param new_plan_utime - utime corresponding to the new plan
+   * @param new_plan_exec_opt - execution options associated with the new plan
+   * @param new_plan_contact_expected - unit vector in the direction of expected
+   * @return true, if the maximum angular distance between current robot conf
+   * and start of new plan is greater than kMediumJointDistance
+   * @return false, otherwise
+   */
   bool IsStartFarFromCurrentJointPosition();
 
-  // Helper function to update active plan
+  /**
+   * @brief Helper function to copy robot plan, utime associated with the plan,
+   * execution options associated with the plan, and expected contact vector
+   * associated with robot plan from the arguments. Also sets sets utime at
+   * start of plan execution, plan start conf, and plan end conf based on the
+   * new plan. Resets franka time if not continuing onto new plan from
+   * current plan.
+   *
+   * @param new_plan - unique_ptr to new plan
+   * @param new_plan_utime - utime corresponding to the new plan
+   * @param new_plan_exec_opt - execution options associated with the new plan
+   * @param new_plan_contact_expected - unit vector in the direction of expected
+   * contact assiciated with the new plan. if any
+   */
   void UpdateActivePlan(std::unique_ptr<PPType> new_plan,
                         int64_t new_plan_utime, int64_t new_plan_exec_opt,
                         const Eigen::Vector3d& new_plan_contact_expected);
