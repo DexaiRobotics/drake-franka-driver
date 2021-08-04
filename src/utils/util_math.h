@@ -123,8 +123,7 @@ bool VectorEpsEq(T a, T b,
  */
 bool is_continuous(const std::unique_ptr<PPType>& old_plan,
                    const std::unique_ptr<PPType>& new_plan, double franka_time,
-                   const Eigen::VectorXd& pos_tolerance,
-                   const Eigen::VectorXd& vel_tolerance,
-                   const Eigen::VectorXd& acc_tolerance);
+                   const double pos_tolerance, const double vel_tolerance,
+                   const double acc_tolerance);
 
 }  // namespace utils

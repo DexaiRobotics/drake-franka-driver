@@ -205,11 +205,10 @@ class RobotParameters {
   Eigen::VectorXd robot_max_accelerations;
   Eigen::VectorXd robot_max_jerks;
 
-  // used to compute tolerance values from position, velocity, and acceleration
-  // limits to check continuity in position, velocity, and acceleration between
-  // active robot plan and a new plan
-  double pos_continuity_tolerance_factor {}, vel_continuity_tolerance_factor {},
-      acc_continuity_tolerance_factor {};
+  // max error tolerance values in checking continuity in position, velocity,
+  // and acceleration between active robot plan and a new plan
+  double pos_continuity_err_tolerance {}, vel_continuity_err_tolerance {},
+      acc_continuity_err_tolerance {};
 
   //$ scales velocity and acceleration scale factors passed to toppra
   double

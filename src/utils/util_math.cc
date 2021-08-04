@@ -92,20 +92,20 @@ Eigen::VectorXd v_to_e(std::vector<int> v) {
 
 bool is_continuous(const std::unique_ptr<PPType>& old_plan,
                    const std::unique_ptr<PPType>& new_plan, double franka_time,
-                   const Eigen::VectorXd& pos_tolerance,
-                   const Eigen::VectorXd& vel_tolerance,
-                   const Eigen::VectorXd& acc_tolerance) {
-  std::function is_tolerated {
-      [&](int order, Eigen::VectorXd tolerance) -> bool {
-        const auto old_plan_derivative {
-            old_plan->derivative(order).value(franka_time)};
-        const auto new_plan_derivative {
-            new_plan->derivative(order).value(franka_time)};
-        const auto err {(new_plan_derivative - old_plan_derivative).cwiseAbs()};
-        dexai::log()->warn("order: {}\terr: {}\ttolerance: {}", order,
-                           err.transpose(), tolerance.transpose());
-        return (err.array() < tolerance.array()).all();
-      }};
+                   const double pos_tolerance, const double vel_tolerance,
+                   const double acc_tolerance) {
+  std::function is_tolerated {[&](int order, double tolerance) -> bool {
+    const Eigen::VectorXd old_plan_derivative {
+        old_plan->derivative(order).value(franka_time)};
+    const Eigen::VectorXd new_plan_derivative {
+        new_plan->derivative(order).value(franka_time)};
+    const Eigen::VectorXd err {
+        (new_plan_derivative - old_plan_derivative).cwiseAbs()};
+    dexai::log()->warn("order: {}\terr: {}\ttolerance: {}", order,
+                           err.transpose(), tolerance);
+    return (err.array() < tolerance).all();
+  }};
+
   return (is_tolerated(0, pos_tolerance) && is_tolerated(1, vel_tolerance)
           && is_tolerated(2, acc_tolerance));
 }
