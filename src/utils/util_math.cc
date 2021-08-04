@@ -102,9 +102,10 @@ bool is_continuous(const std::unique_ptr<PPType>& old_plan,
         const auto new_plan_derivative {
             new_plan->derivative(order).value(franka_time)};
         const auto err {(new_plan_derivative - old_plan_derivative).cwiseAbs()};
+        dexai::log()->warn("order: {}\terr: {}\ttolerance: {}", order,
+                           err.transpose(), tolerance.transpose());
         return (err.array() < tolerance.array()).all();
       }};
-
   return (is_tolerated(0, pos_tolerance) && is_tolerated(1, vel_tolerance)
           && is_tolerated(2, acc_tolerance));
 }
