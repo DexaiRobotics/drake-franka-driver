@@ -76,14 +76,14 @@ franka::RobotState ConvertToCannonical(const franka::RobotState& robot_state,
 
 /**
  * @brief Utility function that takes converts a pose
- * from `bot_core::position_3d_t` to `drake::math::RigidTransformd`
+ * from `robot_msgs::pose_t` to `drake::math::RigidTransformd`
  * which is more convenient for calculations
  *
- * @param pos3dt pose as `bot_core::position_3d_t`
+ * @param pos3dt pose as `robot_msgs::pose_t`
  * @return pose as `drake::math::RigidTransformd`
  */
 inline drake::math::RigidTransformd ToRigidTransform(
-    const bot_core::position_3d_t& pos3dt) {
+    const robot_msgs::pose_t& pos3dt) {
   return {Eigen::Quaterniond(pos3dt.rotation.w, pos3dt.rotation.x,
                              pos3dt.rotation.y, pos3dt.rotation.z),
           Eigen::Vector3d(pos3dt.translation.x, pos3dt.translation.y,
