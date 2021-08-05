@@ -62,8 +62,8 @@ robot_parameters:
     - 1000
     - 1000
   pos_continuity_err_tolerance: 0.0001
-  vel_continuity_err_tolerance: 0.0001
-  acc_continuity_err_tolerance: 0.0001
+  vel_continuity_err_tolerance: 0.001
+  acc_continuity_err_tolerance: 0.01
   stop_epsilon: 0.015 # used to calculate when robot counts as "stopped"
   stop_margin: 0.6 # how long robot sleeps before ready to recieve continue
   simulated: false
