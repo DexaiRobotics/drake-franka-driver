@@ -31,10 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-///@file: util_conv.cc
+/// @file: util_conv.cc
 #include "utils/util_conv.h"
 
 #include <sys/time.h>  // for gettimeofday()
+
+#include <algorithm>  // for copy
 
 #include "utils/dexai_log.h"
 #include "utils/util_math.h"
@@ -257,12 +259,13 @@ robot_msgs::robot_status_t ConvertToRobotStatusLcmMsg(
             std::begin(status_msg.dtheta));
 
   status_msg.control_command_success_rate =
-      status_msg.control_command_success_rate;
+      robot_status.control_command_success_rate;
 
   // casting from franka::RobotMode an enum class defined within libfranka
   // to int16_t for lcm
   status_msg.robot_mode = static_cast<int16_t>(robot_status.robot_mode);
 
+  status_msg.robot_time = robot_data.robot_time;
   status_msg.current_plan_utime = robot_data.current_plan_utime;
   status_msg.plan_start_utime = robot_data.plan_start_utime;
   status_msg.plan_exec_frac = robot_data.plan_completion_frac;

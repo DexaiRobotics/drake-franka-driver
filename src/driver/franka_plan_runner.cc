@@ -49,6 +49,7 @@
 
 #include <algorithm>  // for min
 #include <cmath>      // for exp
+#include <utility>    // for move
 #include <vector>     // for vector
 
 #include <drake/lcmt_iiwa_status.hpp>
@@ -400,7 +401,8 @@ int FrankaPlanRunner::RunFranka() {
       auto cannonical_robot_state {
           utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
       comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
-                                    plan_utime_, plan_start_utime_);
+                                    franka_time_, plan_utime_,
+                                    plan_start_utime_);
     }
     // TODO(@anyone): add a timer to be closer to lcm_publish_rate_ [Hz] * 2.
     std::this_thread::sleep_for(std::chrono::milliseconds(
@@ -496,8 +498,8 @@ int FrankaPlanRunner::RunSim() {
         callback = 0;  // finished, and current active plan_ released already
       }
     } else {  // idle or impedance control, manually update and publish
-      comm_interface_->SetRobotData(robot_state, next_conf, plan_utime_,
-                                    plan_start_utime_);
+      comm_interface_->SetRobotData(robot_state, next_conf, franka_time_,
+                                    plan_utime_, plan_start_utime_);
     }
 
     if ((status_ == RobotStatus::Running
@@ -556,6 +558,20 @@ bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
     }
   }
   return within_limits;
+}
+
+bool FrankaPlanRunner::IsContinuousWithCurrentPlan(
+    const std::unique_ptr<PPType>& plan) {
+  // checks if new plan is continuous with current plan.
+  // throw if no active plan. this function should not have been
+  // called without an active plan.
+  if (!plan_) {
+    throw std::runtime_error {"FPR::IsContinuousWCurrPlan: no active plan!"};
+  }
+  return utils::is_continuous(plan_, plan, franka_time_,
+                              params_.pos_continuity_err_tolerance,
+                              params_.vel_continuity_err_tolerance,
+                              params_.acc_continuity_err_tolerance);
 }
 
 /// Calculate the time to advance while pausing or unpausing
@@ -738,6 +754,68 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
   }
 }
 
+bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition(
+    const RobotParameters& params, const Eigen::VectorXd& franka_start_conf,
+    const Eigen::VectorXd& start_conf_plan) {
+  // Maximum change in joint angle between two confs
+  auto max_ang_distance {
+      utils::max_angular_distance(franka_start_conf, start_conf_plan)};
+  if (max_ang_distance > params.kMediumJointDistance) {
+    // far from start conf. return true
+    dexai::log()->error(
+        "IsStartFarFromCurrentJointPosition: Discarding plan, mismatched start "
+        "position. Max distance: {} > {}",
+        max_ang_distance, params.kMediumJointDistance);
+    return true;
+  }
+  // always returns false below this
+
+  // check to print warning. no control logic
+  if (max_ang_distance > params.kTightJointDistance) {
+    dexai::log()->warn(
+        "IsStartFarFromCurrentJointPosition: max angular distance between "
+        "franka and start of plan is larger than 'kTightJointDistance': {} > "
+        "{}",
+        max_ang_distance, params.kTightJointDistance);
+  }
+  // not far from start conf. return false
+  return false;
+}
+
+void FrankaPlanRunner::UpdateActivePlan(
+    std::unique_ptr<PPType> new_plan, int64_t new_plan_utime,
+    int64_t new_plan_exec_opt,
+    const Eigen::Vector3d& new_plan_contact_expected) {
+  const bool has_active_plan {plan_ != nullptr};
+  plan_ = std::move(new_plan);
+  plan_utime_ = new_plan_utime;
+  plan_exec_opt_ = new_plan_exec_opt;
+  contact_expected_ = new_plan_contact_expected;
+
+  plan_start_utime_ = utils::get_current_utime();
+
+  dexai::log()->info(
+      "UpdateActivePlan: popped new plan {} from buffer, "
+      "starting initial timestep...",
+      plan_utime_);
+
+  if (!has_active_plan) {
+    // first time step of plan, reset time and start conf
+    franka_time_ = 0.0;
+  }
+
+  start_conf_plan_ = plan_->value(franka_time_);
+
+  if (!LimitJoints(start_conf_plan_)) {
+    dexai::log()->warn(
+        "UpdateActivePlan: plan {} at franka_time_: {} seconds "
+        "is exceeding the joint limits!",
+        plan_utime_, franka_time_);
+  }
+
+  end_conf_plan_ = plan_->value(plan_->end_time());
+}
+
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const franka::RobotState& robot_state, franka::Duration period) {
   if (comm_interface_->SimControlExceptionTriggered()) {
@@ -763,45 +841,57 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
-    std::tie(plan_, plan_utime_, plan_exec_opt_, contact_expected_) =
-        comm_interface_->PopNewPlan();
-    plan_start_utime_ = utils::get_current_utime();
-    dexai::log()->info(
-        "JointPositionCallback: popped new plan {} from buffer, "
-        "starting initial timestep...",
-        plan_utime_);
-    // first time step of plan, reset time and start conf
-    franka_time_ = 0.0;
-    start_conf_plan_ = plan_->value(franka_time_);
+    auto [new_plan, new_plan_utime, new_plan_exec_opt,
+          new_plan_contact_expected] {comm_interface_->PopNewPlan()};
 
-    if (!LimitJoints(start_conf_plan_)) {
-      dexai::log()->warn(
-          "JointPositionCallback: plan {} at franka_time_: {} seconds "
-          "is exceeding the joint limits!",
-          plan_utime_, franka_time_);
+    bool has_active_plan {plan_ != nullptr};
+    bool is_new_plan_valid {!new_plan->empty()
+                            && new_plan->end_time() > franka_time_};
+    if (is_new_plan_valid
+        && (!has_active_plan || IsContinuousWithCurrentPlan(new_plan))) {
+      // If the new plan is coninuous in position, velocity and acceleration
+      // with the current plan at current frank time, replace it with the new
+      // plan. Or if we do not currently have a plan, move the new plan's
+      // ownership to the current plan unique_ptr
+      UpdateActivePlan(std::move(new_plan), new_plan_utime, new_plan_exec_opt,
+                       new_plan_contact_expected);
+      // the current (desired) position of franka is the starting position:
+      start_conf_franka_ = current_conf_franka;
+
+      // print the appropriate warning, send plan complete with success=false
+      // and skip this plan
+    } else {
+      if (!is_new_plan_valid) {
+        dexai::log()->warn(
+            "JointPositionCallback: new plan with utime: {} is invalid.\n"
+            "franka_time: {}\tplan.end_time: {}",
+            new_plan_utime, franka_time_, new_plan->end_time());
+        comm_interface_->PublishPlanComplete(
+            new_plan_utime, false, "discarded because plan was invalid");
+      } else {
+        dexai::log()->warn(
+            "JointPositionCallback: new plan with utime: {} is not continuous "
+            "with current plan with utime: {} at t={}",
+            new_plan_utime, plan_utime_, franka_time_);
+        comm_interface_->PublishPlanComplete(
+            new_plan_utime, false,
+            fmt::format("discarded because plan is not continuous with current "
+                        "plan utime: {} at t={}",
+                        plan_utime_, franka_time_));
+      }
     }
 
-    // the current (desired) position of franka is the starting position:
-    start_conf_franka_ = current_conf_franka;
-    end_conf_plan_ = plan_->value(plan_->end_time());
-
-    // Maximum change in joint angle between two confs
-    auto max_ang_distance =
-        utils::max_angular_distance(start_conf_franka_, start_conf_plan_);
-    if (max_ang_distance > params_.kMediumJointDistance) {
-      dexai::log()->error(
-          "JointPositionCallback: Discarding plan, mismatched start position."
-          " Max distance: {} > {}",
-          max_ang_distance, params_.kMediumJointDistance);
+    // if we did have an active plan and were able to switch to the new plan
+    // because the new plan is continuous with the old plan, skip this check
+    // because IsContinuousWithCurrentPlan checks for continuity in position,
+    // velocity, and acceleration
+    if (is_new_plan_valid && !has_active_plan
+        && IsStartFarFromCurrentJointPosition(params_, start_conf_franka_,
+                                              start_conf_plan_)) {
       comm_interface_->PublishPlanComplete(
           plan_utime_, false, "discarded due to mismatched start conf");
       ResetPlan();
       return franka::MotionFinished(franka::JointPositions(robot_state.q));
-    } else if (max_ang_distance > params_.kTightJointDistance) {
-      dexai::log()->warn(
-          "JointPositionCallback: max angular distance between franka and "
-          "start of plan is larger than 'kTightJointDistance': {} > {}",
-          max_ang_distance, params_.kTightJointDistance);
     }
   }
 
@@ -814,7 +904,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "controller...");
     }
     comm_interface_->SetRobotData(cannonical_robot_state, start_conf_franka_,
-                                  plan_utime_, plan_start_utime_);
+                                  franka_time_, plan_utime_, plan_start_utime_);
     return franka::MotionFinished(output_to_franka);
   }
 
@@ -827,11 +917,15 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       std::min(1.0, franka_time_ / plan_end_time)};
 
   // async in another thread, nonblocking
-  std::thread {[&]() {
-    comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
-                                  plan_utime_, plan_start_utime_,
-                                  plan_completion_frac);
-  }}.detach();
+  std::thread {[this, cannonical_robot_state, plan_completion_frac](
+                   auto next_conf_plan, auto franka_time, auto plan_utime,
+                   auto plan_start_utime) {
+                 comm_interface_->SetRobotData(
+                     cannonical_robot_state, next_conf_plan, franka_time,
+                     plan_utime, plan_start_utime, plan_completion_frac);
+               },
+               next_conf_plan_, franka_time_, plan_utime_, plan_start_utime_}
+      .detach();
 
   Eigen::VectorXd next_conf_combined(7);  // derive the next conf for return
   {
@@ -1098,7 +1192,7 @@ franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
   if (time_elapsed_us_.size() > 20) {
     time_elapsed_us_.pop_front();
   }
-  comm_interface_->SetRobotData(robot_state, tau_d, plan_utime_,
+  comm_interface_->SetRobotData(robot_state, tau_d, franka_time_, plan_utime_,
                                 plan_start_utime_);
   return ret_torques;
 }

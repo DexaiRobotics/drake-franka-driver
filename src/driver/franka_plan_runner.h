@@ -212,6 +212,40 @@ class FrankaPlanRunner {
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
 
+  /**
+   * @brief Helper function to determine if the start of new plan is far from
+   * the current robot conf.
+   *
+   * @param params - parameters from which to get comparison thresholds
+   * @param franka_start_conf - current robot conf from which the robot will
+   * start executing plan
+   * @param start_conf_plan - start conf of the new plan
+   * @return true, if the maximum angular distance between current robot conf
+   * and start of new plan is greater than kMediumJointDistance
+   * @return false, otherwise
+   */
+  static bool IsStartFarFromCurrentJointPosition(
+      const RobotParameters& params, const Eigen::VectorXd& franka_start_conf,
+      const Eigen::VectorXd& start_conf_plan);
+
+  /**
+   * @brief Helper function to copy robot plan, utime associated with the plan,
+   * execution options associated with the plan, and expected contact vector
+   * associated with robot plan from the arguments. Also sets sets utime at
+   * start of plan execution, plan start conf, and plan end conf based on the
+   * new plan. Resets franka time if not continuing onto new plan from
+   * current plan.
+   *
+   * @param new_plan - unique_ptr to new plan
+   * @param new_plan_utime - utime corresponding to the new plan
+   * @param new_plan_exec_opt - execution options associated with the new plan
+   * @param new_plan_contact_expected - unit vector in the direction of expected
+   * contact assiciated with the new plan. if any
+   */
+  void UpdateActivePlan(std::unique_ptr<PPType> new_plan,
+                        int64_t new_plan_utime, int64_t new_plan_exec_opt,
+                        const Eigen::Vector3d& new_plan_contact_expected);
+
   /// Set parameters for stiffness and goal direction based on push direction.
   /// TODO(@anyone): long-term the stiffness can be a parameter of the push
   /// request
@@ -240,7 +274,20 @@ class FrankaPlanRunner {
     plan_.reset();
     plan_utime_ = -1;
     plan_start_utime_ = -1;
+    franka_time_ = 0;
   }
+
+  /**
+   * @brief Checks if `plan` is continuous in position, velocity, and
+   * acceleration with the current robot plan at the current franka time
+   *
+   * @param plan - unique_ptr pointing to a new plan which will be checked
+   * against the current plan
+   * @return true, if the new plan is continuous in position, velocity, and
+   * acceleration with the current plan at the current franka time
+   * @return false, otherwise
+   */
+  bool IsContinuousWithCurrentPlan(const std::unique_ptr<PPType>& plan);
 
  private:
   const int dof_;          // degrees of freedom of franka
@@ -305,6 +352,9 @@ class FrankaPlanRunner {
   Eigen::VectorXd joint_pos_offset_;
 
   Eigen::VectorXd max_accels_;
+
+  // empirically proven, increased to work w/ sim robot
+  static constexpr double allowable_max_angle_error_ {0.001};
 
   // Collision torque thresholds for each joint in [Nm].
   const std::array<double, 7> kHighTorqueThreshold {100.0, 100.0, 100.0, 100.0,

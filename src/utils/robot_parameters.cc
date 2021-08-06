@@ -287,6 +287,16 @@ RobotParameters loadYamlParameters(
     get_yaml_val_or_die(param, "robot_max_jerks", p.robot_max_jerks,
                         yaml_full_path, verbose, exit_code);
 
+    get_yaml_val_or_die(param, "pos_continuity_err_tolerance",
+                        p.pos_continuity_err_tolerance, yaml_full_path, verbose,
+                        exit_code);
+    get_yaml_val_or_die(param, "vel_continuity_err_tolerance",
+                        p.vel_continuity_err_tolerance, yaml_full_path, verbose,
+                        exit_code);
+    get_yaml_val_or_die(param, "acc_continuity_err_tolerance",
+                        p.acc_continuity_err_tolerance, yaml_full_path, verbose,
+                        exit_code);
+
     get_yaml_val_or_die(param, "stop_epsilon", p.stop_epsilon, yaml_full_path,
                         verbose, exit_code);
     get_yaml_val_or_die(param, "stop_margin", p.stop_margin, yaml_full_path,

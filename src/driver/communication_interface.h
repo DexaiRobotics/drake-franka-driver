@@ -78,9 +78,22 @@ namespace franka_driver {
 struct RobotData {
   std::atomic<bool> has_robot_data;
   franka::RobotState robot_state;
+
+  // time in seconds since start
+  // of current plan
+  double robot_time {};
+
+  // utime associated with current plan.
+  // defaults to -1 if no plan
   int64_t current_plan_utime {};
+
+  // utime at start of current plan
   int64_t plan_start_utime {};
-  double plan_completion_frac;
+
+  // plan completion fraction.
+  // should be in [0, 1]
+  double plan_completion_frac {};
+
   Eigen::VectorXd robot_plan_next_conf;
 };
 
@@ -168,7 +181,8 @@ class CommunicationInterface {
   // Set the robot state, blocking
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf,
-                    int64_t current_plan_utime, int64_t plan_start_utime = -1,
+                    double robot_time, int64_t current_plan_utime,
+                    int64_t plan_start_utime = -1,
                     double plan_completion_frac = 0.0);
 
   bool GetPauseStatus();

@@ -31,8 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-///@file: util_math.cc
+/// @file: util_math.cc
 #include "utils/util_math.h"
+
+#include <memory>  // for unique_ptr
+#include <string>  // for string
+#include <vector>  // for vector
 
 #include "utils/dexai_log.h"
 
@@ -84,6 +88,24 @@ Eigen::VectorXd v_to_e(std::vector<int> v) {
   Eigen::VectorXi evi =
       Eigen::Map<Eigen::VectorXi, Eigen::Unaligned>(v.data(), v.size());
   return evi.template cast<double>();
+}
+
+bool is_continuous(const std::unique_ptr<PPType>& old_plan,
+                   const std::unique_ptr<PPType>& new_plan, double franka_time,
+                   const double pos_tolerance, const double vel_tolerance,
+                   const double acc_tolerance) {
+  std::function is_tolerated {[&](int order, double tolerance) -> bool {
+    const Eigen::VectorXd old_plan_derivative {
+        old_plan->derivative(order).value(franka_time)};
+    const Eigen::VectorXd new_plan_derivative {
+        new_plan->derivative(order).value(franka_time)};
+    const Eigen::VectorXd err {
+        (new_plan_derivative - old_plan_derivative).cwiseAbs()};
+    return (err.array() < tolerance).all();
+  }};
+
+  return (is_tolerated(0, pos_tolerance) && is_tolerated(1, vel_tolerance)
+          && is_tolerated(2, acc_tolerance));
 }
 
 }  //  namespace utils
