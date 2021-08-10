@@ -34,6 +34,11 @@
 /// @file: util_math.h
 #pragma once
 
+#include <limits>  // for numeric_limits
+#include <memory>  // for unique_ptr
+#include <string>  // for string
+#include <vector>  // for vector
+
 #include "drake/common/trajectories/piecewise_polynomial.h"
 
 typedef drake::trajectories::PiecewisePolynomial<double> PPType;
@@ -95,11 +100,30 @@ bool VectorEpsEq(T a, T b,
     return false;
   }
   for (int i = 0; i < a.size(); i++) {
-    if (!EpsEq(double(a(i)), double(b(i)), relTol)) {
+    if (!EpsEq(static_cast<double>(a(i)), static_cast<double>(b(i)), relTol)) {
       return false;
     }
   }
   return true;
 }
+
+/**
+ * @brief Checks if `new_plan` is continuous in position, velocity, and
+ * acceleration with the `old_plan` at `franka_time`
+ *
+ * @param old_plan - unique_ptr pointing to a old plan
+ * @param new_plan - unique_ptr pointing to a new plan
+ * @param franka_time - time at which the two plans will be compared
+ * @param pos_tolerance - tolerance used for the comparison in position
+ * @param vel_tolerance - tolerance used for the comparison in velocity
+ * @param acc_tolerance - tolerance used for the comparison in acceleration
+ * @return true, if the new plan is continuous in position, velocity, and
+ * acceleration with old at franka time
+ * @return false, otherwise
+ */
+bool is_continuous(const std::unique_ptr<PPType>& old_plan,
+                   const std::unique_ptr<PPType>& new_plan, double franka_time,
+                   const double pos_tolerance, const double vel_tolerance,
+                   const double acc_tolerance);
 
 }  // namespace utils
