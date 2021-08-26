@@ -1034,7 +1034,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     // terminate plan if grace period has ended and still not converged
     // in both position and speed after the deadline
     if (franka_time_ > (plan_->end_time() + 0.1)) {  // 100 ms
-      if (max_joint_err < 1e-4) {
+      if (max_joint_err < 2e-3) {
         // converged in position, publish success and don't wait for speed
         dexai::log()->warn(
             "JointPositionCallback: plan {} overtime by {:.4f} s, grace period "
