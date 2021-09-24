@@ -8,34 +8,30 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror -Wshadow=local")
 
 set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib")
-
-# threads
+find_package(GTest 1.11 REQUIRED)
 find_package(Threads REQUIRED)
-
-# find drake
-set(DRAKE_BUILD_DIR "/opt/drake")
 find_package(drake REQUIRED)
-
-# find franka
-set(FRANKA_BUILD_DIR "${CMAKE_SOURCE_DIR}/externals/libfranka/build")
-list(APPEND CMAKE_PREFIX_PATH ${FRANKA_BUILD_DIR})
-find_package(Franka REQUIRED)
-message("Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
-message("Franka_LIBRARIES: ${Franka_LIBRARIES}")
-
-find_package(yaml-cpp REQUIRED COMPONENTS shared)
-find_package(GTest REQUIRED)
-find_package(gflags REQUIRED COMPONENTS shared)
-find_package(lcm REQUIRED)
 
 # Set ROS Paths for find_package(catkin) to work
 list(APPEND CMAKE_PREFIX_PATH "/opt/ros/$ENV{ROS_DISTRO}")
 # for finding our components in ~/catkin_ws/src, particularly robot_msgs
 list(APPEND CMAKE_PREFIX_PATH "$ENV{HOME}/catkin_ws/devel")
+set(CATKIN_ENABLE_TESTING OFF)
 # for lcmtypes definitions in robot_msgs
 find_package(catkin REQUIRED COMPONENTS
   robot_msgs
 )
+include(GoogleTest)  # catkin screws up gtest functions
+
+# find franka
+find_package(Franka REQUIRED PATHS "${CMAKE_SOURCE_DIR}/externals/libfranka/build" NO_DEFAULT_PATH)
+message(DEBUG "Franka_INCLUDE_DIRS: ${Franka_INCLUDE_DIRS}")
+message(DEBUG "Franka_LIBRARIES: ${Franka_LIBRARIES}")
+
+find_package(yaml-cpp REQUIRED COMPONENTS shared)
+
+find_package(lcm REQUIRED)
+
 
 if (NOT EXISTS "/usr/include/spdlog/")
   set(SPDLOG_INCLUDE_DIR "/opt/drake/include/spdlog")

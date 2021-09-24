@@ -47,7 +47,7 @@ pkill -f franka_driver > /dev/null 2>&1
 hostname_first_letter="$(echo $(hostname) | head -c 1)"
 robot_name="FRANKA_${hostname_first_letter^}"
 status_channel="${robot_name}_STATUS"
-echo "Using hostname: $(hostname) to choose Franka name: ${robot_name}"
+echo "Starting Franka driver with hostname: $(hostname), Franka name: ${robot_name}"
 
 # check if there is already a driver running. at the start of this script
 # we try to kill any existing instances, but if there are multiple containers
