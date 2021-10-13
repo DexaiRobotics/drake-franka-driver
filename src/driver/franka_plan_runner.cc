@@ -208,6 +208,13 @@ int FrankaPlanRunner::RunFranka() {
             utils::get_current_utime(),
             comm_interface_->GetBrakesLockedChannelName(),
             current_mode == franka::RobotMode::kOther);
+        // Set robot state here so we're still publishing an accurate state
+        auto robot_state {robot_->readOnce()};
+        auto cannonical_robot_state {
+            utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
+        comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
+                                      franka_time_, plan_utime_,
+                                      plan_start_utime_);
 
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
