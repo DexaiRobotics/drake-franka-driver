@@ -442,6 +442,16 @@ void CommunicationInterface::HandlePlan(
   dexai::log()->info("CommInterface:HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
+  if (robot_spline->utime == last_confirmed_plan_utime_) {
+    // Looks like plan received confirmation was not received. Send again!
+    log()->warn(
+        "CommInterface:HandlePlan: Exact same plan received again. Resending "
+        "confirmation...");
+    PublishTriggerToChannel(robot_spline->utime,
+                            params_.lcm_plan_received_channel);
+    return;
+  }
+
   // occasionally the controller will return garbage instead of a valid mode
   // reading. try querying the mode a few times before giving up
   auto current_mode {GetRobotMode()};
@@ -486,6 +496,7 @@ void CommunicationInterface::HandlePlan(
       "CommInterface:HandlePlan: "
       "Published confirmation of received plan {}",
       robot_spline->utime);
+  last_confirmed_plan_utime_ = robot_spline->utime;
 
   // Piecewise polynomial
   if (robot_spline->num_states > 0) {
