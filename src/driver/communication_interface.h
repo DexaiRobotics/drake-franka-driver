@@ -102,6 +102,12 @@ struct PauseData {
   std::set<std::string> pause_sources;
 };
 
+/// A struct to describe the current status of the driver.
+struct DriverStatus {
+  bool running;
+  std::string message;
+};
+
 struct RobotPlanBuffer {
   int64_t utime;
   int16_t exec_opt;
@@ -194,6 +200,9 @@ class CommunicationInterface {
   void PublishPlanComplete(const int64_t& plan_utime, bool success = true,
                            std::string driver_status_string = "");
 
+  // set driver status
+  bool SetDriverStatus(bool success, std::string driver_status_string = "");
+
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
   void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
                             bool data);
@@ -267,6 +276,10 @@ class CommunicationInterface {
 
   PauseData pause_data_;
   std::mutex pause_mutex_;
+
+  // TODO(@syler): consolidate into robot status
+  DriverStatus driver_status_;
+  std::mutex driver_status_mutex_;
 
   std::thread lcm_publish_status_thread_;
   std::thread lcm_handle_thread_;

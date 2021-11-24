@@ -268,6 +268,30 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
     PublishRobotStatus();
     // TODO(@anyone): make pause status part of the robot status
     PublishPauseStatus();
+    // publish user stop, brakes locked, and driver status
+
+    if (std::unique_lock<std::mutex> lock {robot_data_mutex_};
+        robot_data_.has_robot_data) {
+      auto utime {utils::get_current_utime()};
+      franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
+      if ((current_mode == franka::RobotMode::kUserStopped)
+          || (current_mode == franka::RobotMode::kOther)) {
+        // publish if robot is user stopped or locked
+        PublishBoolToChannel(utime, GetUserStopChannelName(),
+                             current_mode == franka::RobotMode::kUserStopped);
+        comm_interface_->PublishBoolToChannel(
+            utils::get_current_utime(), GetBrakesLockedChannelName(),
+            current_mode == franka::RobotMode::kOther);
+        // TODO(@syler): setter for driver status to call from previous
+        // PublishDriverStatus location
+        auto err_msg {
+            fmt::format("cannot perform automatic error recovery in mode: {}",
+                        utils::RobotModeToString(current_mode))};
+        dexai::log()->error("RecoverFromControlException: {}", err_msg);
+        PublishDriverStatus(false, err_msg);
+      }
+    }
+
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
     auto time_elapsed = time_end - time_start;
@@ -605,7 +629,8 @@ void CommunicationInterface::HandlePause(
       break;
     default:
       dexai::log()->error(
-          "CommInterface:HandlePause: ignoring unknown pause command type from "
+          "CommInterface:HandlePause: ignoring unknown pause command type "
+          "from "
           "source: {}",
           source);
       break;
