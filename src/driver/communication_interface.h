@@ -118,9 +118,10 @@ struct RobotPlanBuffer {
 
 class CommunicationInterface {
  public:
-  explicit CommunicationInterface(const RobotParameters& params,
-                                  double lcm_publish_rate = 200.0 /* Hz */,
-                                  const bool simulated = false);
+  explicit CommunicationInterface(
+      const RobotParameters& params,
+      const double lcm_publish_rate = 200.0 /* Hz */,
+      const bool simulated = false);
   void StartInterface();
   void StopInterface();
 
@@ -147,7 +148,7 @@ class CommunicationInterface {
     compliant_push_stop_requested_ = false;
   }
 
-  inline void SetCompliantPushActive(bool active) {
+  inline void SetCompliantPushActive(const bool active) {
     compliant_push_active_ = active;
   }
 
@@ -179,7 +180,10 @@ class CommunicationInterface {
 
   // TODO(@anyone): remove franka specific RobotState type and
   // replace with std::array
-  franka::RobotState GetRobotState();
+  inline franka::RobotState GetRobotState() {
+    std::scoped_lock<std::mutex> lock {robot_data_mutex_};
+    return robot_data_.robot_state;
+  }
 
   // acquire mutex lock and return robot mode
   franka::RobotMode GetRobotMode();
@@ -187,12 +191,16 @@ class CommunicationInterface {
   // Set the robot state, blocking
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf,
-                    double robot_time, int64_t current_plan_utime,
-                    int64_t plan_start_utime = -1,
-                    double plan_completion_frac = 0.0);
+                    const double robot_time, const int64_t current_plan_utime,
+                    const int64_t plan_start_utime = -1,
+                    const double plan_completion_frac = 0.0);
 
-  bool GetPauseStatus();
-  void SetPauseStatus(bool paused);
+  inline bool GetPauseStatus() {
+    return pause_data_.paused;  // this is atomic
+  }
+  inline void SetPauseStatus(const bool paused) {
+    pause_data_.paused = paused;  // this is atomic
+  }
   std::set<std::string> GetPauseSources() const {
     return pause_data_.pause_sources;
   }
@@ -208,12 +216,11 @@ class CommunicationInterface {
     driver_status_.message = driver_status_string;
   }
 
-  void PublishDriverStatus(const bool success,
-                           const std::string& driver_status_string = "");
-  void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
-                            bool data);
-  void PublishPauseToChannel(int64_t utime, std::string_view lcm_channel,
-                             int8_t data, std::string_view source = "");
+  void PublishDriverStatus();
+  void PublishBoolToChannel(const int64_t utime, std::string_view lcm_channel,
+                            const bool data);
+  void PublishPauseToChannel(const int64_t utime, std::string_view lcm_channel,
+                             const int8_t data, std::string_view source = "");
 
   std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
   std::string GetBrakesLockedChannelName() {
@@ -238,8 +245,9 @@ class CommunicationInterface {
   void PublishLcmAndPauseStatus();
   void PublishRobotStatus();
   void PublishPauseStatus();
-  void PublishTriggerToChannel(int64_t utime, std::string_view lcm_channel,
-                               bool success = true,
+  void PublishTriggerToChannel(const int64_t utime,
+                               std::string_view lcm_channel,
+                               const bool success = true,
                                std::string_view message = "");
 
   void HandlePlan(const ::lcm::ReceiveBuffer*, const std::string&,
