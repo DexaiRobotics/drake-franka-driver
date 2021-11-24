@@ -325,7 +325,7 @@ int FrankaPlanRunner::RunFranka() {
             comm_interface_->SetRobotData(cannonical_robot_state,
                                           next_conf_plan_, franka_time_,
                                           plan_utime_, plan_start_utime_);
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
           }
         }
         continue;
