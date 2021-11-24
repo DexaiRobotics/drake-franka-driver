@@ -174,6 +174,15 @@ int FrankaPlanRunner::RunFranka() {
       // first verify that the Franka is in a state that can receive commands
       // before fully initializing the driver
       auto current_mode {GetRobotMode()};
+
+      // Set robot state here so we're still publishing an accurate state
+      auto robot_state {robot_->readOnce()};
+      auto cannonical_robot_state {
+          utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
+      comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
+                                    franka_time_, plan_utime_,
+                                    plan_start_utime_);
+
       if (auto t_now {std::chrono::steady_clock::now()};
           current_mode == franka::RobotMode::kReflex) {
         // if in reflex mode, attempt automatic error recovery
@@ -198,13 +207,6 @@ int FrankaPlanRunner::RunFranka() {
             fmt::format("robot cannot receive commands in mode: {} at startup",
                         utils::RobotModeToString(current_mode))};
         comm_interface_->SetDriverStatus(false, err_msg);
-        // Set robot state here so we're still publishing an accurate state
-        auto robot_state {robot_->readOnce()};
-        auto cannonical_robot_state {
-            utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
-        comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
-                                      franka_time_, plan_utime_,
-                                      plan_start_utime_);
 
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
@@ -316,6 +318,13 @@ int FrankaPlanRunner::RunFranka() {
             // keep trying to recover, expect this will require manual
             // intervention - this only fails when robot is user stopped or
             // locked
+            // Set robot state here so we're still publishing an accurate state
+            auto robot_state {robot_->readOnce()};
+            auto cannonical_robot_state {
+                utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
+            comm_interface_->SetRobotData(cannonical_robot_state,
+                                          next_conf_plan_, franka_time_,
+                                          plan_utime_, plan_start_utime_);
             std::this_thread::sleep_for(std::chrono::seconds(1));
           }
         }
