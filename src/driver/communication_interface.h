@@ -197,13 +197,19 @@ class CommunicationInterface {
     return pause_data_.pause_sources;
   }
 
-  void PublishPlanComplete(const int64_t& plan_utime, bool success = true,
-                           std::string driver_status_string = "");
+  void PublishPlanComplete(const int64_t plan_utime, const bool success = true,
+                           const std::string& driver_status_string = "");
 
   // set driver status
-  void SetDriverStatus(bool success, std::string driver_status_string = "");
+  inline void SetDriverStatus(const bool success,
+                              const std::string& driver_status_string = "") {
+    std::scoped_lock<std::mutex> lock {driver_status_mutex_};
+    driver_status_.running = success;
+    driver_status_.message = driver_status_string;
+  }
 
-  void PublishDriverStatus(bool success, std::string driver_status_string = "");
+  void PublishDriverStatus(const bool success,
+                           const std::string& driver_status_string = "");
   void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
                             bool data);
   void PublishPauseToChannel(int64_t utime, std::string_view lcm_channel,

@@ -232,7 +232,8 @@ void CommunicationInterface::SetPauseStatus(bool paused) {
 }
 
 void CommunicationInterface::PublishPlanComplete(
-    const int64_t& plan_utime, bool success, std::string plan_status_string) {
+    const int64_t plan_utime, const bool success,
+    const std::string& plan_status_string) {
   std::string log_msg {
       fmt::format("CommInterface:PublishPlanComplete: plan {} {}", plan_utime,
                   success ? "successful" : "failed")};
@@ -246,15 +247,8 @@ void CommunicationInterface::PublishPlanComplete(
                           success, plan_status_string);
 }
 
-void CommunicationInterface::SetDriverStatus(bool success,
-                                             std::string driver_status_string) {
-  std::scoped_lock<std::mutex> lock {driver_status_mutex_};
-  driver_status_.running = success;
-  driver_status_.message = driver_status_string;
-}
-
 void CommunicationInterface::PublishDriverStatus(
-    bool success, std::string driver_status_string) {
+    const bool success, const std::string& driver_status_string) {
   PublishTriggerToChannel(utils::get_current_utime(),
                           lcm_driver_status_channel_, success,
                           driver_status_string);
