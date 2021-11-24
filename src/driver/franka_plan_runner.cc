@@ -198,16 +198,6 @@ int FrankaPlanRunner::RunFranka() {
             fmt::format("robot cannot receive commands in mode: {} at startup",
                         utils::RobotModeToString(current_mode))};
         comm_interface_->SetDriverStatus(false, err_msg);
-
-        // publish if robot is user stopped or locked on startup
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(),
-            comm_interface_->GetUserStopChannelName(),
-            current_mode == franka::RobotMode::kUserStopped);
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(),
-            comm_interface_->GetBrakesLockedChannelName(),
-            current_mode == franka::RobotMode::kOther);
         // Set robot state here so we're still publishing an accurate state
         auto robot_state {robot_->readOnce()};
         auto cannonical_robot_state {
