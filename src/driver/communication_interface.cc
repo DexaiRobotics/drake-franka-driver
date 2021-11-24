@@ -246,6 +246,13 @@ void CommunicationInterface::PublishPlanComplete(
                           success, plan_status_string);
 }
 
+void CommunicationInterface::SetDriverStatus(bool success,
+                                             std::string driver_status_string) {
+  std::scoped_lock<std::mutex> lock {driver_status_mutex_};
+  driver_status_.running = success;
+  driver_status_.message = driver_status_string;
+}
+
 void CommunicationInterface::PublishDriverStatus(
     bool success, std::string driver_status_string) {
   PublishTriggerToChannel(utils::get_current_utime(),
@@ -272,24 +279,24 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
 
     if (std::unique_lock<std::mutex> lock {robot_data_mutex_};
         robot_data_.has_robot_data) {
-      auto utime {utils::get_current_utime()};
       franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
+      lock.unlock();
+      auto utime {utils::get_current_utime()};
+
       if ((current_mode == franka::RobotMode::kUserStopped)
           || (current_mode == franka::RobotMode::kOther)) {
         // publish if robot is user stopped or locked
         PublishBoolToChannel(utime, GetUserStopChannelName(),
                              current_mode == franka::RobotMode::kUserStopped);
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(), GetBrakesLockedChannelName(),
-            current_mode == franka::RobotMode::kOther);
-        // TODO(@syler): setter for driver status to call from previous
-        // PublishDriverStatus location
-        auto err_msg {
-            fmt::format("cannot perform automatic error recovery in mode: {}",
-                        utils::RobotModeToString(current_mode))};
-        dexai::log()->error("RecoverFromControlException: {}", err_msg);
-        PublishDriverStatus(false, err_msg);
+        PublishBoolToChannel(utime, GetBrakesLockedChannelName(),
+                             current_mode == franka::RobotMode::kOther);
       }
+    }
+
+    // publish driver status
+    {
+      std::scoped_lock<std::mutex> lock {driver_status_mutex_};
+      PublishDriverStatus(driver_status_.running, driver_status_.message);
     }
 
     // Sleep dynamically to achieve the desired print rate.
@@ -484,8 +491,7 @@ void CommunicationInterface::HandlePlan(
     if (ModeIsValid(current_mode)) {
       break;
     }
-    PublishDriverStatus(false,
-                        "Franka controller is reporting an unknown mode");
+    SetDriverStatus(false, "Franka controller is reporting an unknown mode");
     log()->error("HandlePlan: attempt {}/{} to read control mode from Franka",
                  i + 1, max_mode_check_attempts);
     current_mode = GetRobotMode();
@@ -497,7 +503,7 @@ void CommunicationInterface::HandlePlan(
         "Discarding plan with utime: {}, robot is in wrong mode: {}!",
         robot_spline->utime, utils::RobotModeToString(current_mode))};
     dexai::log()->error("CommInterface:HandlePlan: {}", err_msg);
-    PublishDriverStatus(false, err_msg);
+    SetDriverStatus(false, err_msg);
     return;
   }
 

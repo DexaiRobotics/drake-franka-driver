@@ -201,7 +201,7 @@ class CommunicationInterface {
                            std::string driver_status_string = "");
 
   // set driver status
-  bool SetDriverStatus(bool success, std::string driver_status_string = "");
+  void SetDriverStatus(bool success, std::string driver_status_string = "");
 
   void PublishDriverStatus(bool success, std::string driver_status_string = "");
   void PublishBoolToChannel(int64_t utime, std::string_view lcm_channel,
