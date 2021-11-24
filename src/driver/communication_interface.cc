@@ -619,8 +619,7 @@ void CommunicationInterface::HandlePause(
     default:
       dexai::log()->error(
           "CommInterface:HandlePause: ignoring unknown pause command type "
-          "from "
-          "source: {}",
+          "from source: {}",
           source);
       break;
   }
