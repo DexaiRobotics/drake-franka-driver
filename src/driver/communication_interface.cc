@@ -275,23 +275,6 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
     PublishRobotStatus();
     // TODO(@anyone): make pause status part of the robot status
     PublishPauseStatus();
-    // publish user stop, brakes locked, and driver status
-
-    if (std::unique_lock<std::mutex> lock {robot_data_mutex_};
-        robot_data_.has_robot_data) {
-      franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
-      lock.unlock();
-      auto utime {utils::get_current_utime()};
-
-      if ((current_mode == franka::RobotMode::kUserStopped)
-          || (current_mode == franka::RobotMode::kOther)) {
-        // publish if robot is user stopped or locked
-        PublishBoolToChannel(utime, GetUserStopChannelName(),
-                             current_mode == franka::RobotMode::kUserStopped);
-        PublishBoolToChannel(utime, GetBrakesLockedChannelName(),
-                             current_mode == franka::RobotMode::kOther);
-      }
-    }
 
     // publish driver status
     {
