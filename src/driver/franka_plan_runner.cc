@@ -165,7 +165,7 @@ int FrankaPlanRunner::RunFranka() {
           // probably something wrong with networking
           auto err_msg {fmt::format("Franka connection error: {}", e.what())};
           dexai::log()->error("RunFranka: {}", err_msg);
-          comm_interface_->PublishDriverStatus(false, err_msg);
+          comm_interface_->SetDriverStatus(false, err_msg);
           std::this_thread::sleep_for(std::chrono::milliseconds(1000));
           continue;
         }
@@ -174,6 +174,15 @@ int FrankaPlanRunner::RunFranka() {
       // first verify that the Franka is in a state that can receive commands
       // before fully initializing the driver
       auto current_mode {GetRobotMode()};
+
+      // Set robot state here so we're still publishing an accurate state
+      auto robot_state {robot_->readOnce()};
+      auto canonical_robot_state {
+          utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
+      comm_interface_->SetRobotData(canonical_robot_state, next_conf_plan_,
+                                    franka_time_, plan_utime_,
+                                    plan_start_utime_);
+
       if (auto t_now {std::chrono::steady_clock::now()};
           current_mode == franka::RobotMode::kReflex) {
         // if in reflex mode, attempt automatic error recovery
@@ -187,7 +196,7 @@ int FrankaPlanRunner::RunFranka() {
               " now in mode: {}.",
               utils::RobotModeToString(GetRobotMode()));
         } catch (const franka::ControlException& ce) {
-          comm_interface_->PublishDriverStatus(false, ce.what());
+          comm_interface_->SetDriverStatus(false, ce.what());
           dexai::log()->warn(
               "RunFranka: control exception in initialisation during automatic "
               "error recovery for Reflex mode: {}.",
@@ -197,24 +206,7 @@ int FrankaPlanRunner::RunFranka() {
         auto err_msg {
             fmt::format("robot cannot receive commands in mode: {} at startup",
                         utils::RobotModeToString(current_mode))};
-        comm_interface_->PublishDriverStatus(false, err_msg);
-
-        // publish if robot is user stopped or locked on startup
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(),
-            comm_interface_->GetUserStopChannelName(),
-            current_mode == franka::RobotMode::kUserStopped);
-        comm_interface_->PublishBoolToChannel(
-            utils::get_current_utime(),
-            comm_interface_->GetBrakesLockedChannelName(),
-            current_mode == franka::RobotMode::kOther);
-        // Set robot state here so we're still publishing an accurate state
-        auto robot_state {robot_->readOnce()};
-        auto cannonical_robot_state {
-            utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
-        comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
-                                      franka_time_, plan_utime_,
-                                      plan_start_utime_);
+        comm_interface_->SetDriverStatus(false, err_msg);
 
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
@@ -249,11 +241,11 @@ int FrankaPlanRunner::RunFranka() {
     SetCollisionBehaviorSafetyOn();
 
     dexai::log()->info("RunFranka: ready.");
-    comm_interface_->PublishDriverStatus(true);
+    comm_interface_->SetDriverStatus(true);
   } catch (const franka::Exception& ex) {
     dexai::log()->critical(
         "RunFranka: caught exception during initilization, msg: {}", ex.what());
-    comm_interface_->PublishDriverStatus(false, ex.what());
+    comm_interface_->SetDriverStatus(false, ex.what());
     return 1;  // bad things happened.
   }
 
@@ -326,7 +318,14 @@ int FrankaPlanRunner::RunFranka() {
             // keep trying to recover, expect this will require manual
             // intervention - this only fails when robot is user stopped or
             // locked
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            // Set robot state here so we're still publishing an accurate state
+            const auto robot_state {robot_->readOnce()};
+            const auto canonical_robot_state {
+                utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
+            comm_interface_->SetRobotData(canonical_robot_state,
+                                          next_conf_plan_, franka_time_,
+                                          plan_utime_, plan_start_utime_);
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
           }
         }
         continue;
@@ -373,7 +372,7 @@ int FrankaPlanRunner::RunFranka() {
           if (!RecoverFromControlException()) {  // plan_ is released/reset
             dexai::log()->critical(
                 "RunFranka: RecoverFromControlException failed");
-            comm_interface_->PublishDriverStatus(false, ce.what());
+            comm_interface_->SetDriverStatus(false, ce.what());
             return 1;
           }
         }
@@ -404,10 +403,10 @@ int FrankaPlanRunner::RunFranka() {
     }
     // only publish robot_status twice as fast as the lcm publish rate
     {
-      auto robot_state {robot_->readOnce()};
-      auto cannonical_robot_state {
+      const auto robot_state {robot_->readOnce()};
+      const auto canonical_robot_state {
           utils::ConvertToCannonical(robot_state, joint_pos_offset_)};
-      comm_interface_->SetRobotData(cannonical_robot_state, next_conf_plan_,
+      comm_interface_->SetRobotData(canonical_robot_state, next_conf_plan_,
                                     franka_time_, plan_utime_,
                                     plan_start_utime_);
     }
@@ -426,19 +425,11 @@ bool FrankaPlanRunner::RecoverFromControlException() {
     auto current_mode {GetRobotMode()};
     if ((current_mode == franka::RobotMode::kUserStopped)
         || (current_mode == franka::RobotMode::kOther)) {
-      // publish if robot is user stopped or locked
-      comm_interface_->PublishBoolToChannel(
-          utils::get_current_utime(), comm_interface_->GetUserStopChannelName(),
-          current_mode == franka::RobotMode::kUserStopped);
-      comm_interface_->PublishBoolToChannel(
-          utils::get_current_utime(),
-          comm_interface_->GetBrakesLockedChannelName(),
-          current_mode == franka::RobotMode::kOther);
       auto err_msg {
           fmt::format("cannot perform automatic error recovery in mode: {}",
                       utils::RobotModeToString(current_mode))};
       dexai::log()->error("RecoverFromControlException: {}", err_msg);
-      comm_interface_->PublishDriverStatus(false, err_msg);
+      comm_interface_->SetDriverStatus(false, err_msg);
       return false;
     } else {
       dexai::log()->warn(
@@ -456,14 +447,14 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   if (plan_) {
     ResetPlan();
   }
-  comm_interface_->PublishDriverStatus(
+  comm_interface_->SetDriverStatus(
       true, "successfully completed automatic error recovery");
   return true;
 }
 
 int FrankaPlanRunner::RunSim() {
   dexai::log()->info("Starting sim robot and entering run loop...");
-  comm_interface_->PublishDriverStatus(true);
+  comm_interface_->SetDriverStatus(true);
 
   // first, set some parameters
   Eigen::VectorXd next_conf(dof_);  // output state
@@ -841,11 +832,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   // read out robot state
   franka::JointPositions output_to_franka {robot_state.q_d};
   // scale to cannonical robot state
-  auto cannonical_robot_state =
+  auto canonical_robot_state =
       utils::ConvertToCannonical(robot_state, joint_pos_offset_);
   // set current_conf
   Eigen::VectorXd current_conf_franka =
-      utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.q_d));
+      utils::v_to_e(utils::ArrayToVector(canonical_robot_state.q_d));
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
     auto [new_plan, new_plan_utime, new_plan_exec_opt,
@@ -910,7 +901,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: No plan exists (anymore), exiting "
           "controller...");
     }
-    comm_interface_->SetRobotData(cannonical_robot_state, start_conf_franka_,
+    comm_interface_->SetRobotData(canonical_robot_state, start_conf_franka_,
                                   franka_time_, plan_utime_, plan_start_utime_);
     return franka::MotionFinished(output_to_franka);
   }
@@ -924,11 +915,11 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       std::min(1.0, franka_time_ / plan_end_time)};
 
   // async in another thread, nonblocking
-  std::thread {[this, cannonical_robot_state, plan_completion_frac](
+  std::thread {[this, canonical_robot_state, plan_completion_frac](
                    auto next_conf_plan, auto franka_time, auto plan_utime,
                    auto plan_start_utime) {
                  comm_interface_->SetRobotData(
-                     cannonical_robot_state, next_conf_plan, franka_time,
+                     canonical_robot_state, next_conf_plan, franka_time,
                      plan_utime, plan_start_utime, plan_completion_frac);
                },
                next_conf_plan_, franka_time_, plan_utime_, plan_start_utime_}
@@ -953,7 +944,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     for (size_t i {}; i < 7; i++) {
       next_conf_combined[i] =
           franka::lowpassFilter(period.toSec(), next_conf_combined[i],
-                                cannonical_robot_state.q_d[i], 30.0);
+                                canonical_robot_state.q_d[i], 30.0);
     }
   }
 
@@ -994,7 +985,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const double max_joint_err {
         utils::max_angular_distance(end_conf_plan_, current_conf_franka)};
     Eigen::VectorXd dq_abs {
-        utils::v_to_e(utils::ArrayToVector(cannonical_robot_state.dq))
+        utils::v_to_e(utils::ArrayToVector(canonical_robot_state.dq))
             .cwiseAbs()};
     {  // threaded logging, capture member vars by val
       auto overtime_warning {[plan_utime = plan_utime_,
