@@ -823,6 +823,9 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     comm_interface_->ClearSimControlExceptionTrigger();
     // return current joint positions instead of running plan through to
     // completion
+    comm_interface_->PublishPlanComplete(plan_utime_, false,
+                                         "simulated control exception");
+
     return franka::MotionFinished(franka::JointPositions(robot_state.q));
   }
 
