@@ -234,14 +234,6 @@ void CommunicationInterface::PublishPlanComplete(
                           success, plan_status_string);
 }
 
-void CommunicationInterface::PublishDriverStatus() {
-  std::scoped_lock<std::mutex> lock {driver_status_mutex_};
-
-  PublishTriggerToChannel(utils::get_current_utime(),
-                          lcm_driver_status_channel_, driver_status_.running,
-                          driver_status_.message);
-}
-
 void CommunicationInterface::HandleLcm() {
   while (running_) {
     lcm_.handleTimeout(0);
@@ -257,9 +249,6 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
     PublishRobotStatus();
     // TODO(@anyone): make pause status part of the robot status
     PublishPauseStatus();
-
-    // publish driver status
-    PublishDriverStatus();
 
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
@@ -296,8 +285,20 @@ void CommunicationInterface::PublishRobotStatus() {
 
     lcm_.publish(params_.lcm_robot_status_channel, &robot_status);
 
-    PublishBoolToChannel(franka_status.utime, lcm_user_stop_channel_,
-                         current_mode == franka::RobotMode::kUserStopped);
+    {
+      std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
+      driver_status_msg_.utime = franka_status.utime;
+      driver_status_msg_.current_plan_utime = robot_data_.current_plan_utime;
+      driver_status_msg_.plan_start_utime = robot_data_.plan_start_utime;
+      driver_status_msg_.has_plan = robot_data_.current_plan_utime != -1;
+      driver_status_msg_.brakes_locked =
+          current_mode == franka::RobotMode::kOther;
+      driver_status_msg_.user_stopped =
+          current_mode == franka::RobotMode::kUserStopped;
+      driver_status_msg_.compliant_push_active = compliant_push_active_;
+      driver_status_msg_.torque_enabled = true;
+    }
+    lcm_.publish(lcm_driver_status_channel_, &driver_status_msg_);
 
     // Cancel robot plans if robot is U-stopped.
     if (current_mode == franka::RobotMode::kUserStopped) {
@@ -305,11 +306,6 @@ void CommunicationInterface::PublishRobotStatus() {
                             PauseCommandType::CANCEL_PLAN,
                             fmt::format("{}_U_STOP", params_.robot_name));
     }
-    PublishBoolToChannel(franka_status.utime, lcm_brakes_locked_channel_,
-                         current_mode == franka::RobotMode::kOther);
-    PublishBoolToChannel(franka_status.utime,
-                         lcm_compliant_push_active_channel_,
-                         compliant_push_active_);
   }
 }
 
@@ -327,6 +323,9 @@ void CommunicationInterface::PublishPauseStatus() {
   }
   lock.unlock();
   lcm_.publish(lcm_pause_status_channel_, &msg);
+  std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
+  driver_status_msg_.paused = msg.success;
+  driver_status_msg_.pause_sources = msg.message;
 }
 
 void CommunicationInterface::PublishTriggerToChannel(

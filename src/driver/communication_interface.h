@@ -58,6 +58,7 @@
 
 #include <lcm/lcm-cpp.hpp>
 #include <robot_msgs/bool_t.hpp>
+#include <robot_msgs/driver_status_t.hpp>
 #include <robot_msgs/pause_cmd.hpp>
 #include <robot_msgs/plan_exec_opts_t.hpp>
 #include <robot_msgs/robot_spline_t.hpp>
@@ -214,6 +215,8 @@ class CommunicationInterface {
     std::scoped_lock<std::mutex> lock {driver_status_mutex_};
     driver_status_.running = success;
     driver_status_.message = driver_status_string;
+    driver_status_msg_.driver_running = success;
+    driver_status_msg_.err_msg = driver_status_string;
   }
 
   void PublishDriverStatus();
@@ -293,6 +296,7 @@ class CommunicationInterface {
 
   // TODO(@syler): consolidate into robot status
   DriverStatus driver_status_;
+  robot_msgs::driver_status_t driver_status_msg_;
   std::mutex driver_status_mutex_;
 
   std::thread lcm_publish_status_thread_;
