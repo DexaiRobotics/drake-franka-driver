@@ -230,8 +230,16 @@ void CommunicationInterface::PublishPlanComplete(
   dexai::log()->info(log_msg);
   new_plan_buffer_.plan.reset();
   new_plan_buffer_.cartesian_plan.reset();
-  PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
-                          success, plan_status_string);
+
+  {
+    std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
+    driver_status_msg_.last_plan_utime = plan_utime;
+    driver_status_msg_.last_plan_successful = success;
+    driver_status_msg_.last_plan_msg = plan_status_string;
+  }
+
+  // PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
+  //                         success, plan_status_string);
 }
 
 void CommunicationInterface::HandleLcm() {
