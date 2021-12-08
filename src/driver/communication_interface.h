@@ -91,6 +91,12 @@ struct RobotData {
   // utime at start of current plan
   int64_t plan_start_utime {};
 
+  // utime of the last completed plan.
+  int64_t last_plan_utime {};
+
+  // true if last plan was completed successfully
+  bool last_plan_successful {};
+
   // plan completion fraction.
   // should be in [0, 1]
   double plan_completion_frac {};
@@ -169,7 +175,7 @@ class CommunicationInterface {
 
   void ClearNewPlan(std::string_view reason) {
     dexai::log()->warn("ClearNewPlan: {}", reason.data());
-    PublishPlanComplete(new_plan_buffer_.utime, false, reason.data());
+    SetPlanCompletion(new_plan_buffer_.utime, false, reason.data());
     new_plan_buffer_.plan.reset();
     new_plan_buffer_.cartesian_plan.reset();
     new_plan_buffer_.utime = -1;
@@ -206,8 +212,8 @@ class CommunicationInterface {
     return pause_data_.pause_sources;
   }
 
-  void PublishPlanComplete(const int64_t plan_utime, const bool success = true,
-                           const std::string& driver_status_string = "");
+  void SetPlanCompletion(const int64_t plan_utime, const bool success = true,
+                         const std::string& driver_status_string = "");
 
   // set driver status
   inline void SetDriverStatus(const bool success,
@@ -224,11 +230,6 @@ class CommunicationInterface {
                             const bool data);
   void PublishPauseToChannel(const int64_t utime, std::string_view lcm_channel,
                              const int8_t data, std::string_view source = "");
-
-  std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
-  std::string GetBrakesLockedChannelName() {
-    return lcm_brakes_locked_channel_;
-  }
 
   /// check if robot mode corresponds to one of the known control modes from the
   /// controller, return false if the mode is garbage

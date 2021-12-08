@@ -79,11 +79,7 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
   // TODO(@anyone): remove these channels and combine with robot status channel
   lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
-  lcm_user_stop_channel_ = params_.robot_name + "_USER_STOPPED";
   lcm_compliant_push_req_channel_ = params_.robot_name + "_COMPLIANT_PUSH_REQ";
-  lcm_brakes_locked_channel_ = params_.robot_name + "_BRAKES_LOCKED";
-  lcm_compliant_push_active_channel_ =
-      params_.robot_name + "_COMPLIANT_PUSH_ACTIVE";
   lcm_sim_driver_event_trigger_channel_ =
       params_.robot_name + "_SIM_EVENT_TRIGGER";
 
@@ -92,18 +88,12 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
 
   dexai::log()->info("Plan channel:\t\t\t\t{}", params_.lcm_plan_channel);
   dexai::log()->info("Stop channel:\t\t\t\t{}", params_.lcm_stop_channel);
-  dexai::log()->info("Plan received channel:\t\t\t{}",
-                     params_.lcm_plan_received_channel);
-  dexai::log()->info("Plan complete channel:\t\t\t{}",
-                     params_.lcm_plan_complete_channel);
   dexai::log()->info("IIWA Status channel:\t\t\t{}",
                      params_.lcm_iiwa_status_channel);
   dexai::log()->info("Robot Status channel:\t\t\t{}",
                      params_.lcm_robot_status_channel);
   dexai::log()->info("Driver status channel:\t\t\t{}",
                      lcm_driver_status_channel_);
-  dexai::log()->info("Pause status channel:\t\t\t{}",
-                     lcm_pause_status_channel_);
   dexai::log()->info("Sim driver event trigger channel:\t{}",
                      lcm_sim_driver_event_trigger_channel_);
 };
@@ -218,11 +208,11 @@ void CommunicationInterface::SetRobotData(
   }
 }
 
-void CommunicationInterface::PublishPlanComplete(
+void CommunicationInterface::SetPlanCompletion(
     const int64_t plan_utime, const bool success,
     const std::string& plan_status_string) {
   std::string log_msg {
-      fmt::format("CommInterface:PublishPlanComplete: plan {} {}", plan_utime,
+      fmt::format("CommInterface:SetPlanCompletion: plan {} {}", plan_utime,
                   success ? "successful" : "failed")};
   if (!success) {
     log_msg += fmt::format(", error status: {}", plan_status_string);
@@ -237,9 +227,6 @@ void CommunicationInterface::PublishPlanComplete(
     driver_status_msg_.last_plan_successful = success;
     driver_status_msg_.last_plan_msg = plan_status_string;
   }
-
-  // PublishTriggerToChannel(plan_utime, params_.lcm_plan_complete_channel,
-  //                         success, plan_status_string);
 }
 
 void CommunicationInterface::HandleLcm() {
@@ -443,12 +430,9 @@ void CommunicationInterface::HandlePlan(
                      robot_spline->utime);
 
   if (robot_spline->utime == last_confirmed_plan_utime_) {
-    // Looks like plan received confirmation was not received. Send again!
-    log()->warn(
-        "CommInterface:HandlePlan: Exact same plan received again. Resending "
-        "confirmation...");
-    PublishTriggerToChannel(robot_spline->utime,
-                            params_.lcm_plan_received_channel);
+    // Looks like plan received confirmation was not received. driver status
+    // continuously publish active plan utime, so do nothing
+    log()->warn("CommInterface:HandlePlan: Exact same plan received again");
     return;
   }
 
@@ -487,14 +471,6 @@ void CommunicationInterface::HandlePlan(
 
   new_plan_buffer_.utime = robot_spline->utime;
   new_plan_buffer_.exec_opt = robot_spline->exec_opt;
-
-  // publish confirmation that plan was received with same utime
-  PublishTriggerToChannel(new_plan_buffer_.utime,
-                          params_.lcm_plan_received_channel);
-  dexai::log()->info(
-      "CommInterface:HandlePlan: "
-      "Published confirmation of received plan {}",
-      robot_spline->utime);
   last_confirmed_plan_utime_ = robot_spline->utime;
 
   // Piecewise polynomial
@@ -535,8 +511,8 @@ void CommunicationInterface::HandlePlan(
           robot_spline->utime, joint_delta.transpose());
       new_plan_buffer_.plan.reset();
       lock.unlock();
-      PublishPlanComplete(robot_spline->utime, false /*  = failed*/,
-                          "mismatched_start_position");
+      SetPlanCompletion(robot_spline->utime, false /*  = failed*/,
+                        "mismatched_start_position");
       return;
     }
     new_plan_buffer_.plan = std::make_unique<PPType>(piecewise_polynomial);

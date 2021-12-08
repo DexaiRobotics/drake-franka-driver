@@ -309,7 +309,7 @@ int FrankaPlanRunner::RunFranka() {
                 "RunFranka: control exception during active plan "
                 "{} at franka_t: {:.4f}, aborting and recovering...",
                 plan_utime_, franka_time_);
-            comm_interface_->PublishPlanComplete(plan_utime_, false, ce.what());
+            comm_interface_->SetPlanCompletion(plan_utime_, false, ce.what());
           } else {
             dexai::log()->error("RunFranka: exception in main loop: {}.",
                                 ce.what());
@@ -723,7 +723,7 @@ void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
             "IncreaseFrankaTimeBasedOnStatus: Paused successfully after "
             "cancel plan request from source: {}",
             source);
-        comm_interface_->PublishPlanComplete(
+        comm_interface_->SetPlanCompletion(
             plan_utime_, false,
             fmt::format("plan canceled upon request from source: {}", source));
         ResetPlan();
@@ -823,8 +823,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     comm_interface_->ClearSimControlExceptionTrigger();
     // return current joint positions instead of running plan through to
     // completion
-    comm_interface_->PublishPlanComplete(plan_utime_, false,
-                                         "simulated control exception");
+    comm_interface_->SetPlanCompletion(plan_utime_, false,
+                                       "simulated control exception");
 
     return franka::MotionFinished(franka::JointPositions(robot_state.q));
   }
@@ -867,14 +867,14 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
             "JointPositionCallback: new plan with utime: {} is invalid.\n"
             "franka_time: {}\tplan.end_time: {}",
             new_plan_utime, franka_time_, new_plan->end_time());
-        comm_interface_->PublishPlanComplete(
+        comm_interface_->SetPlanCompletion(
             new_plan_utime, false, "discarded because plan was invalid");
       } else {
         dexai::log()->warn(
             "JointPositionCallback: new plan with utime: {} is not continuous "
             "with current plan with utime: {} at t={}",
             new_plan_utime, plan_utime_, franka_time_);
-        comm_interface_->PublishPlanComplete(
+        comm_interface_->SetPlanCompletion(
             new_plan_utime, false,
             fmt::format("discarded because plan is not continuous with current "
                         "plan utime: {} at t={}",
@@ -889,7 +889,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     if (is_new_plan_valid && !has_active_plan
         && IsStartFarFromCurrentJointPosition(params_, start_conf_franka_,
                                               start_conf_plan_)) {
-      comm_interface_->PublishPlanComplete(
+      comm_interface_->SetPlanCompletion(
           plan_utime_, false, "discarded due to mismatched start conf");
       ResetPlan();
       return franka::MotionFinished(franka::JointPositions(robot_state.q));
@@ -974,7 +974,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     const auto contact_bool {cartesian_contact.head(3).array() > 0};
 
     if ((expected_contact_bool.cwiseProduct(contact_bool)).all()) {
-      comm_interface_->PublishPlanComplete(
+      comm_interface_->SetPlanCompletion(
           plan_utime_, true,
           fmt::format("made contact: {}", cartesian_contact.transpose()));
       ResetPlan();
@@ -1011,7 +1011,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "converged within grace period, finished; "
           "plan duration: {:.3f} s, franka_t: {:.3f} s",
           plan_utime_, overtime, plan_end_time, franka_time_);
-      comm_interface_->PublishPlanComplete(plan_utime_, true /* = success */);
+      comm_interface_->SetPlanCompletion(plan_utime_, true /* = success */);
       ResetPlan();
       dexai::log()->info(  // for control exception
           "Joint speeds at convergence:\n\tdq:\t{}\n\texcess:\t{}",
@@ -1042,7 +1042,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
             "exceeded, position converged with small residual speed, aborted "
             "and successful",
             plan_utime_, overtime);
-        comm_interface_->PublishPlanComplete(
+        comm_interface_->SetPlanCompletion(
             plan_utime_, true, "position converged with small residual speed");
         ResetPlan();
         return franka::MotionFinished(output_to_franka);
@@ -1052,7 +1052,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
           "JointPositionCallback: plan {} overtime by {:.4f} s, grace period "
           "exceeded, still divergent, aborted and unsuccessful",
           plan_utime_, overtime);
-      comm_interface_->PublishPlanComplete(plan_utime_, false, "diverged");
+      comm_interface_->SetPlanCompletion(plan_utime_, false, "diverged");
       ResetPlan();
       return franka::MotionFinished(output_to_franka);
     }

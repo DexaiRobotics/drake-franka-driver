@@ -135,10 +135,7 @@ bool RobotParameters::GenerateParametersBasedOnRobotName(
   lcm_iiwa_status_channel = new_robot_name + "_STATUS";
   lcm_robot_status_channel = new_robot_name + "_ROBOT_STATUS";
   lcm_plan_channel = new_robot_name + "_PLAN";
-  lcm_plan_received_channel = new_robot_name + "_PLAN_RECEIVED";
-  lcm_plan_complete_channel = new_robot_name + "_PLAN_COMPLETE";
   lcm_stop_channel = new_robot_name + "_STOP";
-  lcm_user_stop_channel = new_robot_name + "_USER_STOPPED";
   lcm_compliant_push_req_channel = new_robot_name + "_COMPLIANT_PUSH_REQ";
 
   return true;
@@ -256,10 +253,7 @@ RobotParameters loadYamlParameters(
     p.lcm_iiwa_status_channel = p.robot_name + "_STATUS";
     p.lcm_robot_status_channel = p.robot_name + "_ROBOT_STATUS";
     p.lcm_plan_channel = p.robot_name + "_PLAN";
-    p.lcm_plan_received_channel = p.robot_name + "_PLAN_RECEIVED";
-    p.lcm_plan_complete_channel = p.robot_name + "_PLAN_COMPLETE";
     p.lcm_stop_channel = p.robot_name + "_STOP";
-    p.lcm_user_stop_channel = p.robot_name + "_USER_STOPPED";
     p.lcm_compliant_push_req_channel = p.robot_name + "_COMPLIANT_PUSH_REQ";
     get_yaml_val_or_die(param, "lcm_url", p.lcm_url, yaml_full_path, verbose,
                         exit_code);
