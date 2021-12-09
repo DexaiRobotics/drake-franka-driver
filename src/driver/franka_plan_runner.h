@@ -271,6 +271,7 @@ class FrankaPlanRunner {
       const Eigen::Matrix<double, 7, 7> inertia);
 
   inline void ResetPlan() {
+    dexai::log()->debug("ResetPlan: begin");
     plan_.reset();
     plan_utime_ = -1;
     plan_start_utime_ = -1;
