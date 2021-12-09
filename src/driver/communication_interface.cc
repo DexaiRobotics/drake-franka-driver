@@ -301,8 +301,8 @@ void CommunicationInterface::PublishRobotStatus() {
           current_mode == franka::RobotMode::kUserStopped;
       driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
       driver_status_msg_.compliant_push_active = compliant_push_active_;
+      lcm_.publish(lcm_driver_status_channel_, &driver_status_msg_);
     }
-    lcm_.publish(lcm_driver_status_channel_, &driver_status_msg_);
 
     // Cancel robot plans if robot is U-stopped.
     if (current_mode == franka::RobotMode::kUserStopped) {
