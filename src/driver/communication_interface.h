@@ -234,7 +234,7 @@ class CommunicationInterface {
   /// indicating the contents of the pause message.
   void PublishLcmAndPauseStatus();
   void PublishRobotStatus();
-  void PublishPauseStatus();
+  void SetPauseStatus();
   void PublishTriggerToChannel(const int64_t utime,
                                std::string_view lcm_channel,
                                const bool success = true,
@@ -288,7 +288,6 @@ class CommunicationInterface {
   std::thread lcm_handle_thread_;
 
   std::string lcm_driver_status_channel_;
-  std::string lcm_pause_status_channel_;
   std::string lcm_user_stop_channel_;
   std::string lcm_compliant_push_req_channel_;
   std::string lcm_brakes_locked_channel_;

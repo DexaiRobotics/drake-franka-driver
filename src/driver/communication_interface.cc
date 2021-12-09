@@ -77,8 +77,6 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
 
   // TODO(@anyone): define this in parameters file
   lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
-  // TODO(@anyone): remove these channels and combine with robot status channel
-  lcm_pause_status_channel_ = params_.robot_name + "_PAUSE_STATUS";
   lcm_compliant_push_req_channel_ = params_.robot_name + "_COMPLIANT_PUSH_REQ";
   lcm_sim_driver_event_trigger_channel_ =
       params_.robot_name + "_SIM_EVENT_TRIGGER";
@@ -252,7 +250,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
     auto time_start = std::chrono::steady_clock::now();
     PublishRobotStatus();
     // TODO(@anyone): make pause status part of the robot status
-    PublishPauseStatus();
+    SetPauseStatus();
 
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
@@ -313,23 +311,20 @@ void CommunicationInterface::PublishRobotStatus() {
   }
 }
 
-void CommunicationInterface::PublishPauseStatus() {
-  robot_msgs::trigger_t msg;
-  msg.utime = utils::get_current_utime();
+void CommunicationInterface::SetPauseStatus() {
   std::unique_lock<std::mutex> lock(pause_mutex_);
-  msg.success = pause_data_.paused;
-  msg.message = "";
+  bool paused {pause_data_.paused};
+  std::string pause_sources {""};
   if (pause_data_.paused) {
     for (auto elem : pause_data_.pause_sources) {
-      msg.message.append(elem);
-      msg.message.append(",");
+      pause_sources.append(elem);
+      pause_sources.append(",");
     }
   }
   lock.unlock();
-  lcm_.publish(lcm_pause_status_channel_, &msg);
   std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
-  driver_status_msg_.paused = msg.success;
-  driver_status_msg_.pause_sources = msg.message;
+  driver_status_msg_.paused = paused;
+  driver_status_msg_.pause_sources = pause_sources;
 }
 
 void CommunicationInterface::PublishTriggerToChannel(
