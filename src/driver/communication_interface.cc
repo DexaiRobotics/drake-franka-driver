@@ -314,16 +314,16 @@ void CommunicationInterface::PublishRobotStatus() {
 void CommunicationInterface::SetPauseStatus() {
   std::unique_lock<std::mutex> lock(pause_mutex_);
   bool paused {pause_data_.paused};
-  std::string pause_sources {""};
+  std::vector<std::string> pause_sources {};
   if (pause_data_.paused) {
     for (auto elem : pause_data_.pause_sources) {
-      pause_sources.append(elem);
-      pause_sources.append(",");
+      pause_sources.push_back(elem);
     }
   }
   lock.unlock();
   std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
   driver_status_msg_.paused = paused;
+  driver_status_msg_.num_pause_sources = pause_sources.size();
   driver_status_msg_.pause_sources = pause_sources;
 }
 
