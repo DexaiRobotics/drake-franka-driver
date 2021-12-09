@@ -96,6 +96,15 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                      lcm_driver_status_channel_);
   dexai::log()->info("Sim driver event trigger channel:\t{}",
                      lcm_sim_driver_event_trigger_channel_);
+
+  {
+    std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
+    driver_status_msg_.current_plan_utime = -1;
+    driver_status_msg_.plan_start_utime = -1;
+    driver_status_msg_.last_plan_utime = -1;
+    driver_status_msg_.last_plan_successful = false;
+    driver_status_msg_.torque_enabled = true;
+  }
 };
 
 void CommunicationInterface::ResetData() {
@@ -292,7 +301,6 @@ void CommunicationInterface::PublishRobotStatus() {
           current_mode == franka::RobotMode::kUserStopped;
       driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
       driver_status_msg_.compliant_push_active = compliant_push_active_;
-      driver_status_msg_.torque_enabled = true;
     }
     lcm_.publish(lcm_driver_status_channel_, &driver_status_msg_);
 
