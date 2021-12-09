@@ -91,12 +91,6 @@ struct RobotData {
   // utime at start of current plan
   int64_t plan_start_utime {};
 
-  // utime of the last completed plan.
-  int64_t last_plan_utime {};
-
-  // true if last plan was completed successfully
-  bool last_plan_successful {};
-
   // plan completion fraction.
   // should be in [0, 1]
   double plan_completion_frac {};
@@ -107,12 +101,6 @@ struct RobotData {
 struct PauseData {
   std::atomic<bool> paused;
   std::set<std::string> pause_sources;
-};
-
-/// A struct to describe the current status of the driver.
-struct DriverStatus {
-  bool running;
-  std::string message;
 };
 
 struct RobotPlanBuffer {
@@ -219,8 +207,6 @@ class CommunicationInterface {
   inline void SetDriverStatus(const bool success,
                               const std::string& driver_status_string = "") {
     std::scoped_lock<std::mutex> lock {driver_status_mutex_};
-    driver_status_.running = success;
-    driver_status_.message = driver_status_string;
     driver_status_msg_.driver_running = success;
     driver_status_msg_.err_msg = driver_status_string;
   }
@@ -295,8 +281,6 @@ class CommunicationInterface {
   PauseData pause_data_;
   std::mutex pause_mutex_;
 
-  // TODO(@syler): consolidate into robot status
-  DriverStatus driver_status_;
   robot_msgs::driver_status_t driver_status_msg_;
   std::mutex driver_status_mutex_;
 
