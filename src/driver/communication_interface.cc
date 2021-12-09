@@ -290,6 +290,7 @@ void CommunicationInterface::PublishRobotStatus() {
           current_mode == franka::RobotMode::kOther;
       driver_status_msg_.user_stopped =
           current_mode == franka::RobotMode::kUserStopped;
+      driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
       driver_status_msg_.compliant_push_active = compliant_push_active_;
       driver_status_msg_.torque_enabled = true;
     }
