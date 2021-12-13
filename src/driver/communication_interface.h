@@ -183,6 +183,9 @@ class CommunicationInterface {
   // acquire mutex lock and return robot mode
   franka::RobotMode GetRobotMode();
 
+  /// Manual mode switch in sim as opposed to reading from Franka controller
+  void SetModeIfSimulated(const franka::RobotMode& mode);
+
   // Set the robot state, blocking
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf,
@@ -212,7 +215,8 @@ class CommunicationInterface {
   }
 
   /// Update driver status and return publishable status message.
-  robot_msgs::driver_status_t GetUpdatedDriverStatus();
+  robot_msgs::driver_status_t GetUpdatedDriverStatus(
+      const int64_t utime, const RobotData& robot_data);
 
   void PublishBoolToChannel(const int64_t utime, std::string_view lcm_channel,
                             const bool data);

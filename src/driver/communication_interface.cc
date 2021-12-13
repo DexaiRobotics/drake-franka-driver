@@ -133,10 +133,7 @@ void CommunicationInterface::StartInterface() {
   // initialize robot mode to idle when running in simulation.
   // on the real Franka, the robot mode gets read in via libfranka from the
   // actual robot arm
-  if (is_sim_) {
-    std::scoped_lock<std::mutex> lock {robot_data_mutex_};
-    robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
-  }
+  SetModeIfSimulated(franka::RobotMode::kIdle);
 
   // start LCM threads; independent of sim vs. real robot
   dexai::log()->info("CommInterface:StartInterface: Start LCM threads");
@@ -171,6 +168,9 @@ CommunicationInterface::PopNewPlan() {
                     "in buffer: {}",
                     new_plan_buffer_.utime));
   }
+
+  SetModeIfSimulated(franka::RobotMode::kMove);
+
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr new_plan_buffer_.plan
   return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime,
@@ -185,6 +185,8 @@ CommunicationInterface::PopNewCartesianPlan() {
                     "in buffer: {}",
                     new_plan_buffer_.utime));
   }
+  SetModeIfSimulated(franka::RobotMode::kMove);
+
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr new_plan_buffer_.cartesian_plan
   return {std::move(new_plan_buffer_.cartesian_plan), new_plan_buffer_.utime,
@@ -234,6 +236,7 @@ void CommunicationInterface::SetPlanCompletion(
     driver_status_msg_.last_plan_successful = success;
     driver_status_msg_.last_plan_msg = plan_status_string;
   }
+  SetModeIfSimulated(franka::RobotMode::kIdle);
 }
 
 void CommunicationInterface::HandleLcm() {
@@ -277,15 +280,16 @@ void CommunicationInterface::PublishRobotStatus() {
     robot_msgs::robot_status_t robot_status {
         utils::ConvertToRobotStatusLcmMsg(robot_data_)};
 
-    // publish data over lcm
     franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
+
+    auto driver_status_msg {
+        GetUpdatedDriverStatus(franka_status.utime, robot_data_)};
+
     robot_data_.has_robot_data = false;
     lock.unlock();
+    // publish data over lcm
     lcm_.publish(params_.lcm_iiwa_status_channel, &franka_status);
-
     lcm_.publish(params_.lcm_robot_status_channel, &robot_status);
-
-    auto driver_status_msg {GetUpdatedDriverStatus()};
     lcm_.publish(lcm_driver_status_channel_, &driver_status_msg);
 
     // Cancel robot plans if robot is U-stopped.
@@ -297,23 +301,22 @@ void CommunicationInterface::PublishRobotStatus() {
   }
 }
 
-robot_msgs::driver_status_t CommunicationInterface::GetUpdatedDriverStatus() {
+robot_msgs::driver_status_t CommunicationInterface::GetUpdatedDriverStatus(
+    const int64_t utime, const RobotData& robot_data) {
   std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
 
-  driver_status_msg_.utime = utils::get_current_utime();
-  {
-    std::scoped_lock<std::mutex> robot_data_lock {robot_data_mutex_};
-    franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
+  driver_status_msg_.utime = utime;
 
-    driver_status_msg_.current_plan_utime = robot_data_.current_plan_utime;
-    driver_status_msg_.plan_start_utime = robot_data_.plan_start_utime;
-    driver_status_msg_.has_plan = robot_data_.current_plan_utime != -1;
-    driver_status_msg_.brakes_locked =
-        current_mode == franka::RobotMode::kOther;
-    driver_status_msg_.user_stopped =
-        current_mode == franka::RobotMode::kUserStopped;
-    driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
-  }
+  franka::RobotMode current_mode {robot_data.robot_state.robot_mode};
+
+  driver_status_msg_.current_plan_utime = robot_data.current_plan_utime;
+  driver_status_msg_.plan_start_utime = robot_data.plan_start_utime;
+  driver_status_msg_.has_plan = robot_data.current_plan_utime != -1;
+  driver_status_msg_.brakes_locked = current_mode == franka::RobotMode::kOther;
+  driver_status_msg_.user_stopped =
+      current_mode == franka::RobotMode::kUserStopped;
+  driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
+  robot_data_mutex_.unlock();
   driver_status_msg_.compliant_push_active = compliant_push_active_;
 
   {
@@ -363,6 +366,17 @@ void CommunicationInterface::PublishBoolToChannel(const int64_t utime,
 franka::RobotMode CommunicationInterface::GetRobotMode() {
   std::scoped_lock<std::mutex> lock {robot_data_mutex_};
   return robot_data_.robot_state.robot_mode;
+}
+
+void CommunicationInterface::SetModeIfSimulated(const franka::RobotMode& mode) {
+  log()->trace("CommInterface:SetModeIfSimulated: setting to {}",
+               utils::RobotModeToString(mode));
+  if (is_sim_) {
+    std::scoped_lock<std::mutex> lock {robot_data_mutex_};
+    robot_data_.robot_state.robot_mode = mode;
+    log()->info("CommInterface:SetModeIfSimulated: set mode to {}",
+                utils::RobotModeToString(mode));
+  }
 }
 
 bool CommunicationInterface::ModeIsValid(
@@ -562,7 +576,8 @@ void CommunicationInterface::HandlePause(
     }
     case PauseCommandType::PAUSE:
       dexai::log()->warn(
-          "CommInterface:HandlePause: received pause command from source: {}",
+          "CommInterface:HandlePause: received pause command from source: "
+          "{}",
           source);
       if (pause_data_.pause_sources.insert(source).second == false) {
         dexai::log()->warn(
@@ -572,7 +587,8 @@ void CommunicationInterface::HandlePause(
       break;
     case PauseCommandType::CONTINUE:
       dexai::log()->warn(
-          "CommInterface:HandlePause: received continue command from source: "
+          "CommInterface:HandlePause: received continue command from "
+          "source: "
           "{}",
           source);
       if (pause_data_.pause_sources.find(source)
@@ -602,8 +618,8 @@ void CommunicationInterface::HandlePause(
   }
 }
 
-// TODO(@syler): this could be a different message type, pause_cmd is probably
-// not the best here
+// TODO(@syler): this could be a different message type, pause_cmd is
+// probably not the best here
 void CommunicationInterface::HandleSimDriverEventTrigger(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::pause_cmd* cmd_msg) {
@@ -614,6 +630,7 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
     dexai::log()->error(
         "CommInterface:HandleSimDriverEventTrigger: received command "
         "to simulate control exception!");
+    SetModeIfSimulated(franka::RobotMode::kReflex);
     sim_control_exception_triggered_ = true;
     return;
   }
