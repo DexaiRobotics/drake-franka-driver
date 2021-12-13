@@ -211,10 +211,9 @@ class CommunicationInterface {
     driver_status_msg_.err_msg = driver_status_string;
   }
 
-  robot
+  /// Update driver status and return publishable status message.
+  robot_msgs::driver_status_t GetUpdatedDriverStatus();
 
-      void
-      PublishDriverStatus();
   void PublishBoolToChannel(const int64_t utime, std::string_view lcm_channel,
                             const bool data);
   void PublishPauseToChannel(const int64_t utime, std::string_view lcm_channel,
@@ -237,7 +236,6 @@ class CommunicationInterface {
   /// indicating the contents of the pause message.
   void PublishLcmAndPauseStatus();
   void PublishRobotStatus();
-  void SetPauseStatus();
   void PublishTriggerToChannel(const int64_t utime,
                                std::string_view lcm_channel,
                                const bool success = true,

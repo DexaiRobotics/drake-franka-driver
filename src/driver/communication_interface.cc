@@ -249,8 +249,6 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
   while (running_) {
     auto time_start = std::chrono::steady_clock::now();
     PublishRobotStatus();
-    // TODO(@anyone): make pause status part of the robot status
-    SetPauseStatus();
 
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
@@ -287,20 +285,8 @@ void CommunicationInterface::PublishRobotStatus() {
 
     lcm_.publish(params_.lcm_robot_status_channel, &robot_status);
 
-    {
-      std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
-      driver_status_msg_.utime = franka_status.utime;
-      driver_status_msg_.current_plan_utime = robot_data_.current_plan_utime;
-      driver_status_msg_.plan_start_utime = robot_data_.plan_start_utime;
-      driver_status_msg_.has_plan = robot_data_.current_plan_utime != -1;
-      driver_status_msg_.brakes_locked =
-          current_mode == franka::RobotMode::kOther;
-      driver_status_msg_.user_stopped =
-          current_mode == franka::RobotMode::kUserStopped;
-      driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
-      driver_status_msg_.compliant_push_active = compliant_push_active_;
-      lcm_.publish(lcm_driver_status_channel_, &driver_status_msg_);
-    }
+    auto driver_status_msg {GetUpdatedDriverStatus()};
+    lcm_.publish(lcm_driver_status_channel_, &driver_status_msg);
 
     // Cancel robot plans if robot is U-stopped.
     if (current_mode == franka::RobotMode::kUserStopped) {
@@ -311,17 +297,37 @@ void CommunicationInterface::PublishRobotStatus() {
   }
 }
 
-void CommunicationInterface::SetPauseStatus() {
-  std::scoped_lock<std::mutex> pause_lock {pause_mutex_};
+robot_msgs::driver_status_t CommunicationInterface::GetUpdatedDriverStatus() {
   std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
-  driver_status_msg_.paused = pause_data_.paused;
-  driver_status_msg_.pause_sources.clear();
-  driver_status_msg_.num_pause_sources = pause_data_.pause_sources.size();
-  if (pause_data_.paused) {
-    for (auto elem : pause_data_.pause_sources) {
-      driver_status_msg_.pause_sources.push_back(elem);
+
+  driver_status_msg_.utime = utils::get_current_utime();
+  {
+    std::scoped_lock<std::mutex> robot_data_lock {robot_data_mutex_};
+    franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
+
+    driver_status_msg_.current_plan_utime = robot_data_.current_plan_utime;
+    driver_status_msg_.plan_start_utime = robot_data_.plan_start_utime;
+    driver_status_msg_.has_plan = robot_data_.current_plan_utime != -1;
+    driver_status_msg_.brakes_locked =
+        current_mode == franka::RobotMode::kOther;
+    driver_status_msg_.user_stopped =
+        current_mode == franka::RobotMode::kUserStopped;
+    driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
+  }
+  driver_status_msg_.compliant_push_active = compliant_push_active_;
+
+  {
+    std::scoped_lock<std::mutex> pause_lock {pause_mutex_};
+    driver_status_msg_.paused = pause_data_.paused;
+    driver_status_msg_.pause_sources.clear();
+    driver_status_msg_.num_pause_sources = pause_data_.pause_sources.size();
+    if (pause_data_.paused) {
+      for (auto elem : pause_data_.pause_sources) {
+        driver_status_msg_.pause_sources.push_back(elem);
+      }
     }
   }
+  return driver_status_msg_;
 }
 
 void CommunicationInterface::PublishTriggerToChannel(
