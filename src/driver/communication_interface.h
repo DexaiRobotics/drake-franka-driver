@@ -203,15 +203,18 @@ class CommunicationInterface {
   void SetPlanCompletion(const int64_t plan_utime, const bool success = true,
                          const std::string& driver_status_string = "");
 
-  // set driver status
-  inline void SetDriverStatus(const bool success,
-                              const std::string& driver_status_string = "") {
+  /// Set driver status fields with running status and error message.
+  inline void SetDriverIsRunning(const bool success,
+                                 const std::string& driver_status_string = "") {
     std::scoped_lock<std::mutex> lock {driver_status_mutex_};
     driver_status_msg_.driver_running = success;
     driver_status_msg_.err_msg = driver_status_string;
   }
 
-  void PublishDriverStatus();
+  robot
+
+      void
+      PublishDriverStatus();
   void PublishBoolToChannel(const int64_t utime, std::string_view lcm_channel,
                             const bool data);
   void PublishPauseToChannel(const int64_t utime, std::string_view lcm_channel,

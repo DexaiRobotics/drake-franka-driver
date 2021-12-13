@@ -445,7 +445,7 @@ void CommunicationInterface::HandlePlan(
     if (ModeIsValid(current_mode)) {
       break;
     }
-    SetDriverStatus(false, "Franka controller is reporting an unknown mode");
+    SetDriverIsRunning(false, "Franka controller is reporting an unknown mode");
     log()->error("HandlePlan: attempt {}/{} to read control mode from Franka",
                  i + 1, max_mode_check_attempts);
     current_mode = GetRobotMode();
@@ -457,7 +457,7 @@ void CommunicationInterface::HandlePlan(
         "Discarding plan with utime: {}, robot is in wrong mode: {}!",
         robot_spline->utime, utils::RobotModeToString(current_mode))};
     dexai::log()->error("CommInterface:HandlePlan: {}", err_msg);
-    SetDriverStatus(false, err_msg);
+    SetDriverIsRunning(false, err_msg);
     return;
   }
 

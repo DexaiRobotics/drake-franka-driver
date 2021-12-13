@@ -165,7 +165,7 @@ int FrankaPlanRunner::RunFranka() {
           // probably something wrong with networking
           auto err_msg {fmt::format("Franka connection error: {}", e.what())};
           dexai::log()->error("RunFranka: {}", err_msg);
-          comm_interface_->SetDriverStatus(false, err_msg);
+          comm_interface_->SetDriverIsRunning(false, err_msg);
           std::this_thread::sleep_for(std::chrono::milliseconds(1000));
           continue;
         }
@@ -196,7 +196,7 @@ int FrankaPlanRunner::RunFranka() {
               " now in mode: {}.",
               utils::RobotModeToString(GetRobotMode()));
         } catch (const franka::ControlException& ce) {
-          comm_interface_->SetDriverStatus(false, ce.what());
+          comm_interface_->SetDriverIsRunning(false, ce.what());
           dexai::log()->warn(
               "RunFranka: control exception in initialisation during automatic "
               "error recovery for Reflex mode: {}.",
@@ -206,7 +206,7 @@ int FrankaPlanRunner::RunFranka() {
         auto err_msg {
             fmt::format("robot cannot receive commands in mode: {} at startup",
                         utils::RobotModeToString(current_mode))};
-        comm_interface_->SetDriverStatus(false, err_msg);
+        comm_interface_->SetDriverIsRunning(false, err_msg);
 
         if (t_now - t_last_main_loop_log_ >= std::chrono::seconds(1)) {
           dexai::log()->error("RunFranka: {}", err_msg);
@@ -241,11 +241,11 @@ int FrankaPlanRunner::RunFranka() {
     SetCollisionBehaviorSafetyOn();
 
     dexai::log()->info("RunFranka: ready.");
-    comm_interface_->SetDriverStatus(true);
+    comm_interface_->SetDriverIsRunning(true);
   } catch (const franka::Exception& ex) {
     dexai::log()->critical(
         "RunFranka: caught exception during initilization, msg: {}", ex.what());
-    comm_interface_->SetDriverStatus(false, ex.what());
+    comm_interface_->SetDriverIsRunning(false, ex.what());
     return 1;  // bad things happened.
   }
 
@@ -372,7 +372,7 @@ int FrankaPlanRunner::RunFranka() {
           if (!RecoverFromControlException()) {  // plan_ is released/reset
             dexai::log()->critical(
                 "RunFranka: RecoverFromControlException failed");
-            comm_interface_->SetDriverStatus(false, ce.what());
+            comm_interface_->SetDriverIsRunning(false, ce.what());
             return 1;
           }
         }
@@ -429,7 +429,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
           fmt::format("cannot perform automatic error recovery in mode: {}",
                       utils::RobotModeToString(current_mode))};
       dexai::log()->error("RecoverFromControlException: {}", err_msg);
-      comm_interface_->SetDriverStatus(false, err_msg);
+      comm_interface_->SetDriverIsRunning(false, err_msg);
       return false;
     } else {
       dexai::log()->warn(
@@ -447,14 +447,15 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   if (plan_) {
     ResetPlan();
   }
-  comm_interface_->SetDriverStatus(
+  // TODO(@syler): reset this once it has been published once?
+  comm_interface_->SetDriverIsRunning(
       true, "successfully completed automatic error recovery");
   return true;
 }
 
 int FrankaPlanRunner::RunSim() {
   dexai::log()->info("Starting sim robot and entering run loop...");
-  comm_interface_->SetDriverStatus(true);
+  comm_interface_->SetDriverIsRunning(true);
 
   // first, set some parameters
   Eigen::VectorXd next_conf(dof_);  // output state
