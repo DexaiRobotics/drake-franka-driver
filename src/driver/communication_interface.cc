@@ -316,7 +316,6 @@ robot_msgs::driver_status_t CommunicationInterface::GetUpdatedDriverStatus(
   driver_status_msg_.user_stopped =
       current_mode == franka::RobotMode::kUserStopped;
   driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
-  robot_data_mutex_.unlock();
   driver_status_msg_.compliant_push_active = compliant_push_active_;
 
   {
