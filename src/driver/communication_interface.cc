@@ -576,8 +576,7 @@ void CommunicationInterface::HandlePause(
     }
     case PauseCommandType::PAUSE:
       dexai::log()->warn(
-          "CommInterface:HandlePause: received pause command from source: "
-          "{}",
+          "CommInterface:HandlePause: received pause command from source: {}",
           source);
       if (pause_data_.pause_sources.insert(source).second == false) {
         dexai::log()->warn(
@@ -588,8 +587,7 @@ void CommunicationInterface::HandlePause(
     case PauseCommandType::CONTINUE:
       dexai::log()->warn(
           "CommInterface:HandlePause: received continue command from "
-          "source: "
-          "{}",
+          "source: {}",
           source);
       if (pause_data_.pause_sources.find(source)
           != pause_data_.pause_sources.end()) {
@@ -618,8 +616,8 @@ void CommunicationInterface::HandlePause(
   }
 }
 
-// TODO(@syler): this could be a different message type, pause_cmd is
-// probably not the best here
+// TODO(@syler): this could be a different message type, pause_cmd is probably
+// not the best here
 void CommunicationInterface::HandleSimDriverEventTrigger(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::pause_cmd* cmd_msg) {
