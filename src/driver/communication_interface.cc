@@ -324,8 +324,8 @@ robot_msgs::driver_status_t CommunicationInterface::GetUpdatedDriverStatus(
     driver_status_msg_.pause_sources.clear();
     driver_status_msg_.num_pause_sources = pause_data_.pause_sources.size();
     if (pause_data_.paused) {
-      for (auto elem : pause_data_.pause_sources) {
-        driver_status_msg_.pause_sources.push_back(elem);
+      for (const auto& source : pause_data_.pause_sources) {
+        driver_status_msg_.pause_sources.push_back(source);
       }
     }
   }
