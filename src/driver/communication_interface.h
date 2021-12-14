@@ -58,6 +58,7 @@
 
 #include <lcm/lcm-cpp.hpp>
 #include <robot_msgs/bool_t.hpp>
+#include <robot_msgs/driver_status_t.hpp>
 #include <robot_msgs/pause_cmd.hpp>
 #include <robot_msgs/plan_exec_opts_t.hpp>
 #include <robot_msgs/robot_spline_t.hpp>
@@ -100,12 +101,6 @@ struct RobotData {
 struct PauseData {
   std::atomic<bool> paused;
   std::set<std::string> pause_sources;
-};
-
-/// A struct to describe the current status of the driver.
-struct DriverStatus {
-  bool running;
-  std::string message;
 };
 
 struct RobotPlanBuffer {
@@ -168,7 +163,7 @@ class CommunicationInterface {
 
   void ClearNewPlan(std::string_view reason) {
     dexai::log()->warn("ClearNewPlan: {}", reason.data());
-    PublishPlanComplete(new_plan_buffer_.utime, false, reason.data());
+    SetPlanCompletion(new_plan_buffer_.utime, false, reason.data());
     new_plan_buffer_.plan.reset();
     new_plan_buffer_.cartesian_plan.reset();
     new_plan_buffer_.utime = -1;
@@ -188,6 +183,9 @@ class CommunicationInterface {
   // acquire mutex lock and return robot mode
   franka::RobotMode GetRobotMode();
 
+  /// Manual mode switch in sim as opposed to reading from Franka controller
+  void SetModeIfSimulated(const franka::RobotMode& mode);
+
   // Set the robot state, blocking
   void SetRobotData(const franka::RobotState& robot_state,
                     const Eigen::VectorXd& robot_plan_next_conf,
@@ -205,27 +203,25 @@ class CommunicationInterface {
     return pause_data_.pause_sources;
   }
 
-  void PublishPlanComplete(const int64_t plan_utime, const bool success = true,
-                           const std::string& driver_status_string = "");
+  void SetPlanCompletion(const int64_t plan_utime, const bool success = true,
+                         const std::string& driver_status_string = "");
 
-  // set driver status
-  inline void SetDriverStatus(const bool success,
-                              const std::string& driver_status_string = "") {
+  /// Set driver status fields with running status and error message.
+  inline void SetDriverIsRunning(const bool success,
+                                 const std::string& driver_status_string = "") {
     std::scoped_lock<std::mutex> lock {driver_status_mutex_};
-    driver_status_.running = success;
-    driver_status_.message = driver_status_string;
+    driver_status_msg_.driver_running = success;
+    driver_status_msg_.err_msg = driver_status_string;
   }
 
-  void PublishDriverStatus();
+  /// Update driver status and return publishable status message.
+  robot_msgs::driver_status_t GetUpdatedDriverStatus(
+      const int64_t utime, const RobotData& robot_data);
+
   void PublishBoolToChannel(const int64_t utime, std::string_view lcm_channel,
                             const bool data);
   void PublishPauseToChannel(const int64_t utime, std::string_view lcm_channel,
                              const int8_t data, std::string_view source = "");
-
-  std::string GetUserStopChannelName() { return lcm_user_stop_channel_; }
-  std::string GetBrakesLockedChannelName() {
-    return lcm_brakes_locked_channel_;
-  }
 
   /// check if robot mode corresponds to one of the known control modes from the
   /// controller, return false if the mode is garbage
@@ -244,7 +240,6 @@ class CommunicationInterface {
   /// indicating the contents of the pause message.
   void PublishLcmAndPauseStatus();
   void PublishRobotStatus();
-  void PublishPauseStatus();
   void PublishTriggerToChannel(const int64_t utime,
                                std::string_view lcm_channel,
                                const bool success = true,
@@ -291,15 +286,13 @@ class CommunicationInterface {
   PauseData pause_data_;
   std::mutex pause_mutex_;
 
-  // TODO(@syler): consolidate into robot status
-  DriverStatus driver_status_;
+  robot_msgs::driver_status_t driver_status_msg_;
   std::mutex driver_status_mutex_;
 
   std::thread lcm_publish_status_thread_;
   std::thread lcm_handle_thread_;
 
   std::string lcm_driver_status_channel_;
-  std::string lcm_pause_status_channel_;
   std::string lcm_user_stop_channel_;
   std::string lcm_compliant_push_req_channel_;
   std::string lcm_brakes_locked_channel_;
