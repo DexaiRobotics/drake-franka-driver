@@ -195,12 +195,12 @@ int FrankaPlanRunner::RunFranka() {
               "RunFranka: automaticErrorRecovery succeeded, out of Reflex mode,"
               " now in mode: {}.",
               utils::RobotModeToString(GetRobotMode()));
-        } catch (const franka::ControlException& ce) {
-          comm_interface_->SetDriverIsRunning(false, ce.what());
+        } catch (const franka::Exception& e) {
+          comm_interface_->SetDriverIsRunning(false, e.what());
           dexai::log()->warn(
-              "RunFranka: control exception in initialisation during automatic "
+              "RunFranka: caught exception in initialisation during automatic "
               "error recovery for Reflex mode: {}.",
-              ce.what());
+              e.what());
         }
       } else if (current_mode != franka::RobotMode::kIdle) {  // any other mode
         auto err_msg {
