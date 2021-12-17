@@ -421,8 +421,11 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   status_ = RobotStatus::Reversing;
   dexai::log()->warn("RecoverFromControlException: turning safety off...");
   SetCollisionBehaviorSafetyOff();
+  dexai::log()->warn("RecoverFromControlException: set safety off.");
   if (!is_sim_) {
     auto current_mode {GetRobotMode()};
+    dexai::log()->error("RecoverFromControlException: in mode {}",
+                        utils::RobotModeToString(current_mode));
     if ((current_mode == franka::RobotMode::kUserStopped)
         || (current_mode == franka::RobotMode::kOther)) {
       auto err_msg {
