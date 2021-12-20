@@ -825,15 +825,21 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (comm_interface_->SimControlExceptionTriggered()) {
     dexai::log()->warn(
         "JointPositionCallback: simulated control exception triggered");
-    // return current joint positions instead of running plan through to
-    // completion
 
     // copy plan utime, this gets reset when recovering from control exception
     const auto last_plan_utime {plan_utime_};
-    RecoverFromControlException();
-    comm_interface_->SetPlanCompletion(last_plan_utime, false,
-                                       "simulated control exception");
+    if (is_sim_) {
+      // if this gets triggered on the real robot, it will result in an actual
+      // control exception being thrown because of the abrupt termination of
+      // motion - no need to excplicitly call recovery here when running on real
+      // robot
+      RecoverFromControlException();
+      comm_interface_->SetPlanCompletion(last_plan_utime, false,
+                                         "simulated control exception");
+    }
     comm_interface_->ClearSimControlExceptionTrigger();
+    // return current joint positions instead of running plan through to
+    // completion
     return franka::MotionFinished(franka::JointPositions(robot_state.q));
   }
 
