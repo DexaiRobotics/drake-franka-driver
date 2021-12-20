@@ -452,9 +452,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   }
   // if simulated, manually switch from reflex to idle
   comm_interface_->SetModeIfSimulated(franka::RobotMode::kIdle);
-  // TODO(@syler): reset this once it has been published once?
-  comm_interface_->SetDriverIsRunning(
-      true, "successfully completed automatic error recovery");
+  comm_interface_->SetDriverIsRunning(true);
   return true;
 }
 
