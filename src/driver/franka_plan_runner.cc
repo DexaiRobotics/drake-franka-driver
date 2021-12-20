@@ -421,8 +421,11 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   status_ = RobotStatus::Reversing;
   dexai::log()->warn("RecoverFromControlException: turning safety off...");
   SetCollisionBehaviorSafetyOff();
+  dexai::log()->warn("RecoverFromControlException: set safety off.");
   if (!is_sim_) {
     auto current_mode {GetRobotMode()};
+    dexai::log()->error("RecoverFromControlException: in mode {}",
+                        utils::RobotModeToString(current_mode));
     if ((current_mode == franka::RobotMode::kUserStopped)
         || (current_mode == franka::RobotMode::kOther)) {
       auto err_msg {
@@ -449,9 +452,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   }
   // if simulated, manually switch from reflex to idle
   comm_interface_->SetModeIfSimulated(franka::RobotMode::kIdle);
-  // TODO(@syler): reset this once it has been published once?
-  comm_interface_->SetDriverIsRunning(
-      true, "successfully completed automatic error recovery");
+  comm_interface_->SetDriverIsRunning(true);
   return true;
 }
 
@@ -822,12 +823,21 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   if (comm_interface_->SimControlExceptionTriggered()) {
     dexai::log()->warn(
         "JointPositionCallback: simulated control exception triggered");
+
+    // copy plan utime, this gets reset when recovering from control exception
+    const auto last_plan_utime {plan_utime_};
+    if (is_sim_) {
+      // if this gets triggered on the real robot, it will result in an actual
+      // control exception being thrown because of the abrupt termination of
+      // motion - no need to excplicitly call recovery here when running on real
+      // robot
+      RecoverFromControlException();
+      comm_interface_->SetPlanCompletion(last_plan_utime, false,
+                                         "simulated control exception");
+    }
+    comm_interface_->ClearSimControlExceptionTrigger();
     // return current joint positions instead of running plan through to
     // completion
-    comm_interface_->SetPlanCompletion(plan_utime_, false,
-                                       "simulated control exception");
-    RecoverFromControlException();
-    comm_interface_->ClearSimControlExceptionTrigger();
     return franka::MotionFinished(franka::JointPositions(robot_state.q));
   }
 
