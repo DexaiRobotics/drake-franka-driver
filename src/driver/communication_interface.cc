@@ -477,6 +477,7 @@ void CommunicationInterface::HandlePlan(
         robot_spline->utime, utils::RobotModeToString(current_mode))};
     dexai::log()->error("CommInterface:HandlePlan: {}", err_msg);
     SetDriverIsRunning(false, err_msg);
+    SetPlanCompletion(robot_spline->utime, false, err_msg);
     return;
   }
 
@@ -499,9 +500,10 @@ void CommunicationInterface::HandlePlan(
         decodePiecewisePolynomial(robot_spline->piecewise_polynomial)};
 
     if (piecewise_polynomial.get_number_of_segments() < 1) {
-      dexai::log()->error(
-          "CommInterface:HandlePlan: "
-          "Discarding plan, invalid piecewise polynomial.");
+      const auto err_msg {"Invalid piecewise polynomial"};
+      dexai::log()->error("CommInterface:HandlePlan: Discarding plan: {}",
+                          err_msg);
+      SetPlanCompletion(robot_spline->utime, false, err_msg);
       return;
     }
 
@@ -532,7 +534,7 @@ void CommunicationInterface::HandlePlan(
       new_plan_buffer_.plan.reset();
       lock.unlock();
       SetPlanCompletion(robot_spline->utime, false /*  = failed*/,
-                        "mismatched_start_position");
+                        "Mismatched start position");
       return;
     }
     new_plan_buffer_.plan = std::make_unique<PPType>(piecewise_polynomial);
