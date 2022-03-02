@@ -432,14 +432,8 @@ bool CommunicationInterface::CanReceiveCommands(
 
 bool CommunicationInterface::IsUserStopped(
     const franka::RobotMode& current_mode) {
-  switch (current_mode) {
-    case franka::RobotMode::kGuiding:
-      return true;
-    case franka::RobotMode::kUserStopped:
-      return true;
-    default:
-      return false;
-  }
+  return (current_mode == franka::RobotMode::kGuiding)
+         || (current_mode == franka::RobotMode::kUserStopped);
 }
 
 void CommunicationInterface::HandleCompliantPushReq(
