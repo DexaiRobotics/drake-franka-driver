@@ -231,6 +231,10 @@ class CommunicationInterface {
   /// stopped or error recovery
   static bool CanReceiveCommands(const franka::RobotMode& current_mode);
 
+  /// Check if robot is user stopped. Return true if robot is in mode
+  /// kUserStopped or kGuiding (manual move while user stopped)
+  static bool IsUserStopped(const franka::RobotMode& current_mode);
+
  protected:
   void ResetData();
   void HandleLcm();

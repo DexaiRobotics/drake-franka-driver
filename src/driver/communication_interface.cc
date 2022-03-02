@@ -313,8 +313,7 @@ robot_msgs::driver_status_t CommunicationInterface::GetUpdatedDriverStatus(
   driver_status_msg_.plan_start_utime = robot_data.plan_start_utime;
   driver_status_msg_.has_plan = robot_data.current_plan_utime != -1;
   driver_status_msg_.brakes_locked = current_mode == franka::RobotMode::kOther;
-  driver_status_msg_.user_stopped =
-      current_mode == franka::RobotMode::kUserStopped;
+  driver_status_msg_.user_stopped = IsUserStopped(current_mode);
   driver_status_msg_.robot_mode = utils::RobotModeToString(current_mode);
   driver_status_msg_.compliant_push_active = compliant_push_active_;
 
@@ -429,6 +428,12 @@ bool CommunicationInterface::CanReceiveCommands(
       dexai::log()->error("CanReceiveCommands: Mode unknown!");
       return false;
   }
+}
+
+bool CommunicationInterface::IsUserStopped(
+    const franka::RobotMode& current_mode) {
+  return (current_mode == franka::RobotMode::kGuiding)
+         || (current_mode == franka::RobotMode::kUserStopped);
 }
 
 void CommunicationInterface::HandleCompliantPushReq(
