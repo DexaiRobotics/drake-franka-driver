@@ -423,6 +423,9 @@ bool FrankaPlanRunner::RecoverFromControlException() {
       "recovery");
 
   status_ = RobotStatus::Reversing;
+  if (plan_) {
+    ResetPlan();
+  }
   if (!is_sim_) {
     auto current_mode {GetRobotMode()};
     do {
@@ -460,9 +463,6 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   dexai::log()->info("RecoverFromControlException: turning safety on again");
   SetCollisionBehaviorSafetyOn();
   status_ = RobotStatus::Running;
-  if (plan_) {
-    ResetPlan();
-  }
   // if simulated, manually switch from reflex to idle
   comm_interface_->SetModeIfSimulated(franka::RobotMode::kIdle);
   comm_interface_->SetDriverIsRunning(true);
