@@ -829,6 +829,8 @@ void FrankaPlanRunner::UpdateActivePlan(
   }
 
   end_conf_plan_ = plan_->value(plan_->end_time());
+
+  comm_interface_->LogPlanExecutionStartTime();
 }
 
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(

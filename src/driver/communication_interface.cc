@@ -237,6 +237,21 @@ void CommunicationInterface::SetPlanCompletion(
     driver_status_msg_.last_plan_msg = plan_status_string;
   }
   SetModeIfSimulated(franka::RobotMode::kIdle);
+
+  const auto t1 {
+      duration_cast<chrono_ms>(timepoints_.t_accepted - timepoints_.t_received)
+          .count()};
+  const auto t2 {
+      duration_cast<chrono_ms>(timepoints_.t_confirmed - timepoints_.t_received)
+          .count()};
+  const auto t3 {
+      duration_cast<chrono_ms>(timepoints_.t_started - timepoints_.t_received)
+          .count()};
+
+  dexai::log()->info(
+      "CommInterface:SetPlanCompletion: plan {} timing breakdown: input "
+      "checking: {} ms, confirmation: {} ms, execution start: {}",
+      plan_utime, t1, t2, t3);
 }
 
 void CommunicationInterface::HandleLcm() {
@@ -309,6 +324,12 @@ robot_msgs::driver_status_t CommunicationInterface::GetUpdatedDriverStatus(
 
   franka::RobotMode current_mode {robot_data.robot_state.robot_mode};
 
+  if (robot_data.current_plan_utime != -1) {
+    const auto prev_current_plan_utime {driver_status_msg_.current_plan_utime};
+    if (prev_current_plan_utime != robot_data.current_plan_utime) {
+      timepoints_.t_confirmed = hr_clock::now();
+    }
+  }
   driver_status_msg_.current_plan_utime = robot_data.current_plan_utime;
   driver_status_msg_.plan_start_utime = robot_data.plan_start_utime;
   driver_status_msg_.has_plan = robot_data.current_plan_utime != -1;
@@ -451,6 +472,8 @@ void CommunicationInterface::HandleCompliantPushReq(
 void CommunicationInterface::HandlePlan(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::robot_spline_t* robot_spline) {
+  auto t_start {hr_clock::now()};
+
   dexai::log()->info("CommInterface:HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
@@ -554,10 +577,19 @@ void CommunicationInterface::HandlePlan(
     // Cartesian goal command. Not implemented yet. Ignore for now
   }
   lock.unlock();
+
+  auto t_end {hr_clock::now()};
+  timepoints_.t_received = t_start;
+  timepoints_.t_accepted = t_end;
+
   dexai::log()->info(
       "CommInterface:HandlePlan: populated buffer with new plan {}",
       new_plan_buffer_.utime);
-  dexai::log()->debug("CommInterface:HandlePlan: Finished!");
+  auto delta_time {duration_cast<chrono_ms>(t_end - t_start).count()};
+
+  dexai::log()->info(
+      "CommInterface:HandlePlan: Finished input checking plan {} in {} ms",
+      new_plan_buffer_.utime, delta_time);
 }
 
 void CommunicationInterface::HandlePause(

@@ -70,6 +70,10 @@
 using drake::trajectories::PiecewisePolynomial;
 using drake::trajectories::PiecewisePose;
 
+using hr_clock = std::chrono::high_resolution_clock;
+using chrono_ms = std::chrono::milliseconds;
+using std::chrono::duration_cast;
+
 typedef PiecewisePolynomial<double> PPType;
 typedef PiecewisePose<double> PosePoly;
 
@@ -101,6 +105,13 @@ struct RobotData {
 struct PauseData {
   std::atomic<bool> paused;
   std::set<std::string> pause_sources;
+};
+
+struct PlanTimepoints {
+  std::chrono::time_point<hr_clock> t_received;
+  std::chrono::time_point<hr_clock> t_accepted;
+  std::chrono::time_point<hr_clock> t_confirmed;
+  std::chrono::time_point<hr_clock> t_started;
 };
 
 struct RobotPlanBuffer {
@@ -145,6 +156,10 @@ class CommunicationInterface {
 
   inline void SetCompliantPushActive(const bool active) {
     compliant_push_active_ = active;
+  }
+
+  inline void LogPlanExecutionStartTime() {
+    timepoints_.t_started = hr_clock::now();
   }
 
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
@@ -288,6 +303,8 @@ class CommunicationInterface {
   std::mutex robot_data_mutex_;
 
   PauseData pause_data_;
+  PlanTimepoints timepoints_;
+
   std::mutex pause_mutex_;
 
   robot_msgs::driver_status_t driver_status_msg_;
