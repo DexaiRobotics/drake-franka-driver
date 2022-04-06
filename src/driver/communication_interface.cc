@@ -241,20 +241,26 @@ void CommunicationInterface::SetPlanCompletion(
   }
   SetModeIfSimulated(franka::RobotMode::kIdle);
 
-  const auto ms_accept {
-      duration_cast<chrono_ms>(timepoints_.t_accepted - timepoints_.t_received)
-          .count()};
-  const auto ms_confirm {
-      duration_cast<chrono_ms>(timepoints_.t_confirmed - timepoints_.t_received)
-          .count()};
-  const auto ms_start {
-      duration_cast<chrono_ms>(timepoints_.t_started - timepoints_.t_received)
-          .count()};
+  // sanity check and make sure we have all the timepoints, as plans can be
+  // received and accepted but not make it to confirmation and execution
+  if (plan_utime == timepoints_.utime && timepoints_.t_confirmed.has_value()
+      && timepoints_.t_started.has_value()) {
+    const auto ms_accept {duration_cast<chrono_ms>(timepoints_.t_accepted
+                                                   - timepoints_.t_received)
+                              .count()};
+    const auto ms_confirm {
+        duration_cast<chrono_ms>(timepoints_.t_confirmed.value()
+                                 - timepoints_.t_received)
+            .count()};
+    const auto ms_start {duration_cast<chrono_ms>(timepoints_.t_started.value()
+                                                  - timepoints_.t_received)
+                             .count()};
 
-  dexai::log()->info(
-      "CommInterface:SetPlanCompletion: plan {} timing breakdown: input "
-      "checking: {} ms, confirmation: {} ms, execution start: {} ms",
-      plan_utime, ms_accept, ms_confirm, ms_start);
+    dexai::log()->info(
+        "CommInterface:SetPlanCompletion: plan {} timing breakdown: input "
+        "checking: {} ms, confirmation: {} ms, execution start: {} ms",
+        plan_utime, ms_accept, ms_confirm, ms_start);
+  }
 }
 
 void CommunicationInterface::HandleLcm() {

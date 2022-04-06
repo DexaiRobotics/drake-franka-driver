@@ -111,8 +111,8 @@ struct PlanTimepoints {
   int64_t utime;
   std::chrono::time_point<hr_clock> t_received;
   std::chrono::time_point<hr_clock> t_accepted;
-  std::chrono::time_point<hr_clock> t_confirmed;
-  std::chrono::time_point<hr_clock> t_started;
+  std::optional<std::chrono::time_point<hr_clock>> t_confirmed {};
+  std::optional<std::chrono::time_point<hr_clock>> t_started {};
 };
 
 struct RobotPlanBuffer {
