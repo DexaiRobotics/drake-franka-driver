@@ -108,6 +108,7 @@ struct PauseData {
 };
 
 struct PlanTimepoints {
+  int64_t utime;
   std::chrono::time_point<hr_clock> t_received;
   std::chrono::time_point<hr_clock> t_accepted;
   std::chrono::time_point<hr_clock> t_confirmed;
@@ -120,6 +121,7 @@ struct RobotPlanBuffer {
   Eigen::Vector3d contact_expected {};
   std::unique_ptr<PPType> plan;
   std::unique_ptr<PosePoly> cartesian_plan;
+  PlanTimepoints timepoints;
 };
 
 class CommunicationInterface {
@@ -158,6 +160,10 @@ class CommunicationInterface {
     compliant_push_active_ = active;
   }
 
+  inline void SetPlanTimepoints(const PlanTimepoints& timepoints) {
+    timepoints_ = timepoints;
+  }
+
   inline void LogPlanExecutionStartTime() {
     timepoints_.t_started = hr_clock::now();
   }
@@ -184,9 +190,11 @@ class CommunicationInterface {
     new_plan_buffer_.utime = -1;
   }
 
-  std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d>
+  std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d,
+             PlanTimepoints>
   PopNewPlan();
-  std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t> PopNewCartesianPlan();
+  std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t, PlanTimepoints>
+  PopNewCartesianPlan();
 
   // TODO(@anyone): remove franka specific RobotState type and
   // replace with std::array
