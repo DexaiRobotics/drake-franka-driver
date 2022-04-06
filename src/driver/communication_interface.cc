@@ -250,7 +250,7 @@ void CommunicationInterface::SetPlanCompletion(
 
   dexai::log()->info(
       "CommInterface:SetPlanCompletion: plan {} timing breakdown: input "
-      "checking: {} ms, confirmation: {} ms, execution start: {}",
+      "checking: {} ms, confirmation: {} ms, execution start: {} ms",
       plan_utime, ms_accept, ms_confirm, ms_start);
 }
 
