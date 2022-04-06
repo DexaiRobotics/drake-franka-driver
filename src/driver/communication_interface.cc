@@ -238,20 +238,20 @@ void CommunicationInterface::SetPlanCompletion(
   }
   SetModeIfSimulated(franka::RobotMode::kIdle);
 
-  const auto t1 {
+  const auto ms_accept {
       duration_cast<chrono_ms>(timepoints_.t_accepted - timepoints_.t_received)
           .count()};
-  const auto t2 {
+  const auto ms_confirm {
       duration_cast<chrono_ms>(timepoints_.t_confirmed - timepoints_.t_received)
           .count()};
-  const auto t3 {
+  const auto ms_start {
       duration_cast<chrono_ms>(timepoints_.t_started - timepoints_.t_received)
           .count()};
 
   dexai::log()->info(
       "CommInterface:SetPlanCompletion: plan {} timing breakdown: input "
       "checking: {} ms, confirmation: {} ms, execution start: {}",
-      plan_utime, t1, t2, t3);
+      plan_utime, ms_accept, ms_confirm, ms_start);
 }
 
 void CommunicationInterface::HandleLcm() {
@@ -578,18 +578,19 @@ void CommunicationInterface::HandlePlan(
   }
   lock.unlock();
 
-  auto t_end {hr_clock::now()};
   timepoints_.t_received = t_start;
-  timepoints_.t_accepted = t_end;
+  timepoints_.t_accepted = hr_clock::now();
 
   dexai::log()->info(
       "CommInterface:HandlePlan: populated buffer with new plan {}",
       new_plan_buffer_.utime);
-  auto delta_time {duration_cast<chrono_ms>(t_end - t_start).count()};
+  auto ms_accept {
+      duration_cast<chrono_ms>(timepoints_.t_accepted - timepoints_.t_received)
+          .count()};
 
   dexai::log()->info(
       "CommInterface:HandlePlan: Finished input checking plan {} in {} ms",
-      new_plan_buffer_.utime, delta_time);
+      new_plan_buffer_.utime, ms_accept);
 }
 
 void CommunicationInterface::HandlePause(
