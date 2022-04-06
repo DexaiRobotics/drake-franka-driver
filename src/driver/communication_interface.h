@@ -70,6 +70,10 @@
 using drake::trajectories::PiecewisePolynomial;
 using drake::trajectories::PiecewisePose;
 
+using hr_clock = std::chrono::high_resolution_clock;
+using chrono_ms = std::chrono::milliseconds;
+using std::chrono::duration_cast;
+
 typedef PiecewisePolynomial<double> PPType;
 typedef PiecewisePose<double> PosePoly;
 
@@ -103,12 +107,21 @@ struct PauseData {
   std::set<std::string> pause_sources;
 };
 
+struct PlanTimepoints {
+  int64_t utime;
+  std::chrono::time_point<hr_clock> t_received;
+  std::chrono::time_point<hr_clock> t_accepted;
+  std::optional<std::chrono::time_point<hr_clock>> t_confirmed {};
+  std::optional<std::chrono::time_point<hr_clock>> t_started {};
+};
+
 struct RobotPlanBuffer {
   int64_t utime;
   int16_t exec_opt;
   Eigen::Vector3d contact_expected {};
   std::unique_ptr<PPType> plan;
   std::unique_ptr<PosePoly> cartesian_plan;
+  PlanTimepoints timepoints;
 };
 
 class CommunicationInterface {
@@ -147,6 +160,14 @@ class CommunicationInterface {
     compliant_push_active_ = active;
   }
 
+  inline void SetPlanTimepoints(const PlanTimepoints& timepoints) {
+    timepoints_ = timepoints;
+  }
+
+  inline void LogPlanExecutionStartTime() {
+    timepoints_.t_started = hr_clock::now();
+  }
+
   bool CancelPlanRequested() const { return cancel_plan_requested_; }
   void ClearCancelPlanRequest() { cancel_plan_requested_ = false; }
   std::string GetCancelPlanSource() { return cancel_plan_source_; }
@@ -169,9 +190,11 @@ class CommunicationInterface {
     new_plan_buffer_.utime = -1;
   }
 
-  std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d>
+  std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d,
+             PlanTimepoints>
   PopNewPlan();
-  std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t> PopNewCartesianPlan();
+  std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t, PlanTimepoints>
+  PopNewCartesianPlan();
 
   // TODO(@anyone): remove franka specific RobotState type and
   // replace with std::array
@@ -288,6 +311,8 @@ class CommunicationInterface {
   std::mutex robot_data_mutex_;
 
   PauseData pause_data_;
+  PlanTimepoints timepoints_;
+
   std::mutex pause_mutex_;
 
   robot_msgs::driver_status_t driver_status_msg_;

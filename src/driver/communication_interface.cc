@@ -59,6 +59,7 @@
 
 // using namespace franka_driver;
 using franka_driver::CommunicationInterface;
+using franka_driver::PlanTimepoints;
 using utils::PauseCommandType;
 
 CommunicationInterface::CommunicationInterface(const RobotParameters& params,
@@ -160,7 +161,8 @@ void CommunicationInterface::StopInterface() {
   ResetData();
 }
 
-std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d>
+std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d,
+           PlanTimepoints>
 CommunicationInterface::PopNewPlan() {
   if (!HasNewPlan()) {
     throw std::runtime_error(
@@ -174,10 +176,11 @@ CommunicationInterface::PopNewPlan() {
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr new_plan_buffer_.plan
   return {std::move(new_plan_buffer_.plan), new_plan_buffer_.utime,
-          new_plan_buffer_.exec_opt, new_plan_buffer_.contact_expected};
+          new_plan_buffer_.exec_opt, new_plan_buffer_.contact_expected,
+          new_plan_buffer_.timepoints};
 }
 
-std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t>
+std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t, PlanTimepoints>
 CommunicationInterface::PopNewCartesianPlan() {
   if (!HasNewCartesianPlan()) {
     throw std::runtime_error(
@@ -190,7 +193,7 @@ CommunicationInterface::PopNewCartesianPlan() {
   std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
   // std::move nullifies the unique ptr new_plan_buffer_.cartesian_plan
   return {std::move(new_plan_buffer_.cartesian_plan), new_plan_buffer_.utime,
-          new_plan_buffer_.exec_opt};
+          new_plan_buffer_.exec_opt, new_plan_buffer_.timepoints};
 }
 
 void CommunicationInterface::SetRobotData(
@@ -237,6 +240,27 @@ void CommunicationInterface::SetPlanCompletion(
     driver_status_msg_.last_plan_msg = plan_status_string;
   }
   SetModeIfSimulated(franka::RobotMode::kIdle);
+
+  // sanity check and make sure we have all the timepoints, as plans can be
+  // received and accepted but not make it to confirmation and execution
+  if (plan_utime == timepoints_.utime && timepoints_.t_confirmed.has_value()
+      && timepoints_.t_started.has_value()) {
+    const auto ms_accept {duration_cast<chrono_ms>(timepoints_.t_accepted
+                                                   - timepoints_.t_received)
+                              .count()};
+    const auto ms_confirm {
+        duration_cast<chrono_ms>(timepoints_.t_confirmed.value()
+                                 - timepoints_.t_received)
+            .count()};
+    const auto ms_start {duration_cast<chrono_ms>(timepoints_.t_started.value()
+                                                  - timepoints_.t_received)
+                             .count()};
+
+    dexai::log()->info(
+        "CommInterface:SetPlanCompletion: plan {} timing breakdown: input "
+        "checking: {} ms, confirmation: {} ms, execution start: {} ms",
+        plan_utime, ms_accept, ms_confirm, ms_start);
+  }
 }
 
 void CommunicationInterface::HandleLcm() {
@@ -309,6 +333,12 @@ robot_msgs::driver_status_t CommunicationInterface::GetUpdatedDriverStatus(
 
   franka::RobotMode current_mode {robot_data.robot_state.robot_mode};
 
+  if (robot_data.current_plan_utime != -1) {
+    const auto prev_current_plan_utime {driver_status_msg_.current_plan_utime};
+    if (prev_current_plan_utime != robot_data.current_plan_utime) {
+      timepoints_.t_confirmed = hr_clock::now();
+    }
+  }
   driver_status_msg_.current_plan_utime = robot_data.current_plan_utime;
   driver_status_msg_.plan_start_utime = robot_data.plan_start_utime;
   driver_status_msg_.has_plan = robot_data.current_plan_utime != -1;
@@ -451,6 +481,8 @@ void CommunicationInterface::HandleCompliantPushReq(
 void CommunicationInterface::HandlePlan(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::robot_spline_t* robot_spline) {
+  auto t_start {hr_clock::now()};
+
   dexai::log()->info("CommInterface:HandlePlan: Received new plan {}",
                      robot_spline->utime);
 
@@ -496,6 +528,7 @@ void CommunicationInterface::HandlePlan(
   }
 
   new_plan_buffer_.utime = robot_spline->utime;
+  new_plan_buffer_.timepoints.utime = robot_spline->utime;
   new_plan_buffer_.exec_opt = robot_spline->exec_opt;
   last_confirmed_plan_utime_ = robot_spline->utime;
 
@@ -553,11 +586,22 @@ void CommunicationInterface::HandlePlan(
   } else {
     // Cartesian goal command. Not implemented yet. Ignore for now
   }
+  new_plan_buffer_.timepoints.t_received = t_start;
+  new_plan_buffer_.timepoints.t_accepted = hr_clock::now();
+
   lock.unlock();
+
   dexai::log()->info(
       "CommInterface:HandlePlan: populated buffer with new plan {}",
       new_plan_buffer_.utime);
-  dexai::log()->debug("CommInterface:HandlePlan: Finished!");
+  auto ms_accept {
+      duration_cast<chrono_ms>(new_plan_buffer_.timepoints.t_accepted
+                               - new_plan_buffer_.timepoints.t_received)
+          .count()};
+
+  dexai::log()->info(
+      "CommInterface:HandlePlan: Finished input checking plan {} in {} ms",
+      new_plan_buffer_.utime, ms_accept);
 }
 
 void CommunicationInterface::HandlePause(

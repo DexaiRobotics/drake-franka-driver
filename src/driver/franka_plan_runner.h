@@ -241,10 +241,13 @@ class FrankaPlanRunner {
    * @param new_plan_exec_opt - execution options associated with the new plan
    * @param new_plan_contact_expected - unit vector in the direction of expected
    * contact assiciated with the new plan. if any
+   * @param new_plan_timepoints - struct containing times when plan was received
+   * and accepted
    */
   void UpdateActivePlan(std::unique_ptr<PPType> new_plan,
                         int64_t new_plan_utime, int64_t new_plan_exec_opt,
-                        const Eigen::Vector3d& new_plan_contact_expected);
+                        const Eigen::Vector3d& new_plan_contact_expected,
+                        const PlanTimepoints& new_plan_timepoints);
 
   /// Set parameters for stiffness and goal direction based on push direction.
   /// TODO(@anyone): long-term the stiffness can be a parameter of the push

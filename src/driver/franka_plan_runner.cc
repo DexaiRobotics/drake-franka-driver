@@ -799,8 +799,8 @@ bool FrankaPlanRunner::IsStartFarFromCurrentJointPosition(
 
 void FrankaPlanRunner::UpdateActivePlan(
     std::unique_ptr<PPType> new_plan, int64_t new_plan_utime,
-    int64_t new_plan_exec_opt,
-    const Eigen::Vector3d& new_plan_contact_expected) {
+    int64_t new_plan_exec_opt, const Eigen::Vector3d& new_plan_contact_expected,
+    const PlanTimepoints& new_plan_timepoints) {
   const bool has_active_plan {plan_ != nullptr};
   plan_ = std::move(new_plan);
   plan_utime_ = new_plan_utime;
@@ -829,6 +829,9 @@ void FrankaPlanRunner::UpdateActivePlan(
   }
 
   end_conf_plan_ = plan_->value(plan_->end_time());
+
+  comm_interface_->SetPlanTimepoints(new_plan_timepoints);
+  comm_interface_->LogPlanExecutionStartTime();
 }
 
 franka::JointPositions FrankaPlanRunner::JointPositionCallback(
@@ -868,7 +871,8 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   if (comm_interface_->HasNewPlan()) {  // pop the new plan and set it up
     auto [new_plan, new_plan_utime, new_plan_exec_opt,
-          new_plan_contact_expected] {comm_interface_->PopNewPlan()};
+          new_plan_contact_expected,
+          new_plan_timepoints] {comm_interface_->PopNewPlan()};
 
     bool has_active_plan {plan_ != nullptr};
     bool is_new_plan_valid {!new_plan->empty()
@@ -880,7 +884,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
       // plan. Or if we do not currently have a plan, move the new plan's
       // ownership to the current plan unique_ptr
       UpdateActivePlan(std::move(new_plan), new_plan_utime, new_plan_exec_opt,
-                       new_plan_contact_expected);
+                       new_plan_contact_expected, new_plan_timepoints);
       // the current (desired) position of franka is the starting position:
       start_conf_franka_ = current_conf_franka;
 
