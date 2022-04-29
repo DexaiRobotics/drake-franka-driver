@@ -441,9 +441,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
                         utils::RobotModeToString(current_mode))};
         dexai::log()->error("RecoverFromControlException: {}", err_msg);
         comm_interface_->SetDriverIsRunning(false, err_msg);
-        // if error recovery fails because we are in the wrong mode, need user
-        // to intervene, so wait
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        return false;
       } else {
         dexai::log()->warn(
             "RecoverFromControlException: turning safety off...");
