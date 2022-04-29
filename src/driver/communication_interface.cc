@@ -296,25 +296,28 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
 
 void CommunicationInterface::PublishRobotStatus() {
   // Try to lock data to avoid read write collisions.
-  if (std::unique_lock<std::mutex> lock {robot_data_mutex_};
-      robot_data_.has_robot_data) {
-    drake::lcmt_iiwa_status franka_status {
-        utils::ConvertToLcmIiwaStatus(robot_data_)};
+  std::unique_lock<std::mutex> lock {robot_data_mutex_};
 
+  drake::lcmt_iiwa_status franka_status {
+      utils::ConvertToLcmIiwaStatus(robot_data_)};
+  auto driver_status_msg {
+      GetUpdatedDriverStatus(franka_status.utime, robot_data_)};
+  // TODO(@syler): we don't continuosly update robot data when robot is in
+  // reflex/automatic error recovery mode so those modes will never be reflected
+  // in driver status
+  lcm_.publish(lcm_driver_status_channel_, &driver_status_msg);
+
+  if (robot_data_.has_robot_data) {
     robot_msgs::robot_status_t robot_status {
         utils::ConvertToRobotStatusLcmMsg(robot_data_)};
 
     franka::RobotMode current_mode {robot_data_.robot_state.robot_mode};
-
-    auto driver_status_msg {
-        GetUpdatedDriverStatus(franka_status.utime, robot_data_)};
 
     robot_data_.has_robot_data = false;
     lock.unlock();
     // publish data over lcm
     lcm_.publish(params_.lcm_iiwa_status_channel, &franka_status);
     lcm_.publish(params_.lcm_robot_status_channel, &robot_status);
-    lcm_.publish(lcm_driver_status_channel_, &driver_status_msg);
 
     // Cancel robot plans if robot is U-stopped.
     if (current_mode == franka::RobotMode::kUserStopped) {

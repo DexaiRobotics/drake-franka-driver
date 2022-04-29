@@ -418,7 +418,7 @@ int FrankaPlanRunner::RunFranka() {
 }
 
 bool FrankaPlanRunner::RecoverFromControlException() {
-  dexai::log()->error(
+  dexai::log()->debug(
       "RecoverFromControlException: attempting to perform automatic error "
       "recovery");
 
@@ -429,9 +429,6 @@ bool FrankaPlanRunner::RecoverFromControlException() {
   if (!is_sim_) {
     auto current_mode {GetRobotMode()};
     do {
-      dexai::log()->error("RecoverFromControlException: in mode {}",
-                          utils::RobotModeToString(current_mode));
-
       if ((current_mode == franka::RobotMode::kUserStopped)
           || (current_mode == franka::RobotMode::kOther)) {
         // setting collision behavior and performing error recovery will fail if
@@ -441,9 +438,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
                         utils::RobotModeToString(current_mode))};
         dexai::log()->error("RecoverFromControlException: {}", err_msg);
         comm_interface_->SetDriverIsRunning(false, err_msg);
-        // if error recovery fails because we are in the wrong mode, need user
-        // to intervene, so wait
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
+        return false;
       } else {
         dexai::log()->warn(
             "RecoverFromControlException: turning safety off...");
