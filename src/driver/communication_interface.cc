@@ -298,14 +298,13 @@ void CommunicationInterface::PublishRobotStatus() {
   // Try to lock data to avoid read write collisions.
   std::unique_lock<std::mutex> lock {robot_data_mutex_};
 
+  drake::lcmt_iiwa_status franka_status {
+      utils::ConvertToLcmIiwaStatus(robot_data_)};
   auto driver_status_msg {
       GetUpdatedDriverStatus(franka_status.utime, robot_data_)};
   lcm_.publish(lcm_driver_status_channel_, &driver_status_msg);
 
   if (robot_data_.has_robot_data) {
-    drake::lcmt_iiwa_status franka_status {
-        utils::ConvertToLcmIiwaStatus(robot_data_)};
-
     robot_msgs::robot_status_t robot_status {
         utils::ConvertToRobotStatusLcmMsg(robot_data_)};
 
