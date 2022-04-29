@@ -302,6 +302,9 @@ void CommunicationInterface::PublishRobotStatus() {
       utils::ConvertToLcmIiwaStatus(robot_data_)};
   auto driver_status_msg {
       GetUpdatedDriverStatus(franka_status.utime, robot_data_)};
+  // TODO(@syler): we don't continuosly update robot data when robot is in
+  // reflex/automatic error recovery mode so those modes will never be reflected
+  // in driver status
   lcm_.publish(lcm_driver_status_channel_, &driver_status_msg);
 
   if (robot_data_.has_robot_data) {
