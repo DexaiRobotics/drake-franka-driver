@@ -433,7 +433,7 @@ bool FrankaPlanRunner::RecoverFromControlException() {
           || (current_mode == franka::RobotMode::kOther)) {
         // setting collision behavior and performing error recovery will fail if
         // the robot is user stopped or locked
-        auto err_msg {
+        const auto err_msg {
             fmt::format("cannot perform automatic error recovery in mode: {}",
                         utils::RobotModeToString(current_mode))};
         dexai::log()->error("RecoverFromControlException: {}", err_msg);
@@ -447,7 +447,18 @@ bool FrankaPlanRunner::RecoverFromControlException() {
         dexai::log()->warn(
             "RecoverFromControlException: running Franka's automatic error "
             "recovery...");
-        robot_->automaticErrorRecovery();
+        try {
+          robot_->automaticErrorRecovery();
+        } catch (const franka::Exception& e) {
+          const auto err_msg {
+              fmt::format("Caught exception during error recovery attempted in "
+                          "{} mode, current mode: {}, error: {}",
+                          utils::RobotModeToString(current_mode),
+                          utils::RobotModeToString(GetRobotMode()), e.what())};
+          comm_interface_->SetDriverIsRunning(false, err_msg);
+          dexai::log()->error("RecoverFromControlException: {}", err_msg);
+          return false;
+        }
         dexai::log()->warn(
             "RecoverFromControlException: finished Franka's automatic error "
             "recovery");
