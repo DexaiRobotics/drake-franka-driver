@@ -442,12 +442,12 @@ bool FrankaPlanRunner::RecoverFromControlException() {
       } else {
         dexai::log()->warn(
             "RecoverFromControlException: turning safety off...");
-        SetCollisionBehaviorSafetyOff();
-        dexai::log()->warn("RecoverFromControlException: set safety off.");
-        dexai::log()->warn(
-            "RecoverFromControlException: running Franka's automatic error "
-            "recovery...");
         try {
+          SetCollisionBehaviorSafetyOff();
+          dexai::log()->warn("RecoverFromControlException: set safety off.");
+          dexai::log()->warn(
+              "RecoverFromControlException: running Franka's automatic error "
+              "recovery...");
           robot_->automaticErrorRecovery();
         } catch (const franka::Exception& e) {
           const auto err_msg {
