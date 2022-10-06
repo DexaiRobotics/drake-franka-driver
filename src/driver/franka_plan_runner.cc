@@ -442,12 +442,35 @@ bool FrankaPlanRunner::RecoverFromControlException() {
       } else {
         dexai::log()->warn(
             "RecoverFromControlException: turning safety off...");
-        SetCollisionBehaviorSafetyOff();
-        dexai::log()->warn("RecoverFromControlException: set safety off.");
-        dexai::log()->warn(
-            "RecoverFromControlException: running Franka's automatic error "
-            "recovery...");
         try {
+          // Attemts to set collision behavior and perform automatic error
+          // recovery will throw a franka::CommandException if the robot is in
+          // the wrong mode which does not support that. We already check that
+          // the robot is not locked or user stopped in the outer if statement,
+          // but have observed crashes even with that logic in place.
+
+          // It is not well understood yet what modes led to the above, so have
+          // a try-catch around the commands that would issue
+          // franka::CommandException and allow us to proceed with the logic and
+          // print additional information on the exception and robot's current
+          // mode.
+
+          // We are relying on library code from libfranka as the source of the
+          // error in question, triggered by a specific set of circumstances in
+          // the physical world. In order to unit test we would need a
+          // multithreaded setup where we could mock the robot mode and throw an
+          // exception at a very specific time in execution of the logic. We
+          // don't enough information to write the unit test if the
+          // capability existed as we don't have enough insight into what the
+          // state of the libfranka interface WAS at the time.
+
+          // TODO(@syler): update above comment and logic once we have more
+          // information, add unit test
+          SetCollisionBehaviorSafetyOff();
+          dexai::log()->warn("RecoverFromControlException: set safety off.");
+          dexai::log()->warn(
+              "RecoverFromControlException: running Franka's automatic error "
+              "recovery...");
           robot_->automaticErrorRecovery();
         } catch (const franka::Exception& e) {
           const auto err_msg {
