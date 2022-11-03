@@ -53,6 +53,9 @@ echo "Starting Franka driver with hostname: $(hostname), Franka name: ${robot_na
 # we try to kill any existing instances, but if there are multiple containers
 # running on the same machine, or have an instance running on another
 # networked machine, we don't want to duplicate
+if [[ ":$PATH:" != *":/src/deploy/scripts:"* ]]; then
+    export PATH=$PATH:/src/deploy/scripts
+fi
 if lcm-echo -n 1 -v 0 --timeout 0.1 ${status_channel}; then
     echo "A Franka driver instance is already running and publishing to ${status_channel}!"
     echo "Check other containers and networked machines to find out the source."
