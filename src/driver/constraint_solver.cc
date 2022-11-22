@@ -230,7 +230,7 @@ void ConstraintSolver::UpdateModel(
   // TODO(@anyone): set this based on visualization level
   // this performs the magic of making the diagram publish to the visualizer.
   // not needed for the actual collision check.
-  simulator_->get_system().Publish(simulator_->get_context());
+  simulator_->get_system().ForcedPublish(simulator_->get_context());
 }
 
 }  // namespace franka_driver
