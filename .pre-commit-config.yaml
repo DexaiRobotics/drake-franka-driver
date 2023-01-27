@@ -1,17 +1,17 @@
 repos:
 -   repo: https://github.com/timothycrosley/isort
-    rev: 5.7.0
+    rev: 5.11.4
     hooks:
     - id: isort
       types: [python]
       args: [--filter-files]
 -   repo: https://github.com/psf/black
-    rev: 20.8b1
+    rev: 22.12.0
     hooks:
     - id: black
       args: [--line-length, '79']
--   repo: https://gitlab.com/pycqa/flake8
-    rev: 3.8.4
+-   repo: https://github.com/pycqa/flake8
+    rev: 6.0.0
     hooks:
     - id: flake8
       exclude: scripts/robot_msgs/
@@ -25,17 +25,17 @@ repos:
       args: [--rcfile=setup.cfg]
       exclude: scripts/robot_msgs/
 -   repo: https://github.com/pycqa/pydocstyle
-    rev: 5.1.1
+    rev: 6.3.0
     hooks:
     - id: pydocstyle
       exclude: scripts/robot_msgs/
 -   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v0.800
+    rev: v0.991
     hooks:
     - id: mypy
       exclude: scripts/robot_msgs/
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.4.0
+    rev: v4.4.0
     hooks:
     - id: check-added-large-files
       args: [--maxkb=100]
@@ -65,7 +65,7 @@ repos:
     - id: trailing-whitespace
       exclude: '.*[.](urdf|obj|lcm|lcmlog)$'
 -   repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.1.9
+    rev: v1.4.2
     hooks:
     - id: forbid-crlf
     - id: remove-crlf
@@ -168,7 +168,7 @@ repos:
              "--suppress=unusedFunction"
              ]
 -   repo: https://github.com/pocc/pre-commit-hooks
-    rev: 41ad32113ed5abe9c33a01f606b5eacf572b13e0
+    rev: v1.3.5
     hooks:
     - id: oclint
       # keep the original compile_commands.json as oclint requires it
