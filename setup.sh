@@ -92,12 +92,12 @@ if [ ! -f "build/libfranka.so" ]; then
     if (( $build_debug > 0 )); then
         echo "Build libfranka in Debug mode!"
         cmake .. -DCMAKE_BUILD_TYPE=Debug \
-                 -DCMAKE_C_COMPILER=gcc-7 \
-                 -DCMAKE_CXX_COMPILER=g++-7
+                 -DCMAKE_C_COMPILER=gcc-9 \
+                 -DCMAKE_CXX_COMPILER=g++-9
     else
         cmake .. -DCMAKE_BUILD_TYPE=Release \
-                 -DCMAKE_C_COMPILER=gcc-7 \
-                 -DCMAKE_CXX_COMPILER=g++-7
+                 -DCMAKE_C_COMPILER=gcc-9 \
+                 -DCMAKE_CXX_COMPILER=g++-9
     fi
     cmake --build . -j $num_threads --target franka communication_test
     popd
@@ -121,10 +121,10 @@ fi
 mkdir -p build; cd build
 if (( $build_debug > 0 )); then
     echo "Building in debug mode"
-    cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Debug     || exit 4   # Build for debugging
+    cmake .. -D CMAKE_BUILD_TYPE=Debug     || exit 4   # Build for debugging
 else
     echo "Building in release mode"
-    cmake .. -G Ninja -D CMAKE_BUILD_TYPE=Release   || exit 5
+    cmake .. -D CMAKE_BUILD_TYPE=Release   || exit 5
 fi
 
 cmake --build . --target $target -- -j $num_threads || exit 6
