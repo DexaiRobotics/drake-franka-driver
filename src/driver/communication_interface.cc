@@ -404,9 +404,17 @@ void CommunicationInterface::SetModeIfSimulated(const franka::RobotMode& mode) {
                utils::RobotModeToString(mode));
   if (is_sim_) {
     std::scoped_lock<std::mutex> lock {robot_data_mutex_};
-    robot_data_.robot_state.robot_mode = mode;
-    log()->info("CommInterface:SetModeIfSimulated: set mode to {}",
-                utils::RobotModeToString(mode));
+    auto current_mode {robot_data_.robot_state.robot_mode};
+    if (current_mode == franka::RobotMode::kUserStopped) {
+      log()->warn(
+          "CommInterface:SetModeIfSimulated: failed to set mode to {} as "
+          "Franka is user stopped",
+          utils::RobotModeToString(mode));
+    } else {
+      robot_data_.robot_state.robot_mode = mode;
+      log()->info("CommInterface:SetModeIfSimulated: set mode to {}",
+                  utils::RobotModeToString(mode));
+    }
   }
 }
 
@@ -448,11 +456,7 @@ bool CommunicationInterface::CanReceiveCommands(
     case franka::RobotMode::kGuiding:
       return false;
     case franka::RobotMode::kReflex:
-      dexai::log()->warn(
-          "CanReceiveCommands: allowing to receive commands while in "
-          "Reflex mode, but this needs more testing!",
-          utils::RobotModeToString(current_mode));
-      return true;
+      return false;
     case franka::RobotMode::kUserStopped:
       return false;
     case franka::RobotMode::kAutomaticErrorRecovery:
