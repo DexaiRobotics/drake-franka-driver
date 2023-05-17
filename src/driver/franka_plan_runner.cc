@@ -254,8 +254,8 @@ int FrankaPlanRunner::RunFranka() {
 
   while (true) {  // main control loop
     // make sure robot is not user-stopped before doing anything else
-    if (auto mode {GetRobotMode()};
-        CommunicationInterface::CanReceiveCommands(mode)) {
+    auto mode {GetRobotMode()};
+    if (CommunicationInterface::CanReceiveCommands(mode)) {
       // robot status only depends on the LCM pause command
       if (auto new_status {comm_interface_->GetPauseStatus()
                                ? RobotStatus::Paused
@@ -386,12 +386,31 @@ int FrankaPlanRunner::RunFranka() {
         comm_interface_->ClearCancelPlanRequest();
       }
     } else {  // unable to receive commands because robot is in a wrong mode
-      if (comm_interface_->HasNewPlan()) {  // locked or u-stopped, clear plan
+      if (comm_interface_->HasNewPlan()) {  // clear plan
         std::string err_msg {
             fmt::format("buffered plan discarded because robot is now in mode "
                         "{}, unable to receive plan",
                         utils::RobotModeToString(mode))};
         comm_interface_->ClearNewPlan(err_msg);
+      }
+      if (mode == franka::RobotMode::kReflex) {
+        dexai::log()->warn(
+            "RunFranka: robot is in Reflex mode, trying "
+            "automaticErrorRecovery...");
+        try {
+          robot_->automaticErrorRecovery();
+          dexai::log()->info(
+              "RunFranka: automaticErrorRecovery succeeded, out of Reflex mode,"
+              " now in mode: {}.",
+              utils::RobotModeToString(GetRobotMode()));
+          continue;
+        } catch (const franka::Exception& e) {
+          comm_interface_->SetDriverIsRunning(false, e.what());
+          dexai::log()->warn(
+              "RunFranka: caught exception during automatic "
+              "error recovery for Reflex mode: {}.",
+              e.what());
+        }
       }
       if (auto t_now {std::chrono::steady_clock::now()};
           t_now - t_last_main_loop_log_ >= std::chrono::seconds(10)) {
