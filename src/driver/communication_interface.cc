@@ -404,17 +404,9 @@ void CommunicationInterface::SetModeIfSimulated(const franka::RobotMode& mode) {
                utils::RobotModeToString(mode));
   if (is_sim_) {
     std::scoped_lock<std::mutex> lock {robot_data_mutex_};
-    auto current_mode {robot_data_.robot_state.robot_mode};
-    if (current_mode == franka::RobotMode::kUserStopped) {
-      log()->warn(
-          "CommInterface:SetModeIfSimulated: failed to set mode to {} as "
-          "Franka is user stopped",
-          utils::RobotModeToString(mode));
-    } else {
-      robot_data_.robot_state.robot_mode = mode;
-      log()->info("CommInterface:SetModeIfSimulated: set mode to {}",
-                  utils::RobotModeToString(mode));
-    }
+    robot_data_.robot_state.robot_mode = mode;
+    log()->info("CommInterface:SetModeIfSimulated: set mode to {}",
+                utils::RobotModeToString(mode));
   }
 }
 
