@@ -411,6 +411,9 @@ class FrankaPlanRunner {
 
   Eigen::Vector3d desired_position_;
   Eigen::Quaterniond desired_orientation_;
+
+  // number of attempts to automatically recover from being in reflex mode on init
+  size_t reflex_init_recovery_attempts_ {};
 };  // FrankaPlanRunner
 
 }  // namespace franka_driver
