@@ -198,12 +198,16 @@ int FrankaPlanRunner::RunFranka() {
           // reset to 0 when we're successful
           reflex_init_recovery_attempts_ = 0;
         } catch (const franka::Exception& e) {
-          // Sleep before attempting to retry with exponential backoff. Avoids logspam in the case that we can't get out of reflex mode on init with out user help.
-          const auto wait_time_seconds {std::pow(2.0, reflex_init_recovery_attempts_)};
+          // Sleep before attempting to retry with exponential backoff. Avoids
+          // logspam in the case that we can't get out of reflex mode on init
+          // with out user help.
+          const auto wait_time_seconds {
+              std::pow(2.0, reflex_init_recovery_attempts_)};
           comm_interface_->SetDriverIsRunning(false, e.what());
           dexai::log()->warn(
               "RunFranka: caught exception in initialisation during automatic "
-              "error recovery for Reflex mode: {}. Sleeping {} sec before attempting again.",
+              "error recovery for Reflex mode: {}. Sleeping {} sec before "
+              "attempting again.",
               e.what(), wait_time_seconds);
           std::this_thread::sleep_for(
               std::chrono::duration<double>(wait_time_seconds));
