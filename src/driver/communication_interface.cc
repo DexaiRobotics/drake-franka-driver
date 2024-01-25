@@ -619,10 +619,9 @@ void CommunicationInterface::HandlePause(
           fmt::format("CommInterface:HandlePause: Received cancel plan request "
                       "with source: {}",
                       source)};
-      // warn on first user stop cancellation received (we publish continuously
-      // until resolved)
-      if (source == fmt::format("{}_U_STOP", params_.robot_name)
-          && !cancel_plan_requested_) {
+      // warn on first cancellation received (we publish continuously until
+      // resolved)
+      if (!cancel_plan_requested_) {
         dexai::log()->warn(err_msg);
       } else {
         dexai::log()->debug(err_msg);
