@@ -399,7 +399,7 @@ int FrankaPlanRunner::RunFranka() {
     } else {  // unable to receive commands because robot is in a wrong mode
       if (comm_interface_->HasNewPlan()) {  // clear plan
         std::string err_msg {
-            fmt::format("buffered plan discarded because robot is now in mode "
+            fmt::format("Buffered plan discarded because robot is now in mode "
                         "{}, unable to receive plan",
                         utils::RobotModeToString(mode))};
         comm_interface_->ClearNewPlan(err_msg);
@@ -468,6 +468,13 @@ bool FrankaPlanRunner::RecoverFromControlException() {
                         utils::RobotModeToString(current_mode))};
         dexai::log()->error("RecoverFromControlException: {}", err_msg);
         comm_interface_->SetDriverIsRunning(false, err_msg);
+        if (comm_interface_->HasNewPlan()) {
+          const auto clear_plan_msg {fmt::format(
+              "After robot has transitioned out of mode: {}, receipt "
+              "of a new plan is required to proceed",
+              utils::RobotModeToString(current_mode))};
+          comm_interface_->ClearNewPlan(clear_plan_msg);
+        }
         return false;
       } else {
         dexai::log()->warn(
