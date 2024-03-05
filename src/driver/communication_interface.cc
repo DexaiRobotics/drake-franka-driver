@@ -615,10 +615,17 @@ void CommunicationInterface::HandlePause(
 
   switch (pause_type) {
     case PauseCommandType::CANCEL_PLAN: {
-      dexai::log()->debug(
-          "CommInterface:HandlePause: Received cancel plan request with "
-          "source: {}",
-          source);
+      const auto err_msg {
+          fmt::format("CommInterface:HandlePause: Received cancel plan request "
+                      "with source: {}",
+                      source)};
+      // warn on first cancellation received (we publish continuously until
+      // resolved)
+      if (!cancel_plan_requested_) {
+        dexai::log()->warn(err_msg);
+      } else {
+        dexai::log()->debug(err_msg);
+      }
       cancel_plan_requested_ = true;
       cancel_plan_source_ = source;
       break;

@@ -302,7 +302,7 @@ class CommunicationInterface {
   int64_t last_confirmed_plan_utime_;
 
   // This is a buffer storing the new plan received. Capacility is only 1.
-  // Once this plan is popped (taken), this buffer is emptied and avialable
+  // Once this plan is popped (taken), this buffer is emptied and available
   // to store a new plan, while the current plan may be running.
   RobotPlanBuffer new_plan_buffer_;
   std::mutex robot_plan_mutex_;
