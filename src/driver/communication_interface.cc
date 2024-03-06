@@ -320,7 +320,7 @@ void CommunicationInterface::PublishRobotStatus() {
     lcm_.publish(params_.lcm_robot_status_channel, &robot_status);
 
     // Cancel robot plans if robot is U-stopped.
-    if (current_mode == franka::RobotMode::kUserStopped) {
+    if (IsUserStopped(current_mode)) {
       PublishPauseToChannel(franka_status.utime, params_.lcm_stop_channel,
                             PauseCommandType::CANCEL_PLAN,
                             fmt::format("{}_U_STOP", params_.robot_name));
@@ -686,6 +686,21 @@ void CommunicationInterface::HandleSimDriverEventTrigger(
         "to simulate control exception!");
     SetModeIfSimulated(franka::RobotMode::kReflex);
     sim_control_exception_triggered_ = true;
+    return;
+  }
+  if (desired_event == "brakes") {
+    std::scoped_lock<std::mutex> lock {robot_data_mutex_};
+    if (cmd_msg->data) {
+      dexai::log()->warn(
+          "CommInterface:HandleSimDriverEventTrigger: received "
+          "command to simulate brakes lock");
+      robot_data_.robot_state.robot_mode = franka::RobotMode::kOther;
+    } else {
+      dexai::log()->warn(
+          "CommInterface:HandleSimDriverEventTrigger: received "
+          "command to simulate brakes unlock");
+      robot_data_.robot_state.robot_mode = franka::RobotMode::kIdle;
+    }
     return;
   }
   if (desired_event == "u_stop") {
