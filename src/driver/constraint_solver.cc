@@ -82,8 +82,11 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   mb_plant_ = &mb_plant;
   scene_graph_ = &scene_graph;
   try {
-    robot_model_idx_ = drake::multibody::Parser(mb_plant_, scene_graph_)
-                           .AddModelFromFile(urdf_path_, "robot_arm");
+    const auto model_instances {
+        drake::multibody::Parser(mb_plant_, scene_graph_)
+            .AddModels(urdf_path_)};
+    assert(model_instances.size() == 1);
+    robot_model_idx_ = model_instances.front();
   } catch (std::exception const& ex) {
     dexai::log()->error("AddModelFromFile failed: {}", ex.what());
     throw;
