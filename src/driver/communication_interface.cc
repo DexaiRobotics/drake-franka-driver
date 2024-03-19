@@ -38,9 +38,9 @@
 /// The interface also reports via LCM lcmt_franka_status
 /// lcmt_franka_pause_status messages).
 ///
-/// When a plan is received, it will indicate via HasPlan() that a plan is
-/// available. The plan is moved from this communication interface to a franka
-/// plan runner when the MovePlan() is called.
+/// When a plan is received, it will indicate via HasNewPlan() that a plan is
+/// available. The plan is moved from this communication interface to the
+/// franka plan runner when the PopNewPlan() is called.
 ///
 /// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
@@ -180,12 +180,13 @@ CommunicationInterface::PopNewPlan() {
           new_plan_buffer_.timepoints};
 }
 
+/// @deprecated
 std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t, PlanTimepoints>
 CommunicationInterface::PopNewCartesianPlan() {
   if (!HasNewCartesianPlan()) {
     throw std::runtime_error(
-        fmt::format("PopNewPlan: no buffered new plan available to pop; utime "
-                    "in buffer: {}",
+        fmt::format("PopNewCartesianPlan: no buffered new plan available to "
+                    "pop; utime in buffer: {}",
                     new_plan_buffer_.utime));
   }
   SetModeIfSimulated(franka::RobotMode::kMove);
@@ -465,6 +466,7 @@ bool CommunicationInterface::IsUserStopped(
          || (current_mode == franka::RobotMode::kUserStopped);
 }
 
+/// @deprecated
 void CommunicationInterface::HandleCompliantPushReq(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::bool_t* msg) {

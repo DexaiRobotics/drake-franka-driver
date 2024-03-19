@@ -39,9 +39,9 @@
 /// The interface also reports via LCM lcmt_franka_status
 /// lcmt_franka_pause_status messages).
 ///
-/// When a plan is received, it will indicate via HasPlan() that a plan is
-/// available. The plan is moved from this communication interface to a franka
-/// plan runner when the MovePlan() is called. UPDATE
+/// When a plan is received, it will indicate via HasNewPlan() that a plan is
+/// available. The plan is moved from this communication interface to the
+/// franka plan runner when PopNewPlan() is called.
 ///
 /// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
@@ -140,22 +140,27 @@ class CommunicationInterface {
     sim_control_exception_triggered_ = false;
   }
 
+  /// @deprecated
   inline bool CompliantPushStartRequested() const {
     return compliant_push_start_requested_;
   }
 
+  /// @deprecated
   void ClearCompliantPushStartRequest() {
     compliant_push_start_requested_ = false;
   }
 
+  /// @deprecated
   inline bool CompliantPushStopRequested() const {
     return compliant_push_stop_requested_;
   }
 
+  /// @deprecated
   void ClearCompliantPushStopRequest() {
     compliant_push_stop_requested_ = false;
   }
 
+  /// @deprecated
   inline void SetCompliantPushActive(const bool active) {
     compliant_push_active_ = active;
   }
@@ -177,6 +182,7 @@ class CommunicationInterface {
     return !(new_plan_buffer_.plan == nullptr);
   }
 
+  /// @deprecated
   bool HasNewCartesianPlan() {
     std::scoped_lock<std::mutex> lock {robot_plan_mutex_};
     return !(new_plan_buffer_.cartesian_plan == nullptr);
@@ -193,6 +199,8 @@ class CommunicationInterface {
   std::tuple<std::unique_ptr<PPType>, int64_t, int16_t, Eigen::Vector3d,
              PlanTimepoints>
   PopNewPlan();
+
+  /// @deprecated
   std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t, PlanTimepoints>
   PopNewCartesianPlan();
 
@@ -276,6 +284,8 @@ class CommunicationInterface {
                   const robot_msgs::robot_spline_t* robot_spline);
   void HandlePause(const ::lcm::ReceiveBuffer*, const std::string&,
                    const robot_msgs::pause_cmd* pause_cmd_msg);
+
+  /// @deprecated
   void HandleCompliantPushReq(const ::lcm::ReceiveBuffer*, const std::string&,
                               const robot_msgs::bool_t* msg);
 

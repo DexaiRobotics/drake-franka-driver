@@ -641,11 +641,13 @@ bool FrankaPlanRunner::LimitJoints(Eigen::VectorXd& conf) {
   return within_limits;
 }
 
+/// @brief Checks if new plan is continuous with current plan.
+/// @param plan Piecewise polynomial plan to check against currently active
+/// plan.
+/// @return true if plans are continuous
+/// @throws if there is no currently active plan
 bool FrankaPlanRunner::IsContinuousWithCurrentPlan(
     const std::unique_ptr<PPType>& plan) {
-  // checks if new plan is continuous with current plan.
-  // throw if no active plan. this function should not have been
-  // called without an active plan.
   if (!plan_) {
     throw std::runtime_error {"FPR::IsContinuousWCurrPlan: no active plan!"};
   }
@@ -687,10 +689,22 @@ double FrankaPlanRunner::TimeToAdvanceWhilePausing(double period,
   return time_to_advance;
 }
 
-// TODO(@anyone): rewrite this with steady_clock to make
-// franka_t agree exactly with wall clock
+/**
+ * @brief Adjusts the internal time of the Franka robot (`franka_time_`) to
+ * align with the robot's current status, based on its current velocity, period,
+ * and its state (running, pausing, paused, unpausing). It handles the
+ * transition between these states if a pause or cancel request is detected
+ * through the communication interface.
+ *
+ * @param vel An array representing the current velocity of the robot's joints.
+ * @param period_in_seconds time since last callback invocation, zero on first
+ * invocation
+ */
 void FrankaPlanRunner::IncreaseFrankaTimeBasedOnStatus(
     const std::array<double, 7>& vel, double period_in_seconds) {
+  // TODO(@anyone): rewrite this with steady_clock to make
+  // franka_t agree exactly with wall clock
+
   // get pause data from the communication interface
   auto paused = comm_interface_->GetPauseStatus();
   auto cancel_plan_requested = comm_interface_->CancelPlanRequested();
@@ -946,7 +960,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
     if (is_new_plan_valid
         && (!has_active_plan || IsContinuousWithCurrentPlan(new_plan))) {
       // If the new plan is coninuous in position, velocity and acceleration
-      // with the current plan at current frank time, replace it with the new
+      // with the current plan at current franka time, replace it with the new
       // plan. Or if we do not currently have a plan, move the new plan's
       // ownership to the current plan unique_ptr
       UpdateActivePlan(std::move(new_plan), new_plan_utime, new_plan_exec_opt,
@@ -1025,11 +1039,10 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
 
   Eigen::VectorXd next_conf_combined(7);  // derive the next conf for return
   {
-    // We don't track the last callback and delta from it
-    // So we always calculate delta from the start of the plan
-    // For both the plan itself and the franks, since they don't start from
-    // the exact same position.
-    // delta between conf at start of plan to conft at current time of plan:
+    // We don't track the last callback and delta from it, so we always
+    // calculate delta from the start of the plan for both the plan itself and
+    // the franka, since they don't start from the exact same position.
+    // Delta between conf at start of plan to conf at current time of plan:
     Eigen::VectorXd delta_conf_plan {next_conf_plan_ - start_conf_plan_};
     Eigen::VectorXd next_conf_franka {start_conf_franka_ + delta_conf_plan};
 
@@ -1166,6 +1179,7 @@ franka::JointPositions FrankaPlanRunner::JointPositionCallback(
   return output_to_franka;
 }
 
+/// @deprecated
 franka::Torques FrankaPlanRunner::ImpedanceControlCallback(
     const franka::RobotState& robot_state, franka::Duration) {
   auto start_time {std::chrono::high_resolution_clock::now()};
