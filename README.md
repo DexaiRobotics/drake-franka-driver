@@ -24,7 +24,7 @@ make install -j 12
 
 `drake` has deprecated some lcmtypes needed here. The `robot_msgs` [repo](https://github.com/DexaiRobotics/robot_msgs) has a copy of them; only the headers in `include/lcmtypes` are needed. See `.circleci/config.yml` and `CMakeLists.txt` for details.
 
-## Builidng the driver
+## Building the driver
 
 ```bash
 git clone --recursive https://github.com/DexaiRobotics/drake-franka-driver.git`
@@ -51,14 +51,40 @@ The driver listens for commands on the `<robot_name>_cmd` LCM channel. By defaul
 
 The `drake-franka-driver` reports the robot status on the `<robot_name>_status` lcm channel. By default this is set to `franka_0_status`. Status is reported in a `franka_status` struct.
 
-## Starting driver on NUC remotely
-In our implementation, the NUC runs this driver to talk to the Franka Controller.
-There are 3 ways to start the driver: either using `di start core:franka` command on the beast computer, using `franka` command directly on the beast computer, or manually starting the driver on the NUC. See also here: https://github.com/DexaiRobotics/wiki/wiki/Running-Candy-Demo#starting-drake-franka-driver-manually-to-debug
-### franka command
-There is a command called `franka` which is run on the Beast Computer (this is what `di start core:franka` callsunder the hood): https://github.com/DexaiRobotics/deploy/blob/master/franka
-On the NUC, there is a crontab which runs on startup: https://github.com/DexaiRobotics/deploy/blob/master/robot_cron/start_docker_and_driver_servers.sh
-This will:
-1) make sure a docker is running and all code is built
-2) start up the LCM servers for both Franka and AA https://github.com/DexaiRobotics/fullstack/blob/master/src/run_driver_servers.sh
+## Starting driver on NUC
 
-The LCM server https://github.com/DexaiRobotics/drake-franka-driver/blob/master/scripts/franka_server.py will listen to LCM commands from the franka command on the beast computer, and start up the actual driver when requested.
+In our implementation, the NUC runs this driver to talk to the Franka Controller. There are 3 ways to start the driver.
+
+### Using `dexai-cli` from beast machine
+
+On the beast machine, run
+
+```bash
+dexai-cli run -c ful -v <desired_deploy_docker_version>
+```
+
+Note: this will bring up the entire system on the desired version, including the Franka driver and AA driver on the NUC, and the TLE container and deploy container for di/ROS services on the beast machine.
+
+### Using `./run_drivers.sh` script on NUC
+
+Open an ssh session into the NUC and do the following:
+```bash
+cd ~/fullstack
+./run_drivers.sh --tag <desired_deploy_docker_version>
+# example: ./run_drivers.sh --tag 7.1.56
+```
+
+### Building from source
+
+Sometimes, building from source is required in order to test a new feature in the driver. Open an ssh session into the NUC and do the following:
+```bash
+docker kill franka-driver-deploy # if there is currently a driver running
+cd ~/dev_fullstack
+git checkout <your_feature_branch>
+./build_fullstack_detached.sh -b
+```
+Once the build completes, you can enter the running docker container and manually start the driver:
+```bash
+cd /src/drake-franka-driver
+./franka.sh
+```
