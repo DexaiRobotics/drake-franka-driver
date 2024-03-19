@@ -64,14 +64,14 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   log()->debug("CS:ConstraintSolver: ctor: BEGIN");
   if (urdf_path_.empty()) {
     std::string error_msg =
-        "CS::ConstraintSolver constructor: empty parameters->urdf_filepath: "
+        "ConstraintSolver:ctor: empty parameters->urdf_filepath: "
         + urdf_path_;  // add it anyway
     log()->error(error_msg);
     throw std::runtime_error(error_msg);
   }
   if (!fs::exists(urdf_path_)) {
     std::string error_msg =
-        "CS::ConstraintSolver: URDF NOT FOUND: " + urdf_path_;
+        "ConstraintSolver:ctor: URDF NOT FOUND: " + urdf_path_;
     log()->error(error_msg);
     throw std::runtime_error(error_msg);
   }
@@ -88,7 +88,8 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     assert(model_instances.size() == 1);
     robot_model_idx_ = model_instances.front();
   } catch (std::exception const& ex) {
-    dexai::log()->error("AddModelFromFile failed: {}", ex.what());
+    dexai::log()->error("ConstraintSolver:ctor: AddModelFromFile failed: {}",
+                        ex.what());
     throw;
   }
 
@@ -97,19 +98,19 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     auto robot_root_link {params->world_frame};
     try {
       dexai::log()->debug(
-          "CS::ConstraintSolver: "
-          "Creating robot model parser with URDF {} \n"
+          "ConstraintSolver:ctor: Creating robot model parser with URDF {} \n"
           "using root link name in URDF: {}",
           urdf_path_, robot_root_link);
-      dexai::log()->debug("CS:ctor: welding robot frame {} to world frame: {}",
-                          robot_root_link, mb_plant.world_frame().name());
+      dexai::log()->debug(
+          "ConstraintSolver:ctor: welding robot frame {} to world frame: {}",
+          robot_root_link, mb_plant.world_frame().name());
       auto& child_frame {
           mb_plant.GetFrameByName(robot_root_link, robot_model_idx_)};
       mb_plant.WeldFrames(mb_plant.world_frame(), child_frame);
     } catch (std::exception const& err) {
       dexai::log()->error(
-          "CS:Error: Exception in dual robot collision ctor: \n"
-          "Problem parsing this robot's ROOT LINK named: {}\n"
+          "ConstraintSolver:ctor: Problem parsing this robot's ROOT LINK "
+          "named: {}\n"
           "Exception message from Drake Multibody tree is: {}",
           robot_root_link, err.what());
       throw;  // rethrow exception again
@@ -118,7 +119,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
 
   mb_plant.Finalize();
   robot_dof_ = mb_plant.num_positions(robot_model_idx_);
-  dexai::log()->info("CS::ConstraintSolver: robot_dof_: {}", robot_dof_);
+  dexai::log()->info("ConstraintSolver:ctor: robot_dof_: {}", robot_dof_);
 
   // TODO(@anyone): Check if Collision Filter Groups work...
   // remove collisions within each set - do not check for collisions against
@@ -175,8 +176,9 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
     for (const auto& joint_idx : mb_plant.GetJointIndices(robot_model_idx_)) {
       const auto& joint {mb_plant.get_joint(joint_idx)};
       dexai::log()->debug(
-          "joint #{}, name: {}, typename: {}, n_pos: {}, lim size: {}", ++i,
-          joint.name(), joint.type_name(), joint.num_positions(),
+          "ConstraintSolver:ctor: joint #{}, name: {}, typename: {}, n_pos: "
+          "{}, lim size: {}",
+          ++i, joint.name(), joint.type_name(), joint.num_positions(),
           joint.position_lower_limits().size());
       if (joint.type_name() == "weld") {
         continue;
@@ -184,7 +186,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
         joint_names_.push_back(joint.name());
       } else {
         std::string err_msg {"Unrecognised joint type: {}" + joint.type_name()};
-        dexai::log()->error(err_msg);
+        dexai::log()->error("ConstraintSolver:ctor: {}", err_msg);
         throw std::runtime_error(err_msg);
       }
     }
@@ -192,11 +194,12 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
 
   if (joint_names_.size() != robot_dof_) {
     std::string err_msg {"Number of joint mismatch. Double check URDF."};
-    dexai::log()->error(err_msg);
+    dexai::log()->error("ConstraintSolver:ctor: {}", err_msg);
     throw std::runtime_error(err_msg);
   }
   dexai::log()->info(
-      "CS:ConstraintSolver: Number of dof (actuatable joints): {}", robot_dof_);
+      "ConstraintSolver:ctor: Number of dof (actuatable joints): {}",
+      robot_dof_);
   // fill joint limits matrix
   joint_limits_.resize(robot_dof_, 2);
   for (size_t i {}; i < joint_names_.size(); i++) {
@@ -209,7 +212,7 @@ ConstraintSolver::ConstraintSolver(const RobotParameters* params)
   q_guess_.resize(robot_dof_, 1);
   q_nominal_.setZero();
   q_guess_.setZero();
-  log()->trace("CS:ConstraintSolver: END");
+  log()->trace("ConstraintSolver:ctor: END");
 }
 
 ConstraintSolver::~ConstraintSolver() {
@@ -224,8 +227,8 @@ void ConstraintSolver::UpdateModel(
     mb_plant_->SetPositions(plant_context_, robot_model_idx_, pos_robot);
   } catch (std::exception const& err) {
     dexai::log()->error(
-        "ConstraintSolver::UpdateModel: "
-        "failed with error: {}. Robot reports conf: {}",
+        "ConstraintSolver:UpdateModel: failed with error: {}. Robot reports "
+        "conf: {}",
         err.what(), pos_robot.transpose());
     throw;  // rethrow it again
   }

@@ -271,12 +271,14 @@ class FrankaPlanRunner {
   /// Set parameters for stiffness and goal direction based on push direction.
   /// TODO(@anyone): long-term the stiffness can be a parameter of the push
   /// request
+  /// @deprecated
   void SetCompliantPushParameters(
       const franka::RobotState& initial_state,
       const Eigen::Vector3d& desired_ee_translation,
       const Eigen::Vector3d& translational_stiffness,
       const Eigen::Vector3d& rotational_stiffness);
 
+  /// @deprecated
   void SetCompliantPushParameters(
       const franka::RobotState& initial_state,
       const Eigen::Vector3d& desired_ee_translation) {
@@ -285,6 +287,7 @@ class FrankaPlanRunner {
                                       kDefaultRotationalStiffness);
   }
 
+  /// @deprecated
   franka::Torques ImpedanceControlCallback(
       const franka::RobotState& robot_state, franka::Duration);
 
