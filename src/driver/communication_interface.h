@@ -41,7 +41,7 @@
 ///
 /// When a plan is received, it will indicate via HasPlan() that a plan is
 /// available. The plan is moved from this communication interface to a franka
-/// plan runner when the MovePlan() is called.
+/// plan runner when the MovePlan() is called. UPDATE
 ///
 /// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
@@ -322,10 +322,7 @@ class CommunicationInterface {
   std::thread lcm_handle_thread_;
 
   std::string lcm_driver_status_channel_;
-  std::string lcm_user_stop_channel_;
   std::string lcm_compliant_push_req_channel_;
-  std::string lcm_brakes_locked_channel_;
-  std::string lcm_compliant_push_active_channel_;
   std::string lcm_sim_driver_event_trigger_channel_;
 
   std::string cancel_plan_source_;
