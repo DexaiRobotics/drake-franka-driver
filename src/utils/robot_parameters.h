@@ -182,10 +182,23 @@ class RobotParameters {
   bool simulated;
 
   // Robot Control Parameters - generated based on hostname
+
+  /// LCM channel for lcmt_iiwa_status message robot status publishing
   std::string lcm_iiwa_status_channel;
+
+  /// LCM channel for robot_msgs::robot_status_t robot status publishing which
+  /// includes more comprehensive information that's included in the
+  /// franka_driver::RobotData struct
   std::string lcm_robot_status_channel;
+
+  /// LCM channel to receive piecewise polynomial plan
   std::string lcm_plan_channel;
+
+  /// LCM channel for receiving pause, continue, and cancel plan commands
   std::string lcm_stop_channel;
+
+  /// LCM channel to receive compliant push start and stop requests
+  /// @deprecated
   std::string lcm_compliant_push_req_channel;
 
   std::string lcm_url;
@@ -207,11 +220,8 @@ class RobotParameters {
   double pos_continuity_err_tolerance {}, vel_continuity_err_tolerance {},
       acc_continuity_err_tolerance {};
 
-  //$ scales velocity and acceleration scale factors passed to toppra
-  double
-      stop_epsilon;  // used to calculate when robot counts as "stopped" // KEEP
+  double stop_epsilon;  // used to calculate when robot counts as "stopped"
   double stop_margin;  // how long robot sleeps before ready to recieve continue
-                       // // KEEP
 
   bool GenerateParametersBasedOnRobotName(const std::string& new_robot_name);
 
