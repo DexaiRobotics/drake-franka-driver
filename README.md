@@ -2,7 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/DexaiRobotics/drake-franka-driver.svg?style=shield&circle-token=a122ea0349f6e79f84f549e6155bbbfcf923d7d4)](https://circleci.com/gh/DexaiRobotics/drake-franka-driver)
 
-Drake-compatible LCM driver for the Franka PANDA research robot. This driver uses the [Franka Control Interface](https://frankaemika.github.io/docs/) and is designed for use with the [Drake](https://drake.mit.edu/) planning and control toolbox (currently up to the 2020/05/30 build).
+Drake-compatible LCM driver for the Franka PANDA research robot. This driver uses the [Franka Control Interface](https://frankaemika.github.io/docs/) and is designed for use with the [Drake](https://drake.mit.edu/) planning and control toolbox.
 
 ## Prerequisites
 
@@ -27,11 +27,12 @@ make install -j 12
 ## Building the driver
 
 ```bash
-git clone --recursive https://github.com/DexaiRobotics/drake-franka-driver.git`
-drake-franka-driver/setup.sh
+git clone --recursive https://github.com/DexaiRobotics/drake-franka-driver.git
+cd drake-franka-driver
+./setup.sh
 ```
 
-See the beginning of `setup.sh` for more flags.
+See the beginning of [`setup.sh`](setup.sh) for more flags.
 
 ## Running the driver
 
@@ -43,15 +44,22 @@ where the default robot_name is `franka_0` and the default IP is `192.168.200.0`
 
 ## Communicating with the robot
 
-### Sending commands to the robot from a drake program
+### Sending commands to the robot from another program via LCM
 
-The driver listens for commands on the `<robot_name>_cmd` LCM channel. By default this is `franka_0_cmd`.
+The driver listens for plans encoded as a piecewise polynomial of LCM type [`robot_msgs::robot_spline_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/robot_spline_t.lcm) on the `FRANKA_<ID>_PLAN` LCM channel. By default the ID is based on the first letter of the hostname of the computer running the `drake-franka-driver`.
 
-### listening to the robot response
+Currently active plans can be paused or canceled with a [`robot_msgs::pause_cmd`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/pause_cmd.lcm) LCM message via the `FRANKA_<ID>_STOP` LCM channel.
 
-The `drake-franka-driver` reports the robot status on the `<robot_name>_status` lcm channel. By default this is set to `franka_0_status`. Status is reported in a `franka_status` struct.
+If the driver is running in simulated mode, it is possible to simulate driver events like Franka control exceptions, or pressing the user stop button, on the `FRANKA_<ID>_SIM_EVENT_TRIGGER` LCM channel.
 
-## Starting driver on NUC
+### Listening to the robot response
+
+The driver publishes the following LCM channels with information about the current status:
+- `FRANKA_<ID>_STATUS` of type [`drake::lcmt_iiwa_status`](https://github.com/RobotLocomotion/drake/blob/master/lcmtypes/lcmt_iiwa_status.lcm) with information about joint positions, velocities, etc.
+- `FRANKA_<ID>_ROBOT_STATUS` of type [`robot_msgs::robot_status_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/robot_status_t.lcm) which includes more comprehensive information that's included in the `franka::RobotState` struct including end effector forces
+- `FRANKA_<ID>_DRIVER_STATUS` of type [`robot_msgs::driver_status_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/driver_status_t.lcm) which contains high level information about the driver, if it is currently running a plan, if it's paused or user stopped, etc.
+
+## Starting driver
 
 In our implementation, the NUC runs this driver to talk to the Franka Controller. There are 3 ways to start the driver.
 

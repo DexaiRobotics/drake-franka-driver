@@ -188,7 +188,7 @@ class RobotParameters {
 
   /// LCM channel for robot_msgs::robot_status_t robot status publishing which
   /// includes more comprehensive information that's included in the
-  /// franka_driver::RobotData struct
+  /// franka::RobotData struct
   std::string lcm_robot_status_channel;
 
   /// LCM channel to receive piecewise polynomial plan
