@@ -71,8 +71,8 @@ int do_main(std::string param_yaml, uint verbosity) {
 
   dexai::log()->info("Loading parameters: {}", param_yaml);
   RobotParameters params = loadYamlParameters(param_yaml, verbosity);
-  FrankaPlanRunner frankaPlanRunner(params);
-  return frankaPlanRunner.Run();
+  FrankaPlanRunner franka_plan_runner(params);
+  return franka_plan_runner.Run();
 }
 
 }  // namespace franka_driver
