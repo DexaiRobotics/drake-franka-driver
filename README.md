@@ -37,27 +37,34 @@ See the beginning of [`setup.sh`](setup.sh) for more flags.
 ## Running the driver
 
 Once built, the executable `drake-franka-driver` can be found in the `build/` directory. In order to run the driver, execute:
+
 ```bash
-drake-franka-driver <robot_name> <robot_ip_address>
+./franka.sh
 ```
-where the default robot_name is `franka_0` and the default IP is `192.168.200.0`. This enables multiple robots to be run on the same network.
+
+To run the driver in simulated mode without connecting to real Franka hardware, run the following:
+
+```bash
+export SIM_ROBOT=true
+./franka.sh
+```
 
 ## Communicating with the robot
 
 ### Sending commands to the robot from another program via LCM
 
-The driver listens for plans encoded as a piecewise polynomial of LCM type [`robot_msgs::robot_spline_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/robot_spline_t.lcm) on the `FRANKA_<ID>_PLAN` LCM channel. By default the ID is based on the first letter of the hostname of the computer running the `drake-franka-driver`.
+The driver listens for plans encoded as a piecewise polynomial of LCM type [`robot_msgs::robot_spline_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/robot_spline_t.lcm) on the `<FRANKA_ID>_PLAN` LCM channel. By default the name is `FRANKA_` plus the capitalized first letter of the hostname of the computer running the `drake-franka-driver`. The `FRANKA_ID` can be overridden by setting the `robot_name` field in the parameters file.
 
-Currently active plans can be paused or canceled with a [`robot_msgs::pause_cmd`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/pause_cmd.lcm) LCM message via the `FRANKA_<ID>_STOP` LCM channel.
+Currently active plans can be paused or canceled with a [`robot_msgs::pause_cmd`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/pause_cmd.lcm) LCM message via the `<FRANKA_ID>_STOP` LCM channel.
 
-If the driver is running in simulated mode, it is possible to simulate driver events like Franka control exceptions, or pressing the user stop button, on the `FRANKA_<ID>_SIM_EVENT_TRIGGER` LCM channel.
+If the driver is running in simulated mode, it is possible to simulate driver events like Franka control exceptions, or pressing the user stop button, on the `<FRANKA_ID>_SIM_EVENT_TRIGGER` LCM channel.
 
 ### Listening to the robot response
 
 The driver publishes the following LCM channels with information about the current status:
-- `FRANKA_<ID>_STATUS` of type [`drake::lcmt_iiwa_status`](https://github.com/RobotLocomotion/drake/blob/master/lcmtypes/lcmt_iiwa_status.lcm) with information about joint positions, velocities, etc.
-- `FRANKA_<ID>_ROBOT_STATUS` of type [`robot_msgs::robot_status_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/robot_status_t.lcm) which includes more comprehensive information that's included in the `franka::RobotState` struct including end effector forces
-- `FRANKA_<ID>_DRIVER_STATUS` of type [`robot_msgs::driver_status_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/driver_status_t.lcm) which contains high level information about the driver, if it is currently running a plan, if it's paused or user stopped, etc.
+- `<FRANKA_ID>_STATUS` of type [`drake::lcmt_iiwa_status`](https://github.com/RobotLocomotion/drake/blob/master/lcmtypes/lcmt_iiwa_status.lcm) with information about joint positions, velocities, etc.
+- `<FRANKA_ID>_ROBOT_STATUS` of type [`robot_msgs::robot_status_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/robot_status_t.lcm) which includes more comprehensive information that's included in the `franka::RobotState` struct including end effector forces
+- `<FRANKA_ID>_DRIVER_STATUS` of type [`robot_msgs::driver_status_t`](https://github.com/DexaiRobotics/robot_msgs/blob/master/lcmtypes/driver_status_t.lcm) which contains high level information about the driver, if it is currently running a plan, if it's paused or user stopped, etc.
 
 ## Starting driver
 

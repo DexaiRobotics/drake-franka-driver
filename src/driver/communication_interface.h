@@ -331,10 +331,6 @@ class CommunicationInterface {
   std::thread lcm_publish_status_thread_;
   std::thread lcm_handle_thread_;
 
-  std::string lcm_driver_status_channel_;
-  std::string lcm_compliant_push_req_channel_;
-  std::string lcm_sim_driver_event_trigger_channel_;
-
   std::string cancel_plan_source_;
 
   double lcm_publish_rate_;  // Hz

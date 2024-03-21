@@ -254,6 +254,9 @@ RobotParameters loadYamlParameters(
     p.lcm_robot_status_channel = p.robot_name + "_ROBOT_STATUS";
     p.lcm_plan_channel = p.robot_name + "_PLAN";
     p.lcm_stop_channel = p.robot_name + "_STOP";
+    p.lcm_driver_status_channel = p.robot_name + "_DRIVER_STATUS";
+    p.lcm_sim_driver_event_trigger_channel =
+        p.robot_name + "_SIM_EVENT_TRIGGER";
     p.lcm_compliant_push_req_channel = p.robot_name + "_COMPLIANT_PUSH_REQ";
     get_yaml_val_or_die(param, "lcm_url", p.lcm_url, yaml_full_path, verbose,
                         exit_code);

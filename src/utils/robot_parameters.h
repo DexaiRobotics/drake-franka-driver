@@ -197,6 +197,13 @@ class RobotParameters {
   /// LCM channel for receiving pause, continue, and cancel plan commands
   std::string lcm_stop_channel;
 
+  /// LCM channel to publish driver status
+  std::string lcm_driver_status_channel;
+
+  /// LCM channel to receive triggers for simulated driver events
+  /// like user stop, locking brakes, and control exceptions
+  std::string lcm_sim_driver_event_trigger_channel;
+
   /// LCM channel to receive compliant push start and stop requests
   /// @deprecated
   std::string lcm_compliant_push_req_channel;

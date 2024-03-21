@@ -75,14 +75,7 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                  this);
   lcm_.subscribe(params_.lcm_compliant_push_req_channel,
                  &CommunicationInterface::HandleCompliantPushReq, this);
-
-  // TODO(@anyone): define this in parameters file
-  lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
-  lcm_compliant_push_req_channel_ = params_.robot_name + "_COMPLIANT_PUSH_REQ";
-  lcm_sim_driver_event_trigger_channel_ =
-      params_.robot_name + "_SIM_EVENT_TRIGGER";
-
-  lcm_.subscribe(lcm_sim_driver_event_trigger_channel_,
+  lcm_.subscribe(params_.lcm_sim_driver_event_trigger_channel,
                  &CommunicationInterface::HandleSimDriverEventTrigger, this);
 
   dexai::log()->info("Plan channel:\t\t\t\t{}", params_.lcm_plan_channel);
@@ -92,9 +85,9 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
   dexai::log()->info("Robot Status channel:\t\t\t{}",
                      params_.lcm_robot_status_channel);
   dexai::log()->info("Driver status channel:\t\t\t{}",
-                     lcm_driver_status_channel_);
+                     params_.lcm_driver_status_channel);
   dexai::log()->info("Sim driver event trigger channel:\t{}",
-                     lcm_sim_driver_event_trigger_channel_);
+                     params_.lcm_sim_driver_event_trigger_channel);
 
   {
     std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
@@ -306,7 +299,7 @@ void CommunicationInterface::PublishRobotStatus() {
   // TODO(@syler): we don't continuosly update robot data when robot is in
   // reflex/automatic error recovery mode so those modes will never be reflected
   // in driver status
-  lcm_.publish(lcm_driver_status_channel_, &driver_status_msg);
+  lcm_.publish(params_.lcm_driver_status_channel, &driver_status_msg);
 
   if (robot_data_.has_robot_data) {
     robot_msgs::robot_status_t robot_status {
