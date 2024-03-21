@@ -99,14 +99,6 @@ target_compile_definitions(franka_driver PUBLIC HAVE_SPDLOG)
 
 target_link_libraries(franka_driver
   franka_driver_lib
-
-  # ${Franka_LIBRARIES}
-  # ${LCM_NAMESPACE}lcm
-  # gflags
-  # drake::drake
-  # yaml-cpp
-  # Threads::Threads
-  # cnpy
 )
 
 # -------------------
@@ -144,11 +136,6 @@ set(TEST_LINK_LIBRARIES
   franka_driver_lib
   GTest::gtest
   GTest::gtest_main
-  Threads::Threads
-  gflags
-  drake::drake
-  yaml-cpp
-  ${Franka_LIBRARIES}
 )
 
 foreach(_file ${GTEST_SRC_FILES})
