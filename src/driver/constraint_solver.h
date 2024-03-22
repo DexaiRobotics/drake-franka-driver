@@ -44,6 +44,12 @@
 
 namespace franka_driver {
 
+/**
+ * @brief Manages the geometric model of a robot using Drake's MultibodyPlant
+ * and SceneGraph. Initializes the robot model from parameters and a URDF file
+ * and provides access to robot parameters, URDF path, joint limits, and other
+ * model-related information.
+ */
 class ConstraintSolver {
  private:
   const RobotParameters* params_;

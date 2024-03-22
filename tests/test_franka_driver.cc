@@ -34,6 +34,17 @@
 /// @file test_franka_driver.cc
 #include <gtest/gtest.h>
 
-// ToDo add unit tests for the franka driver functions here
+#include "driver/franka_plan_runner.h"
+#include "utils/robot_parameters.h"
 
-TEST(FrankaDriver, theTruth) { EXPECT_EQ(true, true) << "true == true"; }
+using namespace franka_driver;
+
+const std::string test_params_yaml_file_name {"franka_test.yaml"};
+
+TEST(FrankaDriver, constructFrankaPlanRunner) {
+  dexai::log()->info("Loading parameters: {}", test_params_yaml_file_name);
+  const int verbosity {4};
+  RobotParameters params {
+      loadYamlParameters(test_params_yaml_file_name, verbosity)};
+  EXPECT_NO_THROW(FrankaPlanRunner franka_plan_runner(params));
+}

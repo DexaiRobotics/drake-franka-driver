@@ -38,9 +38,9 @@
 /// The interface also reports via LCM lcmt_franka_status
 /// lcmt_franka_pause_status messages).
 ///
-/// When a plan is received, it will indicate via HasPlan() that a plan is
-/// available. The plan is moved from this communication interface to a franka
-/// plan runner when the MovePlan() is called.
+/// When a plan is received, it will indicate via HasNewPlan() that a plan is
+/// available. The plan is moved from this communication interface to the
+/// franka plan runner when the PopNewPlan() is called.
 ///
 /// If a pause message is received, it will set the pause status to true and
 /// keep track of what source paused it.
@@ -75,14 +75,7 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                  this);
   lcm_.subscribe(params_.lcm_compliant_push_req_channel,
                  &CommunicationInterface::HandleCompliantPushReq, this);
-
-  // TODO(@anyone): define this in parameters file
-  lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
-  lcm_compliant_push_req_channel_ = params_.robot_name + "_COMPLIANT_PUSH_REQ";
-  lcm_sim_driver_event_trigger_channel_ =
-      params_.robot_name + "_SIM_EVENT_TRIGGER";
-
-  lcm_.subscribe(lcm_sim_driver_event_trigger_channel_,
+  lcm_.subscribe(params_.lcm_sim_driver_event_trigger_channel,
                  &CommunicationInterface::HandleSimDriverEventTrigger, this);
 
   dexai::log()->info("Plan channel:\t\t\t\t{}", params_.lcm_plan_channel);
@@ -92,9 +85,9 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
   dexai::log()->info("Robot Status channel:\t\t\t{}",
                      params_.lcm_robot_status_channel);
   dexai::log()->info("Driver status channel:\t\t\t{}",
-                     lcm_driver_status_channel_);
+                     params_.lcm_driver_status_channel);
   dexai::log()->info("Sim driver event trigger channel:\t{}",
-                     lcm_sim_driver_event_trigger_channel_);
+                     params_.lcm_sim_driver_event_trigger_channel);
 
   {
     std::scoped_lock<std::mutex> status_lock {driver_status_mutex_};
@@ -180,12 +173,13 @@ CommunicationInterface::PopNewPlan() {
           new_plan_buffer_.timepoints};
 }
 
+/// @deprecated
 std::tuple<std::unique_ptr<PosePoly>, int64_t, int16_t, PlanTimepoints>
 CommunicationInterface::PopNewCartesianPlan() {
   if (!HasNewCartesianPlan()) {
     throw std::runtime_error(
-        fmt::format("PopNewPlan: no buffered new plan available to pop; utime "
-                    "in buffer: {}",
+        fmt::format("PopNewCartesianPlan: no buffered new plan available to "
+                    "pop; utime in buffer: {}",
                     new_plan_buffer_.utime));
   }
   SetModeIfSimulated(franka::RobotMode::kMove);
@@ -305,7 +299,7 @@ void CommunicationInterface::PublishRobotStatus() {
   // TODO(@syler): we don't continuosly update robot data when robot is in
   // reflex/automatic error recovery mode so those modes will never be reflected
   // in driver status
-  lcm_.publish(lcm_driver_status_channel_, &driver_status_msg);
+  lcm_.publish(params_.lcm_driver_status_channel, &driver_status_msg);
 
   if (robot_data_.has_robot_data) {
     robot_msgs::robot_status_t robot_status {
@@ -465,6 +459,7 @@ bool CommunicationInterface::IsUserStopped(
          || (current_mode == franka::RobotMode::kUserStopped);
 }
 
+/// @deprecated
 void CommunicationInterface::HandleCompliantPushReq(
     const ::lcm::ReceiveBuffer*, const std::string&,
     const robot_msgs::bool_t* msg) {

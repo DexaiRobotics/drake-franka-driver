@@ -207,8 +207,27 @@ class FrankaPlanRunner {
   // the callback functions have to compute their result in a short time frame
   // in order to be accepted.
 
-  // @param robot_state current robot state
-  // @param period time since last callback invocation, zero on first invocation
+  /**
+   * @brief Generates joint positions for the robot based on the current robot
+   * state and the active plan.
+   *
+   * This callback function is called at each control loop iteration to
+   * determine the next set of joint positions for the Franka robot. It handles
+   * simulation control exceptions, updates internal timing based on pause
+   * status, and manages plan transitions. If a new plan is available and valid,
+   * it updates the active plan. The function also checks for plan completion
+   * and handles plan execution options, such as stopping at the expected
+   * contact point.
+   *
+   * When no active plan is present, or upon plan completion, it returns the
+   * current joint positions to finish the motion.
+   *
+   * @param robot_state The current state of the robot, including joint
+   * positions and velocities
+   * @param period Time since last callback invocation, zero on first
+   * @return A `franka::JointPositions` object indicating the next set of
+   * desired joint positions for the robot
+   */
   franka::JointPositions JointPositionCallback(
       const franka::RobotState& robot_state, franka::Duration period);
 
@@ -252,12 +271,14 @@ class FrankaPlanRunner {
   /// Set parameters for stiffness and goal direction based on push direction.
   /// TODO(@anyone): long-term the stiffness can be a parameter of the push
   /// request
+  /// @deprecated
   void SetCompliantPushParameters(
       const franka::RobotState& initial_state,
       const Eigen::Vector3d& desired_ee_translation,
       const Eigen::Vector3d& translational_stiffness,
       const Eigen::Vector3d& rotational_stiffness);
 
+  /// @deprecated
   void SetCompliantPushParameters(
       const franka::RobotState& initial_state,
       const Eigen::Vector3d& desired_ee_translation) {
@@ -266,6 +287,7 @@ class FrankaPlanRunner {
                                       kDefaultRotationalStiffness);
   }
 
+  /// @deprecated
   franka::Torques ImpedanceControlCallback(
       const franka::RobotState& robot_state, franka::Duration);
 
