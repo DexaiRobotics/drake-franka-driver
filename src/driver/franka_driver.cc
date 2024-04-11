@@ -79,7 +79,8 @@ int do_main(std::string param_yaml, uint verbosity) {
 
 int main(int argc, char** argv) {
   // Ensure app is singleton (added by 5yler):
-  std::string pid_file = "/var/run/cobot_driver.pid";
+  std::string home_dir = getenv("HOME");
+  std::string pid_file = fmt::format("{0}/.cobot_driver.pid", home_dir);
   bool kill_existing_process = true;
   bool prompt_before_kill = false;
   uint verbosity {3};
