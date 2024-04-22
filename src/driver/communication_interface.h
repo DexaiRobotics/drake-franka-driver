@@ -63,6 +63,7 @@
 #include <robot_msgs/plan_exec_opts_t.hpp>
 #include <robot_msgs/robot_spline_t.hpp>
 #include <robot_msgs/robot_status_t.hpp>
+#include <robot_msgs/string_t.hpp>
 
 #include "franka/robot_state.h"
 #include "utils/robot_parameters.h"
@@ -234,6 +235,10 @@ class CommunicationInterface {
     return pause_data_.pause_sources;
   }
 
+  std::vector<double> GetCurrentJoints() const {
+    return curr_joint_vector_;
+  }
+
   void SetPlanCompletion(const int64_t plan_utime, const bool success = true,
                          const std::string& driver_status_string = "");
 
@@ -275,6 +280,7 @@ class CommunicationInterface {
   /// indicating the contents of the pause message.
   void PublishLcmAndPauseStatus();
   void PublishRobotStatus();
+  void PublishRobotCommands();
   void PublishTriggerToChannel(const int64_t utime,
                                std::string_view lcm_channel,
                                const bool success = true,
@@ -288,6 +294,8 @@ class CommunicationInterface {
   /// @deprecated
   void HandleCompliantPushReq(const ::lcm::ReceiveBuffer*, const std::string&,
                               const robot_msgs::bool_t* msg);
+  void HandleCurrentJoint(const ::lcm::ReceiveBuffer*, const std::string&,
+                   const robot_msgs::string_t* curr_joint_msg);
 
   /// Handler for control exception and u-stop triggers for simulated driver so
   /// we can test full spectrum of driver states.
@@ -334,6 +342,8 @@ class CommunicationInterface {
   std::string cancel_plan_source_;
 
   double lcm_publish_rate_;  // Hz
+
+  std::vector<double> curr_joint_vector_ {0, 0, 0, 0, 0, 0, 0};
 };
 
 }  // namespace franka_driver
