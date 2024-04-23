@@ -50,6 +50,10 @@
 #include <chrono>   // for steady_clock, for duration
 #include <utility>  // for move
 
+#include <json.hpp>
+
+using json = nlohmann::json;
+
 #include "robot_msgs/bool_t.hpp"
 #include "robot_msgs/pause_cmd.hpp"          // for pause_cmd
 #include "robot_msgs/trigger_t.hpp"          // for trigger_t
@@ -61,6 +65,59 @@
 using franka_driver::CommunicationInterface;
 using franka_driver::PlanTimepoints;
 using utils::PauseCommandType;
+
+void trim(std::string& _string, const char* end_chars) {
+  _string.erase(0, _string.find_first_not_of(end_chars));
+  _string.erase(_string.find_last_not_of(end_chars) + 1);
+}
+
+const Eigen::IOFormat VectorXdFmt(6, 0, ", ", "\n", "[", "]");
+
+std::string to_string(Eigen::VectorXd const& ev) {
+  return fmt::format("{}", ev.transpose().format(VectorXdFmt));
+}
+
+int64_t get_current_utime() {
+  struct timeval tv;
+  gettimeofday(&tv, NULL);
+  int64_t current_utime = int64_t(tv.tv_sec * 1e6 + tv.tv_usec);
+  return current_utime;
+}
+
+std::vector<std::string> split_string(const std::string_view str) {
+  std::vector<std::string> str_vec;
+  std::string token;
+  std::stringstream ss {str.data()};
+  while (std::getline(ss, token, ',')) {
+    str_vec.push_back(token);
+  }
+  return str_vec;
+}
+
+std::vector<double> string_to_double_vector(
+    const std::string_view str) {
+  // works for vector string that looks like: [1, 2, 3, 4]
+  // whitespace negligable
+  try {
+    std::string mutable_input {str};
+    std::vector<double> output_vec;
+
+    // trim input string to just numbers with comma delimeter
+    trim(mutable_input, "' \"\t\n\r\f\v[]");
+
+    auto string_vector {split_string(mutable_input)};
+
+    for (const auto& num : string_vector) {
+      output_vec.push_back(std::stod(num));
+    }
+
+    return output_vec;
+  } catch (std::exception& e) {
+    dexai::log()->error(
+        "string_to_double_vector: failed to find vector in string '{}'", str);
+    return {};
+  }
+}
 
 CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                                                const double lcm_publish_rate,
@@ -75,8 +132,14 @@ CommunicationInterface::CommunicationInterface(const RobotParameters& params,
                  this);
   lcm_.subscribe(params_.lcm_compliant_push_req_channel,
                  &CommunicationInterface::HandleCompliantPushReq, this);
+
   lcm_.subscribe(params_.lcm_sim_driver_event_trigger_channel,
                  &CommunicationInterface::HandleSimDriverEventTrigger, this);
+  //lcm_.subscribe("SHOKUNIN_FRANKA_JOINT_CURRENT", &CommunicationInterface::HandleCurrentJoint, this);
+
+  // TODO(@anyone): define this in parameters file
+  lcm_driver_status_channel_ = params_.robot_name + "_DRIVER_STATUS";
+  lcm_compliant_push_req_channel_ = params_.robot_name + "_COMPLIANT_PUSH_REQ";
 
   dexai::log()->info("Plan channel:\t\t\t\t{}", params_.lcm_plan_channel);
   dexai::log()->info("Stop channel:\t\t\t\t{}", params_.lcm_stop_channel);
@@ -270,6 +333,7 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
   while (running_) {
     auto time_start = std::chrono::steady_clock::now();
     PublishRobotStatus();
+    PublishRobotCommands();
 
     // Sleep dynamically to achieve the desired print rate.
     auto time_end = std::chrono::steady_clock::now();
@@ -286,6 +350,19 @@ void CommunicationInterface::PublishLcmAndPauseStatus() {
     }
     std::this_thread::sleep_for(remaining_wait);
   }
+}
+
+void CommunicationInterface::PublishRobotCommands() {
+  // Try to lock data to avoid read write collisions.
+  std::unique_lock<std::mutex> lock {robot_data_mutex_};
+
+  robot_msgs::string_t msg;
+  json json_payload;
+  json_payload["commanded_positions"] = to_string(robot_data_.robot_plan_next_conf);
+  msg.data = json_payload.dump();
+  msg.utime = get_current_utime();
+
+  lcm_.publish("SHOKUNIN_FRANKA_JOINT_COMMAND", &msg);
 }
 
 void CommunicationInterface::PublishRobotStatus() {
@@ -596,6 +673,21 @@ void CommunicationInterface::HandlePlan(
   dexai::log()->info(
       "CommInterface:HandlePlan: Finished input checking plan {} in {} ms",
       new_plan_buffer_.utime, ms_accept);
+}
+
+void CommunicationInterface::HandleCurrentJoint(
+    const ::lcm::ReceiveBuffer*, const std::string&,
+    const robot_msgs::string_t* curr_joint_msg) {
+  try {
+    json data = json::parse(curr_joint_msg->data);
+    const std::string curr_joint_string {data["current_joint_positions"]};
+    curr_joint_vector_ = string_to_double_vector(curr_joint_string);
+  } catch (const std::exception& ex) {
+    dexai::log()->error(
+        "MCD:HandleCurrentJoint: Caught exception ",
+        ex.what());
+    return;
+  }
 }
 
 void CommunicationInterface::HandlePause(
